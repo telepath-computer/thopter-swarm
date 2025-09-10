@@ -120,7 +120,7 @@ if [ "$HUB_COUNT" -gt 0 ]; then
                         sleep 5
                     fi
                     fly machine destroy $HUB_ID --force
-                done
+                fi
             done
             echo -e "${CHECK} All hub machines destroyed"
             ;;
