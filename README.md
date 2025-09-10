@@ -131,20 +131,49 @@ You can create multiple thopters by issuing multiple comments with /thopter comm
 └── thopter/            # Agent containers
 ```
 
-## GitHub Authentication
+## Authentication and security
 
-Two PATs for security isolation:
+### GitHub Authentication
+
+You need two PATs for security isolation:
 
 - **`GITHUB_ISSUES_PAT`**: For the hub's issue monitoring (read/write issues)
 - **`GITHUB_AGENT_CODER_PAT`**: Thopter agent repository access (read repo, write optional)
 
-**Security recommendations:**
-- TODO: proper guide needed here for sure
-- Create a dedicated GitHub bot user, invite to your org/repos, and issue PATs from that user
-- Restrict them to `thopter/*` branch commits only (via repo rulesets)
-- Prevent force push and deletions (via repo rulesets)
-- If Claude Code or your dev environment needs secrets, set them up in a file on your golden claude(s) (note: env vars are NOT copied from golden claudes, only the /data/thopter folder tree contents).
-- Thopters run under an egress firewall to prevent secrets and code exfil, adjust ALLOWED_DOMAINS to add holes in it
+Sorry but we need to dive into github integration and access control patterns for a bit here. Bare with me and follow along.
+
+Since the coder PAT has full read/write on whatever repos it's been issued for, they could accidentally or deliberately check out other branches and mess with or completely rewrite their history, or push to special branches you're trying to keep constrained, etc. There are three strategies to constrain the scope of a bot user's write access:
+- Strategy 1: fork your repo(s) and have the bots work on forks without constraints, then issue PRs manually from the fork in a way you know is safe. This means more manual work to integrate code, and that have to sync the fork with origin often so the thopters are working off current code. Thopters don't know they're in a fork and don't know they have to sync anything. Since I'm not using the forking strategy, this needs more work to be fleshed out. For example, the issue scanner isn't designed to read issues from a main repo but contribute on a fork, you will have to open thopter work requests as issues on the fork.
+- Strategy 2 (what I use): use the main repo, but constrain bot activity to only `thopter/*` branches using rulesets that target everything except `thopter/*` branches and blocking writes, but this comes with a major overhead/admin cost - rulesets can't target just a specific user or team, they always target everyone and can only allow a bypass list. So, you also have to define a bypass list of people who are exempted from the blank restriction. I created a team called "non-thopters" and exempted them. GitHub genuinely lacks a means to target a specific user and apply constrained permissed, the convention is generally "untrusted users should fork and submit PRs."
+- Strategy 3: YOLO. Skip this stuff and allow autonomous, unsupervised Claude Code instances full read/write on your GitHub repo without branch constraints. Not recommended, but it will work until one day it decides to push to a branch you didn't ask it to and that's on you TBH.
+
+Pick your strategy and set up a user with PATs:
+- Create a dedicated GitHub bot user (e.g. mythopterbot) via GitHub web signup, with a valid email (e.g. thopterbot@yourdomain.com). Issue comments and commits will come from this user.
+- For repos managed by an org, invite this user to the org, and accept the invite as the user. You'll need two browsers with your github admin and bot user logged in respectively for this workflow.
+- For forking strategy, create a fork of the repos you want to work with just for this use case. As repo admin, add the bot user directly as a collaborator with write access on the forks via repo settings -> collaborators (the bot just being in the org is not enough).
+- For main repo access strategy, you must also add the bot as a writer contributor to the main repos, and then define the branch ruleset. The ruleset should "exclude by pattern" `thopter/*` branches and deny creation, update, deletion, and force pushes, then you must add a bypass list of human contributers which you unfortunately have to maintain yourself to ensure normal contributors don't get blocked by this new blanket deny rule outside of thopter branches.
+- As the bot user, create two fine grained personal access tokens. Name them clearly and with a date, like thopter-issues-YYMMDD and thopter-coder-YYMMDD, as you'll need to recreate them later most likely. The first needs read/write on issues in the repos (or forks, and you'll have to open the issues on the forks) you are integrating with, the second needs read/write on those repos' contents. For an org, it should be set to owned by the org and the org admin will need to approve the tokens in that case. I don't recommend using "all repos," be specific to the forks.
+- Save the values in a vault for future use in the .env files, GitHub only shows the values once.
+- Add the tokens, the owners/names of the repos, and your bot user's name+email to the .env file. This must be done deploying the hub and if the values change, recreate the hub.
+- Note: I have found that these tokens can be brittle. Create entirely new ones if things stop working.
+
+### Handling dev env secrets
+
+If Claude Code or your dev environment needs secrets, the only way is to manually set them up in a file in /data/thopter on your golden claude(s). The full contents of /data/thopter on your golden claude are copied to each thopter upon provisioning it. You can also modify the thopter base image or init script to do things you want to have happen each time.
+
+Note: env vars are NOT copied from golden claudes, only the /data/thopter folder tree contents.
+
+TODO: support a `.env.thopters` var that is sent to the hub and automatically copied to thopters for secrets.
+
+TODO: add a file `post-checkout.sh` in the thopter base image you can modify, it gets run after the provisioner has done all its git setup, cloning, right before it launches claude. Changes to that file require a rebuild of the thopter image (`rebuild-thopter.sh`) and after that rebuild will affect new thopters.
+
+### Thopter firewall
+
+Thopters run inside an egress firewall to prevent secrets and code exfil. This means Claude Code cannot do web searches, read docs for libraries etc. A whitelist of common package repos (e.g. npm, pypy, etc) are whitelisted by default, just like the [official Anthropic devcontainer example](https://github.com/anthropics/claude-code/tree/main/.devcontainer).
+
+Adjust `ALLOWED_DOMAINS` in `.env` to add holes in it. You can also disable it, but you risk code and secrets exfil from prompt injection attacks or just Claude making mistakes.
+
+TODO: integrate Context7 MCP documentation MCP server under a flag and enable that one additional domain, this is a good way to have docs without having to disable the firewall. But it does expose higher risk as this server could well contain prompt injection attacks, if I were a black hat I'd be sneaking prompt injection attacks into Context7.
 
 ## Adding prompts and golden claude options
 
