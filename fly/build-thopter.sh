@@ -82,11 +82,13 @@ if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
     docker buildx build \
       --platform linux/amd64 \
       -t $THOPTER_IMAGE \
+      --build-arg CURRENT_IMAGE="$THOPTER_IMAGE" \
       .
 else
     echo -e "${INFO} Detected AMD64 architecture, using native docker build"
     docker build \
       -t $THOPTER_IMAGE \
+      --build-arg CURRENT_IMAGE="$THOPTER_IMAGE" \
       .
 fi 
 

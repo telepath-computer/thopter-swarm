@@ -1,5 +1,9 @@
 FROM ubuntu:22.04
 
+# Build argument for current image tag
+ARG CURRENT_IMAGE
+ENV CURRENT_IMAGE=${CURRENT_IMAGE}
+
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
