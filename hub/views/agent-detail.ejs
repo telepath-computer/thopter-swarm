@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent <%= agent.id %> - Thopter Swarm Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-nav">
+        <h1>Agent: <%= agent.id %></h1>
+        <div class="nav-links">
+          <a href="/" class="back-btn">← Back</a>
+        </div>
+      </div>
+      <button onclick="window.location.reload()" class="refresh-btn">Refresh</button>
+    </header>
+
+    <main>
+      <!-- Agent Details Section -->
+      <section class="agent-detail-section">        
+        <div class="agent-detail-info">
+          <div class="detail-grid">
+            <div class="detail-row">
+              <div class="detail-label">Status:</div>
+              <div class="detail-value">
+                <span class="agent-state <%= formatters.stateClass(agent.state) %>">
+                  <%= agent.state %>
+                </span>
+              </div>
+            </div>
+            
+            <% if (agent.issue_number) { %>
+              <div class="detail-row">
+                <div class="detail-label">Issue:</div>
+                <div class="detail-value">
+                  #<%= agent.issue_number %>
+                  <% if (agent.issue_title) { %>
+                    - <%= agent.issue_title %>
+                  <% } %>
+                </div>
+              </div>
+            <% } %>
+            
+            <% if (agent.repository) { %>
+              <div class="detail-row">
+                <div class="detail-label">Repository:</div>
+                <div class="detail-value"><%= agent.repository %></div>
+              </div>
+            <% } %>
+            
+            <% if (agent.branch) { %>
+              <div class="detail-row">
+                <div class="detail-label">Branch:</div>
+                <div class="detail-value"><%= agent.branch %></div>
+              </div>
+            <% } %>
+            
+            <% if (agent.connection_string) { %>
+              <div class="detail-row">
+                <div class="detail-label">Connection:</div>
+                <div class="detail-value"><%= agent.connection_string %></div>
+              </div>
+            <% } %>
+            
+            <% if (agent.spawnedAt) { %>
+              <div class="detail-row">
+                <div class="detail-label">Spawned:</div>
+                <div class="detail-value"><%= formatters.absoluteTime(agent.spawnedAt) %></div>
+              </div>
+            <% } %>
+            
+            <% if (agent.lastActivity) { %>
+              <div class="detail-row">
+                <div class="detail-label">Last Activity:</div>
+                <div class="detail-value">
+                  <%= formatters.absoluteTime(agent.lastActivity) %> 
+                  (<%= formatters.relativeTime(agent.lastActivity) %>)
+                </div>
+              </div>
+            <% } %>
+          </div>
+        </div>
+        
+        <!-- Agent Actions -->
+        <div class="agent-actions-section">
+          <div class="action-buttons">
+            <a href="<%= formatters.terminalUrl(agent.id) %>" class="terminal-btn" target="_blank">Web Terminal</a>
+            <form action="/agent/<%= agent.id %>/kill" method="POST" onsubmit="return confirmKill()" style="display: inline;">
+              <button type="submit" class="kill-btn">Kill Agent</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- Terminal Snapshot Section -->
+      <section class="terminal-section">
+        <h2>Terminal Snapshot</h2>
+        <% if (agent.lastActivity) { %>
+          <div class="terminal-timestamp">
+            Last updated: <%= formatters.absoluteTime(agent.lastActivity) %> (<%= formatters.relativeTime(agent.lastActivity) %>)
+          </div>
+        <% } %>
+        <div class="terminal-container">
+          <pre class="terminal-output"><%= agent.screenDump %></pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    function confirmKill() {
+      return confirm('Are you sure you want to kill this agent? This action cannot be undone.');
+    }
+  </script>
+</body>
+</html>

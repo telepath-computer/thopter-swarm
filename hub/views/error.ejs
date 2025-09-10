@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error - Thopter Swarm Dashboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Thopter Swarm Dashboard</h1>
+      <a href="/" class="refresh-btn">Back to Dashboard</a>
+    </header>
+
+    <main>
+      <div class="error-container">
+        <h2>Error</h2>
+        <div class="error-message">
+          <p><strong><%= error %></strong></p>
+          <% if (message) { %>
+            <p><%= message %></p>
+          <% } %>
+        </div>
+        <div class="error-actions">
+          <a href="/" class="btn">Return to Dashboard</a>
+          <button onclick="window.location.reload()" class="btn">Try Again</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

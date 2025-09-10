@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thopter Swarm Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Thopter Swarm Dashboard</h1>
+      <div class="header-controls">
+        <!-- Operating Mode Indicator -->
+        <div class="mode-indicator">
+          <span class="mode-label">Mode:</span>
+          <span class="mode-status <%= formatters.modeClass(operatingMode) %>">
+            <%= operatingMode %>
+          </span>
+        </div>
+        
+        <!-- Pause/Resume Controls -->
+        <div class="mode-controls">
+          <% if (operatingMode === 'running') { %>
+            <form action="/control/pause" method="POST" style="display: inline;">
+              <button type="submit" class="control-btn pause-btn">Pause</button>
+            </form>
+          <% } else if (operatingMode === 'paused') { %>
+            <form action="/control/resume" method="POST" style="display: inline;">
+              <button type="submit" class="control-btn resume-btn">Resume</button>
+            </form>
+          <% } %>
+        </div>
+        
+        <button onclick="window.location.reload()" class="refresh-btn">Refresh</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Golden Claudes Section -->
+      <section class="golden-claudes-section">
+        <h2>Golden Claudes (<%= goldenClaudes.length %>)</h2>
+        
+        <% if (goldenClaudes.length === 0) { %>
+          <div class="empty-state">
+            <p>No Golden Claude instances found.</p>
+            <p>Create Golden Claudes using: <code>./fly/recreate-gc.sh [name]</code></p>
+          </div>
+        <% } else { %>
+          <div class="table-container">
+            <table class="gc-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Machine ID</th>
+                  <th>Terminal</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% goldenClaudes.forEach(gc => { %>
+                  <tr class="gc-row">
+                    <td class="gc-name-cell">
+                      <span class="gc-name">gc-<%= gc.name %></span>
+                    </td>
+                    <td class="status-cell">
+                      <span class="gc-state <%= gc.state === 'running' ? 'state-running' : 'state-stopped' %>">
+                        <%= gc.state %>
+                      </span>
+                    </td>
+                    <td class="gc-id-cell">
+                      <span class="machine-id" title="<%= gc.machineId %>">
+                        <%= gc.machineId.substring(0, 8) %>...
+                      </span>
+                    </td>
+                    <td class="terminal-cell">
+                      <% if (gc.webTerminalUrl) { %>
+                        <a href="<%= gc.webTerminalUrl %>" target="_blank" class="terminal-btn">
+                          🖥️ Terminal
+                        </a>
+                      <% } else { %>
+                        <span class="no-data">—</span>
+                      <% } %>
+                    </td>
+                    <td class="actions-cell">
+                      <span class="no-action">—</span>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </section>
+
+      <!-- Active Agents Section -->
+      <section class="agents-section">
+        <h2>Active Agents (<%= agents.length %>)</h2>
+        
+        <% if (agents.length === 0) { %>
+          <div class="empty-state">
+            <p>No active agents found.</p>
+            <p>Agents will appear here when they are spawned and running.</p>
+          </div>
+        <% } else { %>
+          <div class="table-container">
+            <table class="agents-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Status</th>
+                  <th>Age</th>
+                  <th>Last Activity</th>
+                  <th>Repository / Issue</th>
+                  <th></th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% agents.forEach(agent => { %>
+                  <tr class="agent-row">
+                    <td class="agent-id-cell">
+                      <a href="/agent/<%= agent.id %>" class="agent-id-link">
+                        <%= agent.id.substring(0, 8) %>...
+                      </a>
+                      <% if (!agent.hasObserver) { %>
+                        <span class="orphaned-indicator" title="No observer data - agent may not be responding">⚠️</span>
+                      <% } %>
+                    </td>
+                    <td class="status-cell">
+                      <span class="agent-state <%= formatters.stateClass(agent.state) %>">
+                        <%= agent.state %>
+                      </span>
+                      <% const idleDuration = formatters.idleDuration(agent.idleSince, agent.state); %>
+                      <% if (idleDuration) { %>
+                        <span class="idle-duration">(<%= idleDuration %>)</span>
+                      <% } %>
+                    </td>
+                    <td class="age-cell">
+                      <% if (agent.spawnedAt) { %>
+                        <span title="<%= formatters.absoluteTime(agent.spawnedAt) %>">
+                          <%= formatters.relativeTime(agent.spawnedAt) %>
+                        </span>
+                      <% } else { %>
+                        <span class="no-data">—</span>
+                      <% } %>
+                    </td>
+                    <td class="activity-cell">
+                      <% if (agent.lastActivity) { %>
+                        <span title="<%= formatters.absoluteTime(agent.lastActivity) %>">
+                          <%= formatters.relativeTime(agent.lastActivity) %>
+                        </span>
+                      <% } else { %>
+                        <span class="no-data">—</span>
+                      <% } %>
+                    </td>
+                    <td class="repo-issue-cell">
+                      <div class="repo-issue-content">
+                        <% if (agent.repository) { %>
+                          <div class="repo-line">
+                            <a href="<%= formatters.gitHubUrl(agent.repository) %>" target="_blank">
+                              <%= agent.repository %>
+                            </a>
+                          </div>
+                        <% } else { %>
+                          <div class="repo-line no-data">—</div>
+                        <% } %>
+                        <% if (agent.github && agent.github.issueNumber) { %>
+                          <div class="issue-line">
+                            <a href="<%= formatters.gitHubUrl(agent.repository, agent.github.issueNumber) %>" target="_blank">
+                              #<%= agent.github.issueNumber %>: <%= formatters.truncateText(agent.github.issueTitle, 50) %>
+                            </a>
+                          </div>
+                        <% } %>
+                      </div>
+                    </td>
+                    <td class="action-cell">
+                      <% if (agent.webTerminalUrl) { %>
+                        <a href="<%= agent.webTerminalUrl %>" class="table-btn terminal-btn" target="_blank" title="Open Web Terminal">
+                          Terminal
+                        </a>
+                      <% } %>
+                    </td>
+                    <td class="action-cell">
+                      <form action="/agent/<%= agent.id %>/kill" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to kill this agent? This action cannot be undone.');">
+                        <button type="submit" class="table-btn kill-btn" title="Kill Agent">
+                          Kill
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </section>
+
+      <!-- Provision Requests Section -->
+      <section class="requests-section">
+        <h2>Provision Requests (<%= provisionRequests.length %>)</h2>
+        
+        <% if (provisionRequests.length === 0) { %>
+          <div class="empty-state">
+            <p>No recent provision requests.</p>
+          </div>
+        <% } else { %>
+          <div class="requests-list">
+            <% provisionRequests.forEach(request => { %>
+              <div class="request-card">
+                <div class="request-header">
+                  <span class="request-id"><%= request.requestId %></span>
+                  <span class="request-status <%= formatters.requestStatusClass(request.status) %>">
+                    <%= request.status %>
+                  </span>
+                  <% if (request.agentId) { %>
+                    <span class="request-agent">→ <%= request.agentId.substring(0, 8) %>...</span>
+                  <% } %>
+                </div>
+                
+                <div class="request-info">
+                  <% if (request.github && request.github.issueNumber) { %>
+                    <div class="info-line">
+                      <strong>Issue:</strong> 
+                      <a href="<%= formatters.gitHubUrl(request.repository, request.github.issueNumber) %>" target="_blank">
+                        #<%= request.github.issueNumber %> - <%= formatters.truncateText(request.github.issueTitle, 60) %>
+                      </a>
+                    </div>
+                  <% } %>
+                  
+                  <div class="info-line">
+                    <strong>Repository:</strong> <%= request.repository %>
+                  </div>
+                  
+                  <div class="info-line">
+                    <strong>Created:</strong> <%= formatters.relativeTime(request.createdAt) %>
+                    <% if (request.completedAt) { %>
+                      | <strong>Completed:</strong> <%= formatters.relativeTime(request.completedAt) %>
+                    <% } %>
+                  </div>
+                  
+                  <% if (request.error) { %>
+                    <div class="info-line error-line">
+                      <strong>Error:</strong> <%= request.error %>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </section>
+
+      <!-- Destroy Requests Section -->
+      <section class="requests-section">
+        <h2>Destroy Requests (<%= destroyRequests.length %>)</h2>
+        
+        <% if (destroyRequests.length === 0) { %>
+          <div class="empty-state">
+            <p>No recent destroy requests.</p>
+          </div>
+        <% } else { %>
+          <div class="requests-list">
+            <% destroyRequests.forEach(request => { %>
+              <div class="request-card">
+                <div class="request-header">
+                  <span class="request-id"><%= request.requestId %></span>
+                  <span class="request-status <%= formatters.requestStatusClass(request.status) %>">
+                    <%= request.status %>
+                  </span>
+                  <span class="request-source"><%= request.source %></span>
+                </div>
+                
+                <div class="request-info">
+                  <div class="info-line">
+                    <strong>Agent:</strong> <%= request.agentId %>
+                  </div>
+                  
+                  <% if (request.reason) { %>
+                    <div class="info-line">
+                      <strong>Reason:</strong> <%= request.reason %>
+                    </div>
+                  <% } %>
+                  
+                  <div class="info-line">
+                    <strong>Created:</strong> <%= formatters.relativeTime(request.createdAt) %>
+                    <% if (request.completedAt) { %>
+                      | <strong>Completed:</strong> <%= formatters.relativeTime(request.completedAt) %>
+                    <% } %>
+                  </div>
+                  
+                  <% if (request.error) { %>
+                    <div class="info-line error-line">
+                      <strong>Error:</strong> <%= request.error %>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </section>
+
+      <!-- Recent Activity Logs Section -->
+      <section class="logs-section">
+        <h2>Recent Activity (<%= logs.length %>)</h2>
+        
+        <% if (logs.length === 0) { %>
+          <div class="empty-state">
+            <p>No recent activity logs.</p>
+          </div>
+        <% } else { %>
+          <div class="logs-container">
+            <% logs.forEach(log => { %>
+              <div class="log-entry <%= formatters.logLevelClass(log.level) %>">
+                <span class="log-time" title="<%= formatters.absoluteTime(log.timestamp) %>">
+                  <%= formatters.relativeTime(log.timestamp) %>
+                </span>
+                <span class="log-level"><%= log.level.toUpperCase() %></span>
+                <% if (log.agentId) { %>
+                  <span class="log-agent">[<%= log.agentId.substring(0, 8) %>...]</span>
+                <% } %>
+                <% if (log.source) { %>
+                  <span class="log-source">{<%= log.source %>}</span>
+                <% } %>
+                <span class="log-message"><%= log.message %></span>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
+      <!-- Provisioning Test Form Section -->
+      <section class="test-provision-section">
+        <h2>Test Provisioning</h2>
+        
+        <div class="test-form-container">
+          <p class="test-description">
+            Manually test the provisioning endpoint with a fake issue request.
+            This sends the same data format as the test-provision.sh script.
+          </p>
+          
+          <form id="provisionTestForm" class="provision-test-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="repository">Repository:</label>
+                <select id="repository" name="repository" required>
+                  <% configuredRepositories.forEach(repo => { %>
+                    <option value="<%= repo %>" <%= repo === testRepository ? 'selected' : '' %>><%= repo %></option>
+                  <% }); %>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label for="issueNumber">Issue Number:</label>
+                <input type="text" id="issueNumber" name="issueNumber" 
+                       value="<%= testIssueNumber %>" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="goldenClaude">Golden Claude:</label>
+                <select id="goldenClaude" name="goldenClaude">
+                  <option value="default" selected>default</option>
+                  <% goldenClaudes.forEach(gc => { %>
+                    <% if (gc.name !== 'default') { %>
+                      <option value="<%= gc.name %>"><%= gc.name %></option>
+                    <% } %>
+                  <% }); %>
+                </select>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="issueTitle">Issue Title:</label>
+              <input type="text" id="issueTitle" name="issueTitle" 
+                     value="Fix authentication bug in user login" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="issueBody">Issue Body:</label>
+              <textarea id="issueBody" name="issueBody" rows="6" required>Users are experiencing login failures when using special characters in passwords. The authentication service is throwing validation errors.
+
+Steps to reproduce:
+1. Create user with password containing @#$%
+2. Attempt to login
+3. See error
+
+Expected: Login should succeed
+Actual: ValidationError thrown
+
+/thopter</textarea>
+            </div>
+            
+            <div class="form-actions">
+              <button type="submit" class="submit-btn">
+                Submit Test Provision
+              </button>
+              <button type="button" class="generate-btn" onclick="generateRandomIssue()">
+                Generate Random Issue
+              </button>
+            </div>
+          </form>
+          
+          <div id="testResult" class="test-result" style="display: none;">
+            <h3>Response:</h3>
+            <pre id="testResultContent"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Generate random issue number
+    function generateRandomIssue() {
+      const randomIssueNumber = Math.floor(Math.random() * 1000) + 1;
+      document.getElementById('issueNumber').value = randomIssueNumber;
+    }
+
+    // Handle form submission
+    document.getElementById('provisionTestForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const submitBtn = e.target.querySelector('.submit-btn');
+      const resultDiv = document.getElementById('testResult');
+      const resultContent = document.getElementById('testResultContent');
+      
+      // Show loading state
+      submitBtn.textContent = 'Submitting...';
+      submitBtn.disabled = true;
+      resultDiv.style.display = 'none';
+      
+      try {
+        const formData = new FormData(e.target);
+        const data = {
+          repository: formData.get('repository'),
+          gc: formData.get('goldenClaude') || 'default',
+          github: {
+            issueNumber: formData.get('issueNumber'),
+            issueTitle: formData.get('issueTitle'),
+            issueBody: formData.get('issueBody'),
+            issueUrl: `https://github.com/${formData.get('repository')}/issues/${formData.get('issueNumber')}`,
+            issueAuthor: 'dashboard-user',
+            mentionAuthor: 'dashboard-user',
+            mentionLocation: 'body'
+          }
+        };
+        
+        const response = await fetch('/provision', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        // Show result
+        resultContent.textContent = JSON.stringify(result, null, 2);
+        resultDiv.style.display = 'block';
+        
+        // If successful, refresh the page after a delay to show the new agent
+        if (result.success) {
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+        
+      } catch (error) {
+        resultContent.textContent = 'Error: ' + error.message;
+        resultDiv.style.display = 'block';
+      } finally {
+        submitBtn.textContent = 'Submit Test Provision';
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
