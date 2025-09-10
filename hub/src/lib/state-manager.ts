@@ -150,22 +150,13 @@ class StateManager {
     
     // Update source-agnostic metadata
     if (status.repository) agent.repository = status.repository;
-    if (status.branch) agent.branch = status.branch;
+    if (status.workBranch) agent.workBranch = status.workBranch;
     if (status.spawned_at) agent.spawnedAt = new Date(status.spawned_at);
     
     // Update GitHub context if present
     if (status.github) {
       agent.source = 'github';
-      agent.github = {
-        issueNumber: status.github.issue_number || '',
-        issueTitle: status.github.issue_title || '',
-        issueBody: status.github.issue_body || '',
-        issueUrl: status.github.issue_url || '',
-        issueAuthor: '',
-        mentionAuthor: status.github.mention_author || '',
-        mentionLocation: 'comment',
-        mentionCommentId: status.github.mention_comment_id
-      };
+      agent.github = status.github;  // Use GitHubContext directly
     }
     
     // Log state transitions
@@ -263,14 +254,14 @@ class StateManager {
   /**
    * Add a new agent to state (used when provisioner creates agent)
    */
-  addAgent(agentId: string, machineId: string, repository?: string, branch?: string, github?: GitHubContext): AgentState {
+  addAgent(agentId: string, machineId: string, repository?: string, workBranch?: string, github?: GitHubContext): AgentState {
     const agent: AgentState = {
       id: agentId,
       machineId,
       state: 'provisioning',
       hasObserver: false,
       repository,
-      branch,
+      workBranch,
       webTerminalUrl: `http://${machineId}.vm.${this.appName}.internal:${this.webTerminalPort}/`,
       spawnedAt: new Date()
     };

@@ -23,7 +23,7 @@ coding agents spawned in containers (firecracker VMs actually) based on
 
 ## Branch Requirements
 - **You can ONLY commit to branches matching the pattern `thopter/*`**.
-- **Your branch is uniquely pre-generated and must be: `{{branchName}}`**
+- **Your branch is uniquely pre-generated and must be: `{{workBranch}}`**
 - Never commit to main, master, or any other branch outside `thopter/*`,
   although you are free to check out, diff, and merge from any branch or commit
   in the repo, as long as your new commits are on your branch only.
@@ -35,7 +35,7 @@ coding agents spawned in containers (firecracker VMs actually) based on
    - If the issue mentions a specific branch, checkout that branch first (e.g.
      `git checkout feature-xyz` if the issue is about `feature-xyz` branch)
    - Otherwise, use the default branch (usually main/master)
-5. Create your branch from the appropriate base: `git checkout -b {{branchName}}`
+5. Create your branch from the appropriate base: `git checkout -b {{workBranch}}`
 6. Explore the codebase to understand the context and existing patterns
 7. Implement your solution following project conventions
 8. Write tests if the project has a testing framework  

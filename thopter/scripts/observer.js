@@ -164,15 +164,8 @@ class SessionObserver {
       // Include issue context metadata if available
       if (this.issueContext) {
         payload.repository = this.issueContext.repository;
-        payload.branch = this.issueContext.branch;
-        payload.github = {
-          issue_number: this.issueContext.github.issueNumber,
-          issue_title: this.issueContext.github.issueTitle,
-          issue_body: this.issueContext.github.issueBody,
-          issue_url: this.issueContext.github.issueUrl,
-          mention_author: this.issueContext.github.mentionAuthor,
-          mention_comment_id: this.issueContext.github.mentionCommentId
-        };
+        payload.workBranch = this.issueContext.workBranch;
+        payload.github = this.issueContext.github;  // Use GitHubContext directly
       }
 
       // Track idle duration
