@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { AgentState, ProvisionRequest, DestroyRequest, LogEvent, OperatingMode, ThopterStatusUpdate, GoldenClaudeState, GitHubIntegrationConfig } from './types';
+import { AgentState, ProvisionRequest, DestroyRequest, LogEvent, OperatingMode, ThopterStatusUpdate, GoldenClaudeState, GitHubIntegrationConfig, GitHubContext } from './types';
 import { logger } from './logger';
 import tinyspawn from 'tinyspawn';
 
@@ -263,7 +263,7 @@ class StateManager {
   /**
    * Add a new agent to state (used when provisioner creates agent)
    */
-  addAgent(agentId: string, machineId: string, repository?: string, branch?: string): AgentState {
+  addAgent(agentId: string, machineId: string, repository?: string, branch?: string, github?: GitHubContext): AgentState {
     const agent: AgentState = {
       id: agentId,
       machineId,
@@ -274,9 +274,15 @@ class StateManager {
       webTerminalUrl: `http://${machineId}.vm.${this.appName}.internal:${this.webTerminalPort}/`,
       spawnedAt: new Date()
     };
+
+    // Add GitHub context if provided
+    if (github) {
+      agent.source = 'github';
+      agent.github = github;
+    }
     
     this.agents.set(agentId, agent);
-    logger.info(`Added new agent in provisioning state`, agentId, 'state-manager');
+    logger.info(`Added new agent in provisioning state${github ? ' with GitHub context' : ''}`, agentId, 'state-manager');
     
     return agent;
   }
