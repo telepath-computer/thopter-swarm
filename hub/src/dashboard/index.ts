@@ -27,8 +27,8 @@ router.get('/', (req: Request, res: Response) => {
   try {
     const agents = stateManager.getAllAgents();
     const goldenClaudes = stateManager.getAllGoldenClaudes();
-    const provisionRequests = stateManager.getRecentProvisionRequests(20);
-    const destroyRequests = stateManager.getRecentDestroyRequests(20);
+    const provisionRequests = stateManager.getRecentProvisionRequests(5);
+    const destroyRequests = stateManager.getRecentDestroyRequests(5);
     const logs = stateManager.getRecentLogs(50);
     const operatingMode = stateManager.getOperatingMode();
     
