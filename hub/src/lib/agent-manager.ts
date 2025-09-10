@@ -113,7 +113,8 @@ export class AgentManager {
           result.agentId,
           result.machineId,
           request.repository,
-          request.branch
+          request.branch,
+          request.github
         );
         
         logger.info(`Provision request completed: ${requestId} → agent ${result.agentId}`, result.agentId, 'agent-manager');
