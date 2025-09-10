@@ -17,9 +17,10 @@ This is v0.1 for internal testing with several constraints:
 - **Unstable provisioning**: expect thopters not to launch sometimes. Be ready to look at hub machine logs (`fly logs --machine NNN`)
 - **Weird DNS names**: like the dashboard lives at 1.hub.kv._metadata.{appname}.internal
 - **Manual lifecycle**: Agents must be killed manually; idle agents block new ones at MAX_AGENTS
-- **No PR workflow**: Agents push to `thopter/*` branches but don't create PRs
+- **No PR workflow**: Agents push to `thopter/*` branches but don't create PRs yet
 - **Auth fragility**: Claude Code credentials expire frequently, requiring re-authentication
 - **GitHub polling scale**: Not suitable for large repositories with hundreds of active issues.
+- **Awkward GitHub integration** to protect against rogue agents: heavy-handeds rulesets required that punish normal users and normal workflows
 - **Guides/docs needed**: Lots of details warrant further documentation and explanation.
 
 ## Quick start of a new swarm setup
@@ -142,10 +143,22 @@ You need two PATs for security isolation:
 
 Sorry but we need to dive into github integration and access control patterns for a bit here. Bare with me and follow along.
 
-Since the coder PAT has full read/write on whatever repos it's been issued for, they could accidentally or deliberately check out other branches and mess with or completely rewrite their history, or push to special branches you're trying to keep constrained, etc. There are three strategies to constrain the scope of a bot user's write access:
-- Strategy 1: fork your repo(s) and have the bots work on forks without constraints, then issue PRs manually from the fork in a way you know is safe. This means more manual work to integrate code, and that have to sync the fork with origin often so the thopters are working off current code. Thopters don't know they're in a fork and don't know they have to sync anything. Since I'm not using the forking strategy, this needs more work to be fleshed out. For example, the issue scanner isn't designed to read issues from a main repo but contribute on a fork, you will have to open thopter work requests as issues on the fork.
-- Strategy 2 (what I use): use the main repo, but constrain bot activity to only `thopter/*` branches using rulesets that target everything except `thopter/*` branches and blocking writes, but this comes with a major overhead/admin cost - rulesets can't target just a specific user or team, they always target everyone and can only allow a bypass list. So, you also have to define a bypass list of people who are exempted from the blanket restriction. I created a team called "non-thopters" and exempted them. GitHub genuinely lacks a means to target a specific user and apply constrained permissed, the convention is generally "untrusted users should fork and submit PRs."
+I'm still figuring out what the best authentication and constraints system is for GitHub here. Help/advice needed! Maybe GitHub apps is the right way?
+
+Since the coder PAT has full read/write on whatever repos it's been issued for, they could accidentally or deliberately check out other branches and mess with or completely rewrite their history, or push to special branches you're trying to keep constrained, etc. There are three strategies to constrain the scope of a bot user's PAT write access:
+- Strategy 1: fork your repo(s) and have the bots work on forks without constraints, then issue PRs manually from the fork in a way you know is safe. 
+  - This means more manual work to integrate code, and that have to sync the fork with origin often so the thopters are working off current code.
+  - Thopters don't know they're in a fork and don't know they have to sync anything. 
+  - Since I'm not using the forking strategy, this needs more work to be fleshed out.
+  - For example, the issue scanner isn't designed to read issues from a main repo but contribute on a fork, thopter work requests must be issues on the fork.
+- Strategy 2 (what I use, which is not great): use the main repo, but constrain bot activity to only `thopter/*` branches using draconian, friction-inducing rulesets that target everything except `thopter/*` branches and blocking writes
+  - these rulesets can't target just a specific user or team, they always target everyone and can only allow a bypass list. this means by default, everyone gets blocked from normal activity and then the bypass list re-opens it.
+  - So, you also have to define a bypass list of people who are exempted from the blanket restriction. I created a team called "non-thopters" and exempted them.
+  - Another major pain points is that PRs now always show up as "blocked," and you have to manually check the "bypass the rules" box to merge any old regular PR between branches, from a feature branch to main, etc. The PR interface is not smart enough to know you are exempted from the rule.
+  - GitHub genuinely lacks a means to target a specific user and apply constrained permissed, the convention is generally "untrusted users should fork and submit PRs"
 - Strategy 3: YOLO. Skip this stuff and allow autonomous, unsupervised Claude Code instances full read/write on your GitHub repo without branch constraints. Not recommended, but it will work until one day it decides to push to a branch you didn't ask it to and that's on you TBH.
+
+TODO: another idea could be to not issue the PAT access to Claude Code, have a separate root-owned process with the PAT, and allow Claude Code to only say "okay push my changes" via some kind of message system, and then trusted code is what issues the push commands using PATs. in other words give claude an opaque wat to trigger a  pre-authenticated `git push origin thopter/my-preconfigured-branch` command. This could be good?
 
 Pick your strategy and set up a user with PATs:
 - Create a dedicated GitHub bot user (e.g. mythopterbot) via GitHub web signup, with a valid email (e.g. thopterbot@yourdomain.com). Issue comments and commits will come from this user.
