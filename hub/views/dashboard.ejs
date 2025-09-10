@@ -68,7 +68,7 @@
                     </td>
                     <td class="gc-id-cell">
                       <span class="machine-id" title="<%= gc.machineId %>">
-                        <%= gc.machineId.substring(0, 8) %>...
+                        <%= gc.machineId %>
                       </span>
                     </td>
                     <td class="terminal-cell">
@@ -105,8 +105,8 @@
                   <th>ID</th>
                   <th>Status</th>
                   <th>Age</th>
-                  <th>Last Activity</th>
-                  <th>Repository / Issue</th>
+                  <th>Last Ping</th>
+                  <th>Task</th>
                   <th></th>
                   <th></th>
                 </tr>
@@ -116,7 +116,7 @@
                   <tr class="agent-row">
                     <td class="agent-id-cell">
                       <a href="/agent/<%= agent.id %>" class="agent-id-link">
-                        <%= agent.id.substring(0, 8) %>...
+                        <%= agent.id %>
                       </a>
                       <% if (!agent.hasObserver) { %>
                         <span class="orphaned-indicator" title="No observer data - agent may not be responding">⚠️</span>
