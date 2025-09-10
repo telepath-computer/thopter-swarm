@@ -32,23 +32,30 @@ if [ -f ".env" ]; then
     source .env
 fi
 
-# Check if hub exists
-echo "1. Checking for existing hub machine..."
-if ! fly machines list --json | jq -e '.[] | select(.name=="hub")' > /dev/null 2>&1; then
-    echo -e "${INFO} No hub machine found"
+# Check for hub machines
+echo "1. Checking for existing hub machines..."
+HUB_MACHINES=$(fly machines list --json | jq -r '.[] | select(.name | startswith("hub-")) | .name' 2>/dev/null || echo "")
+HUB_COUNT=$(echo "$HUB_MACHINES" | grep -c . 2>/dev/null || echo "0")
+
+if [ "$HUB_COUNT" -eq 0 ]; then
+    echo -e "${INFO} No hub machines found"
     exit 0
 fi
 
-HUB_ID=$(fly machines list --json | jq -r '.[] | select(.name=="hub") | .id')
-HUB_STATE=$(fly machines list --json | jq -r '.[] | select(.name=="hub") | .state')
-
-echo -e "${WARNING} Found hub machine: $HUB_ID (state: $HUB_STATE)"
+echo -e "${WARNING} Found $HUB_COUNT hub machine(s):"
+echo "$HUB_MACHINES" | while read -r hub_name; do
+    if [ -n "$hub_name" ]; then
+        HUB_ID=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .id')
+        HUB_STATE=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .state')
+        echo -e "  ${INFO} $hub_name ($HUB_ID) - state: $HUB_STATE"
+    fi
+done
 echo ""
-echo "⚠️  WARNING: This will destroy the hub machine!"
+echo "⚠️  WARNING: This will destroy ALL hub machines!"
 echo ""
 echo "Options:"
 echo "1. Cancel (exit)"
-echo "2. Destroy hub machine"
+echo "2. Destroy all hub machines"
 echo ""
 read -p "Choose option (1 or 2): " choice
 
@@ -68,41 +75,56 @@ esac
 
 echo ""
 
-# Stop hub if running
-if [ "$HUB_STATE" = "started" ]; then
-    echo "2. Stopping hub machine..."
-    fly machine stop $HUB_ID
-    
-    echo "Waiting for hub to stop..."
-    for i in {1..10}; do
-        CURRENT_STATE=$(fly machines list --json | jq -r ".[] | select(.id==\"$HUB_ID\") | .state")
-        if [ "$CURRENT_STATE" = "stopped" ]; then
-            echo -e "${CHECK} Hub machine stopped"
-            break
+# Stop and destroy all hub machines
+echo "2. Processing hub machines..."
+DESTROYED_COUNT=0
+FAILED_COUNT=0
+
+echo "$HUB_MACHINES" | while read -r hub_name; do
+    if [ -n "$hub_name" ]; then
+        HUB_ID=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .id')
+        HUB_STATE=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .state')
+        
+        echo "  Processing $hub_name ($HUB_ID)..."
+        
+        # Stop if running
+        if [ "$HUB_STATE" = "started" ]; then
+            echo "    Stopping machine..."
+            if fly machine stop $HUB_ID; then
+                echo "    Waiting for stop..."
+                for i in {1..10}; do
+                    CURRENT_STATE=$(fly machines list --json | jq -r ".[] | select(.id==\"$HUB_ID\") | .state" 2>/dev/null || echo "destroyed")
+                    if [ "$CURRENT_STATE" = "stopped" ] || [ "$CURRENT_STATE" = "destroyed" ]; then
+                        break
+                    fi
+                    echo "    Waiting for stop... ($i/10)"
+                    sleep 2
+                done
+            else
+                echo -e "    ${WARNING} Failed to stop cleanly, will force destroy"
+            fi
         fi
-        echo "Waiting for stop... ($i/10)"
-        sleep 2
-    done
-    
-    # Check if it actually stopped
-    FINAL_STATE=$(fly machines list --json | jq -r ".[] | select(.id==\"$HUB_ID\") | .state")
-    if [ "$FINAL_STATE" != "stopped" ]; then
-        echo -e "${WARNING} Hub didn't stop cleanly (state: $FINAL_STATE), forcing destruction..."
+        
+        # Destroy machine
+        echo "    Destroying machine..."
+        if fly machine destroy $HUB_ID --force; then
+            echo -e "    ${CHECK} $hub_name destroyed successfully"
+            DESTROYED_COUNT=$((DESTROYED_COUNT + 1))
+        else
+            echo -e "    ${RED}${CROSS} Failed to destroy $hub_name${NC}"
+            FAILED_COUNT=$((FAILED_COUNT + 1))
+        fi
+        
+        echo ""
     fi
+done
+
+# Final status outside the subshell
+HUB_REMAINING=$(fly machines list --json | jq '[.[] | select(.name | startswith("hub-"))] | length' 2>/dev/null || echo "0")
+if [ "$HUB_REMAINING" -eq 0 ]; then
+    echo -e "${CHECK} All hub machines destroyed successfully"
 else
-    echo "2. Hub machine is already stopped"
-fi
-
-echo ""
-
-# Destroy hub machine
-echo "3. Destroying hub machine..."
-fly machine destroy $HUB_ID --force
-
-if [ $? -eq 0 ]; then
-    echo -e "${CHECK} Hub machine destroyed successfully"
-else
-    echo -e "${RED}${CROSS} Failed to destroy hub machine${NC}"
+    echo -e "${RED}${CROSS} $HUB_REMAINING hub machines still remain${NC}"
     exit 1
 fi
 
@@ -114,8 +136,8 @@ echo "========================================"
 echo ""
 
 echo -e "${GREEN}Cleaned up:${NC}"
-echo "  ✓ Hub machine destroyed"
+echo "  ✓ All hub machines destroyed"
 echo ""
-echo -e "${GREEN}Result: Hub destroyed - you can run fly/recreate-hub.sh to recreate${NC}"
+echo -e "${GREEN}Result: Hub(s) destroyed - you can run fly/recreate-hub.sh to recreate${NC}"
 
 echo ""

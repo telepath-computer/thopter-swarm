@@ -74,12 +74,13 @@ done
 echo -e "${INFO} App: $APP_NAME, Region: $REGION"
 echo ""
 
-# Check if hub already exists
+# Check if any hub machine already exists (hub-* pattern)
 echo "1. Checking for existing hub machine..."
-if fly machines list --json | jq -e '.[] | select(.name=="hub")' > /dev/null 2>&1; then
-    HUB_ID=$(fly machines list --json | jq -r '.[] | select(.name=="hub") | .id')
-    HUB_STATE=$(fly machines list --json | jq -r '.[] | select(.name=="hub") | .state')
-    echo -e "${WARNING} Hub machine already exists: $HUB_ID (state: $HUB_STATE)"
+if fly machines list --json | jq -e '.[] | select(.name | startswith("hub-"))' > /dev/null 2>&1; then
+    HUB_ID=$(fly machines list --json | jq -r '.[] | select(.name | startswith("hub-")) | .id')
+    HUB_STATE=$(fly machines list --json | jq -r '.[] | select(.name | startswith("hub-")) | .state')
+    HUB_NAME=$(fly machines list --json | jq -r '.[] | select(.name | startswith("hub-")) | .name')
+    echo -e "${WARNING} Hub machine already exists: $HUB_NAME ($HUB_ID, state: $HUB_STATE)"
     
     if [ "$FORCE_RECREATE" = true ]; then
         echo -e "${WARNING} --force flag specified, destroying existing hub machine..."
@@ -130,12 +131,15 @@ fi
 
 echo ""
 
-# Generate unique tag for this deployment
+# Generate unique tag and machine name for this deployment
+EPOCH_SECONDS=$(date +%s)
 HUB_TAG="hub-$(date +%Y%m%d-%H%M%S)"
+HUB_MACHINE_NAME="hub-$EPOCH_SECONDS"
 HUB_IMAGE="registry.fly.io/$APP_NAME:$HUB_TAG"
 
 echo "3. Building hub image..."
 echo -e "${INFO} Image tag: $HUB_TAG"
+echo -e "${INFO} Machine name: $HUB_MACHINE_NAME"
 
 # todo: figure out how to properly use fly's builder. it was working for me,
 # then stopped working, and now refuses to build anything but the hello world
@@ -186,7 +190,7 @@ echo -e "${ROCKET} Starting hub with image: $HUB_IMAGE"
 METADATA_SERVICE_HOST=1.redis.kv._metadata.${APP_NAME}.internal
 
 fly machine run $HUB_IMAGE \
-    --name hub \
+    --name $HUB_MACHINE_NAME \
     --vm-size=$HUB_VM_SIZE \
     --autostop=off \
     --region $REGION \
@@ -213,7 +217,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Get hub machine ID
-HUB_ID=$(fly machines list --json | jq -r '.[] | select(.name=="hub") | .id')
+HUB_ID=$(fly machines list --json | jq -r --arg name "$HUB_MACHINE_NAME" '.[] | select(.name==$name) | .id')
 
 echo -e "${CHECK} Hub machine launched successfully"
 echo -e "${INFO} Hub ID: $HUB_ID"

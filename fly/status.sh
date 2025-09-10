@@ -75,11 +75,25 @@ fi
 # 3. Hub Status
 echo ""
 echo -e "${BLUE}Hub Status:${NC}"
-if fly machines list --json | jq -e '.[] | select(.name=="hub")' > /dev/null 2>&1; then
-    HUB_ID=$(fly machines list --json | jq -r '.[] | select(.name=="hub") | .id')
-    HUB_STATE=$(fly machines list --json | jq -r '.[] | select(.name=="hub") | .state')
-    HUB_IMAGE=$(fly machines list --json | jq -r '.[] | select(.name=="hub") | .image_ref.tag' 2>/dev/null || echo "unknown")
-    HUB_REGION=$(fly machines list --json | jq -r '.[] | select(.name=="hub") | .region')
+HUB_MACHINES=$(fly machines list --json | jq -r '.[] | select(.name | startswith("hub-")) | .name' 2>/dev/null || echo "")
+HUB_COUNT=$(echo "$HUB_MACHINES" | grep -c . 2>/dev/null || echo "0")
+
+if [ "$HUB_COUNT" -gt 1 ]; then
+    echo -e "  ${WARNING} Found $HUB_COUNT hub machines (expected 1):"
+    echo "$HUB_MACHINES" | while read -r hub_name; do
+        if [ -n "$hub_name" ]; then
+            HUB_ID=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .id')
+            HUB_STATE=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .state')
+            HUB_REGION=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .region')
+            echo -e "    ${INFO} $hub_name ($HUB_ID) $HUB_STATE in $HUB_REGION"
+        fi
+    done
+elif [ "$HUB_COUNT" -eq 1 ]; then
+    HUB_NAME=$(echo "$HUB_MACHINES" | head -1)
+    HUB_ID=$(fly machines list --json | jq -r --arg name "$HUB_NAME" '.[] | select(.name==$name) | .id')
+    HUB_STATE=$(fly machines list --json | jq -r --arg name "$HUB_NAME" '.[] | select(.name==$name) | .state')
+    HUB_IMAGE=$(fly machines list --json | jq -r --arg name "$HUB_NAME" '.[] | select(.name==$name) | .image_ref.tag' 2>/dev/null || echo "unknown")
+    HUB_REGION=$(fly machines list --json | jq -r --arg name "$HUB_NAME" '.[] | select(.name==$name) | .region')
     
     if [ "$HUB_STATE" = "started" ]; then
         echo -e "  ${CHECK} hub ($HUB_ID) running in $HUB_REGION"
@@ -174,7 +188,7 @@ echo -e "${BLUE}Resource Summary:${NC}"
 
 # Count machines
 TOTAL_MACHINES=$(fly machines list --json | jq '. | length' 2>/dev/null || echo "0")
-HUB_COUNT=$(fly machines list --json | jq '[.[] | select(.name=="hub")] | length' 2>/dev/null || echo "0")
+HUB_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("hub-"))] | length' 2>/dev/null || echo "0")
 METADATA_COUNT=$(fly machines list --json | jq '[.[] | select(.name=="metadata")] | length' 2>/dev/null || echo "0")
 GC_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("gc-"))] | length' 2>/dev/null || echo "0")
 AGENT_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("thopter-"))] | length' 2>/dev/null || echo "0")
