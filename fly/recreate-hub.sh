@@ -74,40 +74,55 @@ done
 echo -e "${INFO} App: $APP_NAME, Region: $REGION"
 echo ""
 
-# Check if any hub machine already exists (hub-* pattern)
-echo "1. Checking for existing hub machine..."
-if fly machines list --json | jq -e '.[] | select(.name | startswith("hub-"))' > /dev/null 2>&1; then
-    HUB_ID=$(fly machines list --json | jq -r '.[] | select(.name | startswith("hub-")) | .id')
-    HUB_STATE=$(fly machines list --json | jq -r '.[] | select(.name | startswith("hub-")) | .state')
-    HUB_NAME=$(fly machines list --json | jq -r '.[] | select(.name | startswith("hub-")) | .name')
-    echo -e "${WARNING} Hub machine already exists: $HUB_NAME ($HUB_ID, state: $HUB_STATE)"
+# Check for any existing hub machines (hub-* pattern)
+echo "1. Checking for existing hub machines..."
+HUB_MACHINES=$(fly machines list --json | jq -r '.[] | select(.name | startswith("hub-")) | .name' 2>/dev/null || echo "")
+HUB_COUNT=$(echo "$HUB_MACHINES" | grep -c . 2>/dev/null || echo "0")
+
+if [ "$HUB_COUNT" -gt 0 ]; then
+    echo -e "${WARNING} Found $HUB_COUNT existing hub machine(s):"
+    echo "$HUB_MACHINES" | while read -r hub_name; do
+        if [ -n "$hub_name" ]; then
+            HUB_ID=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .id')
+            HUB_STATE=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .state')
+            echo -e "  ${INFO} $hub_name ($HUB_ID) - state: $HUB_STATE"
+        fi
+    done
     
     if [ "$FORCE_RECREATE" = true ]; then
-        echo -e "${WARNING} --force flag specified, destroying existing hub machine..."
+        echo -e "${WARNING} --force flag specified, destroying all existing hub machines..."
         choice=2
     else
         echo ""
         echo "Options:"
         echo "1. Keep existing hub (exit)"
-        echo "2. Destroy and recreate hub"
+        echo "2. Destroy all hubs and recreate"
         echo ""
         read -p "Choose option (1 or 2): " choice
     fi
     
     case $choice in
         1)
-            echo -e "${INFO} Keeping existing hub machine"
+            echo -e "${INFO} Keeping existing hub machines"
             exit 0
             ;;
         2)
-            echo -e "${WARNING} Destroying existing hub machine..."
-            if [ "$HUB_STATE" = "started" ]; then
-                fly machine stop $HUB_ID
-                echo "Waiting for hub to stop..."
-                sleep 5
-            fi
-            fly machine destroy $HUB_ID --force
-            echo -e "${CHECK} Hub machine destroyed"
+            echo -e "${WARNING} Destroying all existing hub machines..."
+            echo "$HUB_MACHINES" | while read -r hub_name; do
+                if [ -n "$hub_name" ]; then
+                    HUB_ID=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .id')
+                    HUB_STATE=$(fly machines list --json | jq -r --arg name "$hub_name" '.[] | select(.name==$name) | .state')
+                    
+                    echo "  Destroying $hub_name ($HUB_ID)..."
+                    if [ "$HUB_STATE" = "started" ]; then
+                        fly machine stop $HUB_ID
+                        echo "  Waiting for $hub_name to stop..."
+                        sleep 5
+                    fi
+                    fly machine destroy $HUB_ID --force
+                done
+            done
+            echo -e "${CHECK} All hub machines destroyed"
             ;;
         *)
             echo -e "${RED}${CROSS} Invalid choice${NC}"
@@ -115,7 +130,7 @@ if fly machines list --json | jq -e '.[] | select(.name | startswith("hub-"))' >
             ;;
     esac
 else
-    echo -e "${CHECK} No existing hub machine found"
+    echo -e "${CHECK} No existing hub machines found"
 fi
 
 echo ""
