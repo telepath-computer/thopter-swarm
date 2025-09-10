@@ -151,6 +151,9 @@ class SessionObserver {
 
   async updateHubState(state, screenDump) {
     try {
+      // Reload issue context every time to avoid race conditions
+      await this.loadIssueContext();
+
       const now = new Date().toISOString();
       const payload = {
         agent_id: this.agentId,
