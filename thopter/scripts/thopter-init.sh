@@ -42,7 +42,7 @@ fi
 
 # Phase 4: Setup network firewall (as root before switching to thopter user)
 echo "Setting up network firewall..."
-/usr/local/bin/firewall.sh
+/usr/local/bin/firewall.js
 
 # If credentials were injected during container setup, fix ownership
 if [ -d "/data/thopter/.claude" ]; then

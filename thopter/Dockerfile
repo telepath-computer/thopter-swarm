@@ -108,8 +108,8 @@ RUN echo "set -g mouse off" > /etc/tmux.conf && \
     echo "set -g default-terminal 'tmux-256color'" >> /etc/tmux.conf && \
     echo "set -ga terminal-overrides ',*256col*:Tc'" >> /etc/tmux.conf
 
-COPY scripts/firewall.sh /usr/local/bin/firewall.sh
-RUN chmod +x /usr/local/bin/firewall.sh
+COPY scripts/firewall.js /usr/local/bin/firewall.js
+RUN chmod +x /usr/local/bin/firewall.js
 
 # Create init script that transitions from root to thopter user
 COPY scripts/thopter-init.sh /usr/local/bin/thopter-init.sh
