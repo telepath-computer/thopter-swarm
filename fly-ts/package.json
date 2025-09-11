@@ -1,0 +1,36 @@
+{
+  "name": "thopter-swarm-deployment",
+  "version": "1.0.0",
+  "description": "TypeScript deployment scripts for Thopter Swarm on Fly.io",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "dev": "tsc && node dist/scripts/status.js",
+    "preflight": "tsc && node dist/scripts/preflight.js",
+    "status": "tsc && node dist/scripts/status.js",
+    "build-thopter": "tsc && node dist/scripts/build-thopter.js",
+    "destroy-metadata": "tsc && node dist/scripts/destroy-metadata.js",
+    "test": "echo 'Tests not implemented yet'"
+  },
+  "dependencies": {
+    "@types/node": "^20.11.0",
+    "minimist": "^1.2.8",
+    "chalk": "^4.1.2",
+    "inquirer": "^8.2.6"
+  },
+  "devDependencies": {
+    "@types/minimist": "^1.2.5",
+    "@types/inquirer": "^8.2.10",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "fly-ts-preflight": "./dist/scripts/preflight.js",
+    "fly-ts-status": "./dist/scripts/status.js",
+    "fly-ts-build-thopter": "./dist/scripts/build-thopter.js",
+    "fly-ts-destroy-metadata": "./dist/scripts/destroy-metadata.js"
+  }
+}
