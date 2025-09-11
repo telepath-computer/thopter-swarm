@@ -6,12 +6,18 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "dev": "tsc && node dist/scripts/status.js",
+    "test": "echo 'Tests not implemented yet'",
     "preflight": "tsc && node dist/scripts/preflight.js",
     "status": "tsc && node dist/scripts/status.js",
     "build-thopter": "tsc && node dist/scripts/build-thopter.js",
+    "ensure-metadata": "tsc && node dist/scripts/ensure-metadata.js",
+    "recreate-gc": "tsc && node dist/scripts/recreate-gc.js",
+    "recreate-hub": "tsc && node dist/scripts/recreate-hub.js",
     "destroy-metadata": "tsc && node dist/scripts/destroy-metadata.js",
-    "test": "echo 'Tests not implemented yet'"
+    "destroy-gc": "tsc && node dist/scripts/destroy-gc.js",
+    "destroy-hub": "tsc && node dist/scripts/destroy-hub.js",
+    "destroy-thopters": "tsc && node dist/scripts/destroy-thopters.js",
+    "test-fake-issue": "tsc && node dist/scripts/test-fake-issue.js"
   },
   "dependencies": {
     "@types/node": "^20.11.0",
