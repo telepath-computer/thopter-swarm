@@ -137,56 +137,27 @@ fi
 
 echo ""
 
-# Generate unique tag for this deployment
-THOPTER_TAG="thopter-$(date +%Y%m%d-%H%M%S)"
-THOPTER_IMAGE="registry.fly.io/$APP_NAME:$THOPTER_TAG"
-
+# Build thopter image using separate build script
 echo "3. Building thopter image..."
-echo -e "${INFO} Image tag: $THOPTER_TAG"
-
-# Use local Docker build instead of fly deploy
-cd thopter
-
-# Detect platform and use appropriate Docker command
-ARCH=$(uname -m)
-if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    echo -e "${INFO} Detected ARM64 architecture, using docker buildx for cross-compilation"
-    docker buildx build \
-      --platform linux/amd64 \
-      -t $THOPTER_IMAGE \
-      .
-else
-    echo -e "${INFO} Detected AMD64 architecture, using native docker build"
-    docker build \
-      -t $THOPTER_IMAGE \
-      .
-fi 
+./fly/build-thopter.sh
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}${CROSS} Failed to build thopter image${NC}"
     exit 1
 fi
 
-# Push to fly registry
-fly auth docker
-docker push $THOPTER_IMAGE
-# one more time, a crude solution, but sometimes auth expires too fast and the
-# push doesn't complete
-fly auth docker
-docker push $THOPTER_IMAGE
-
-cd ..
-
-echo -e "${CHECK} Thopter image built and pushed successfully"
-
-# Update metadata service with new thopter image
-echo -e "${INFO} Updating metadata service with thopter image information..."
+# Get the latest thopter image from metadata service
+echo -e "${INFO} Retrieving thopter image from metadata service..."
 METADATA_SERVICE_HOST=1.redis.kv._metadata.${APP_NAME}.internal
 if redis-cli -h $METADATA_SERVICE_HOST -t 10 ping >/dev/null 2>&1; then
-    redis-cli -h $METADATA_SERVICE_HOST HSET metadata THOPTER_IMAGE "$THOPTER_IMAGE"
-    echo -e "${CHECK} Metadata service updated with thopter image: $THOPTER_IMAGE"
+    THOPTER_IMAGE=$(redis-cli -h $METADATA_SERVICE_HOST HGET metadata THOPTER_IMAGE)
+    if [ -z "$THOPTER_IMAGE" ]; then
+        echo -e "${RED}${CROSS} Could not retrieve thopter image from metadata service${NC}"
+        exit 1
+    fi
+    echo -e "${CHECK} Retrieved thopter image: $THOPTER_IMAGE"
 else
-    echo -e "${RED}${CROSS} Could not update metadata service (service discovery not responding)"
+    echo -e "${RED}${CROSS} Could not connect to metadata service${NC}"
     exit 1
 fi
 

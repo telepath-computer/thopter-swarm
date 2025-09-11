@@ -89,11 +89,9 @@ TABLE=thopter
 SET4=allowed_ipv4
 SET6=allowed_ipv6
 
-# Remove existing table to avoid conflicts (does not touch other tables)
-if nft list table inet "$TABLE" >/dev/null 2>&1; then
-  log_info "delete existing table inet $TABLE"
-  nft delete table inet "$TABLE"
-fi
+# Flush entire ruleset to avoid conflicts with persisted state
+log_info "flush entire nftables ruleset to avoid element conflicts"
+nft flush ruleset
 
 # --- compose nft batch into a temp file (no shell syntax inside batch) ---
 NF_FILE="$(mktemp /tmp/nft-apply.XXXXXX.nft)"
@@ -107,15 +105,9 @@ add set inet $TABLE $SET4 { type ipv4_addr; flags interval; }
 add set inet $TABLE $SET6 { type ipv6_addr; flags interval; }
 EOF
 
-# Populate sets with resolved host IPs (point-in-time)
-for ip in "${uniq_v4[@]}"; do
-  printf 'add element inet %s %s { %s }\n' "$TABLE" "$SET4" "$ip" >>"$NF_FILE"
-done
-for ip in "${uniq_v6[@]}"; do
-  printf 'add element inet %s %s { %s }\n' "$TABLE" "$SET6" "$ip" >>"$NF_FILE"
-done
-
-# Populate sets with GitHub meta CIDRs (api, web, packages)
+# Populate sets with GitHub meta CIDRs first (api, web, packages)
+# this is important because if we put the IPs in first, the CIDRs that contain
+# them will be rejected as duplicates.
 if [[ ${#GH_META_CIDRS[@]} -gt 0 ]]; then
   for cidr in "${GH_META_CIDRS[@]}"; do
     if [[ "$cidr" == *:* ]]; then
@@ -127,6 +119,14 @@ if [[ ${#GH_META_CIDRS[@]} -gt 0 ]]; then
     fi
   done
 fi
+
+# Populate sets with resolved host IPs (point-in-time)
+for ip in "${uniq_v4[@]}"; do
+  printf 'add element inet %s %s { %s }\n' "$TABLE" "$SET4" "$ip" >>"$NF_FILE"
+done
+for ip in "${uniq_v6[@]}"; do
+  printf 'add element inet %s %s { %s }\n' "$TABLE" "$SET6" "$ip" >>"$NF_FILE"
+done
 
 # OUTPUT rules (quotes are literal for nft)
 cat >>"$NF_FILE" <<'EOF'
@@ -158,9 +158,19 @@ if [[ "${DEBUG:-0}" == "1" ]]; then
   printf '-----------------\n' >&2
 fi
 
-# Apply batch
-log_info "apply nft batch"
-nft -f "$NF_FILE"
+# Apply batch line by line and don't die on errors, which are caused by
+# duplication errors. the problem is that the github CIDRs incldue the IPs we
+# resolve via DNS, and nftables rejects adding IPs covered by existing CIDR
+# rules. TODO: find a better way. rewrite this script in a real programming
+# language where we can create a non-overlapping set of IPs and CIDRs to
+# populate.
+log_info "apply nft batch line by line"
+while IFS= read -r line; do
+  # Skip empty lines and comments
+  [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]] && {
+    nft $line 2>/dev/null || true
+  }
+done < "$NF_FILE"
 
 # Persist base structure (static; dynamic set contents are populated by running this script)
 CONF=/etc/nftables.conf

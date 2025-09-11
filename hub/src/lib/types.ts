@@ -37,18 +37,11 @@ export interface ThopterStatusUpdate {
   
   // Source-agnostic metadata
   repository?: string;
-  branch?: string;
+  workBranch?: string;
   spawned_at?: string;
   
   // Source-specific contexts
-  github?: {
-    issue_number?: string;
-    issue_title?: string;
-    issue_body?: string;
-    issue_url?: string;
-    mention_author?: string;
-    mention_comment_id?: number;
-  };
+  github?: GitHubContext;
 }
 
 // Internal agent state
@@ -59,10 +52,10 @@ export interface AgentState {
   
   // Core fields
   repository?: string;
-  branch?: string;
+  workBranch?: string;
   spawnedAt?: Date;
   lastActivity?: Date;
-  idleSince?: Date;
+  idle_since?: Date;
   screenDump?: string;
   webTerminalUrl?: string;
   hasObserver: boolean;  // False = orphaned
@@ -93,7 +86,7 @@ export interface ProvisionRequest {
   
   // Required for provisioning
   repository: string;
-  branch?: string;
+  workBranch?: string;
   gc?: string;  // Golden Claude to use (default: "default")
   prompt?: string;  // Prompt template to use (default: "default")
   

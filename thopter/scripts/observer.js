@@ -22,6 +22,7 @@ class SessionObserver {
     this.pollTimer = null;
     this.issueContext = null;
     this.spawnedAt = new Date().toISOString();
+    this.idle_since = null; // Track when agent went idle
     // Using redis-cli instead of ioredis module
     this.appName = process.env.APP_NAME || 'thopter-swarm';
   }
@@ -151,6 +152,9 @@ class SessionObserver {
 
   async updateHubState(state, screenDump) {
     try {
+      // Reload issue context every time to avoid race conditions
+      await this.loadIssueContext();
+
       const now = new Date().toISOString();
       const payload = {
         agent_id: this.agentId,
@@ -164,24 +168,22 @@ class SessionObserver {
       // Include issue context metadata if available
       if (this.issueContext) {
         payload.repository = this.issueContext.repository;
-        payload.branch = this.issueContext.branch;
-        payload.github = {
-          issue_number: this.issueContext.github.issueNumber,
-          issue_title: this.issueContext.github.issueTitle,
-          issue_body: this.issueContext.github.issueBody,
-          issue_url: this.issueContext.github.issueUrl,
-          mention_author: this.issueContext.github.mentionAuthor,
-          mention_comment_id: this.issueContext.github.mentionCommentId
-        };
+        payload.workBranch = this.issueContext.workBranch;
+        payload.github = this.issueContext.github;  // Use GitHubContext directly
       }
 
       // Track idle duration
       if (state === 'idle' && this.lastState !== 'idle') {
         // Just transitioned to idle - record when it went idle
-        payload.idle_since = new Date(this.lastChangeTime).toISOString();
+        this.idle_since = new Date(this.lastChangeTime).toISOString();
+        payload.idle_since = this.idle_since;
       } else if (state === 'running' && this.lastState === 'idle') {
         // Just transitioned to running - clear idle timestamp
+        this.idle_since = null;
         payload.idle_since = null;
+      } else if (state === 'idle' && this.idle_since) {
+        // Still idle - include the original idle timestamp
+        payload.idle_since = this.idle_since;
       }
 
       const response = await this.postToHub(payload);

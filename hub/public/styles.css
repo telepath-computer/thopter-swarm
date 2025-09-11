@@ -1,10 +1,16 @@
 /* Thopter Swarm Dashboard Styles */
 
-/* Reset and base styles */
-* {
+/* Reset and normalize */
+*, *::before, *::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  font-size: 16px;
 }
 
 body {
@@ -12,6 +18,70 @@ body {
   line-height: 1.6;
   color: #333;
   background-color: #f5f5f5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Reset margins on typography */
+h1, h2, h3, h4, h5, h6, p {
+  margin: 0;
+}
+
+/* Normalize links */
+a {
+  color: inherit;
+  text-decoration: none;
+  background-color: transparent;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Form elements normalization */
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: 100%;
+  line-height: inherit;
+  margin: 0;
+}
+
+button {
+  text-transform: none;
+  cursor: pointer;
+  -webkit-appearance: button;
+}
+
+button::-moz-focus-inner,
+[type="button"]::-moz-focus-inner,
+[type="reset"]::-moz-focus-inner,
+[type="submit"]::-moz-focus-inner {
+  border-style: none;
+  padding: 0;
+}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* Remove default list styles */
+ul, ol {
+  list-style: none;
+}
+
+/* Make images responsive by default */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Consistent code/pre styling */
+code, pre {
+  font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.875rem;
 }
 
 /* Container */
@@ -37,24 +107,183 @@ body {
   color: #2c3e50;
   font-size: 1.8rem;
   font-weight: 600;
+  margin: 0;
 }
 
-/* Buttons */
-.refresh-btn, .btn {
+/* Header controls */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Mode indicator */
+.mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.mode-label {
+  font-size: 0.875rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.mode-status {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.mode-status.mode-running {
+  color: #27ae60;
+}
+
+.mode-status.mode-paused {
+  color: #f39c12;
+}
+
+.mode-status.mode-error {
+  color: #e74c3c;
+}
+
+/* Mode controls */
+.mode-controls {
+  display: flex;
+  align-items: center;
+}
+
+.mode-controls form {
+  display: inline-block;
+}
+
+/* Base button styles - all buttons should have consistent sizing */
+.btn,
+button[type="submit"],
+.control-btn,
+.table-btn,
+.terminal-btn,
+.view-details-btn,
+.back-btn,
+.kill-btn,
+.submit-btn,
+.generate-btn {
+  display: inline-block;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  vertical-align: middle;
+  min-height: 36px;
+}
+
+/* Primary button style */
+.btn-primary,
+.submit-btn {
   background: #3498db;
   color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  text-decoration: none;
-  display: inline-block;
-  transition: background-color 0.2s;
 }
 
-.refresh-btn:hover, .btn:hover {
+.btn-primary:hover,
+.submit-btn:hover:not(:disabled) {
   background: #2980b9;
+  text-decoration: none;
+}
+
+/* Success button style */
+.btn-success,
+.terminal-btn,
+.resume-btn {
+  background: #27ae60;
+  color: white;
+}
+
+.btn-success:hover,
+.terminal-btn:hover,
+.resume-btn:hover {
+  background: #229954;
+  text-decoration: none;
+}
+
+/* Warning button style */
+.btn-warning,
+.pause-btn {
+  background: #f39c12;
+  color: white;
+}
+
+.btn-warning:hover,
+.pause-btn:hover {
+  background: #e67e22;
+  text-decoration: none;
+}
+
+/* Danger button style */
+.btn-danger,
+.kill-btn {
+  background: #e74c3c;
+  color: white;
+}
+
+.btn-danger:hover,
+.kill-btn:hover {
+  background: #c0392b;
+  text-decoration: none;
+}
+
+/* Secondary button style */
+.btn-secondary,
+.back-btn,
+.generate-btn {
+  background: #7f8c8d;
+  color: white;
+}
+
+.btn-secondary:hover,
+.back-btn:hover,
+.generate-btn:hover {
+  background: #6c7b7d;
+  text-decoration: none;
+}
+
+/* Dark button style */
+.btn-dark,
+.view-details-btn {
+  background: #34495e;
+  color: white;
+}
+
+.btn-dark:hover,
+.view-details-btn:hover {
+  background: #2c3e50;
+  text-decoration: none;
+}
+
+/* Disabled state */
+button:disabled,
+.btn:disabled {
+  background: #95a5a6;
+  color: #ecf0f1;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Small button variant for tables */
+.table-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  min-height: 30px;
 }
 
 /* Main sections */
@@ -65,7 +294,10 @@ main {
 }
 
 .agents-section,
-.requests-section {
+.requests-section,
+.golden-claudes-section,
+.logs-section,
+.test-provision-section {
   background: white;
   padding: 25px;
   border-radius: 8px;
@@ -73,7 +305,10 @@ main {
 }
 
 .agents-section h2,
-.requests-section h2 {
+.requests-section h2,
+.golden-claudes-section h2,
+.logs-section h2,
+.test-provision-section h2 {
   color: #2c3e50;
   font-size: 1.4rem;
   margin-bottom: 20px;
@@ -92,13 +327,63 @@ main {
   margin-bottom: 8px;
 }
 
-/* Agents table */
+/* Tables */
 .table-container {
   overflow-x: auto;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Golden Claudes table */
+.gc-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 0.9rem;
+}
+
+.gc-table th {
+  background: #f8f9fa;
+  color: #2c3e50;
+  font-weight: 600;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 2px solid #e9ecef;
+  white-space: nowrap;
+}
+
+.gc-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e9ecef;
+  vertical-align: middle;
+}
+
+.gc-row:hover {
+  background: #f8f9fa;
+}
+
+.gc-name {
+  font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.gc-state {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+.machine-id {
+  font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+/* Agents table */
 .agents-table {
   width: 100%;
   border-collapse: collapse;
@@ -279,11 +564,78 @@ main {
   background: #229954;
 }
 
-/* Requests list */
-.requests-list {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+/* Request tables */
+.requests-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 0.85rem;
+}
+
+.requests-table th {
+  background: #f8f9fa;
+  color: #2c3e50;
+  font-weight: 600;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 2px solid #e9ecef;
+  white-space: nowrap;
+}
+
+.requests-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e9ecef;
+  vertical-align: middle;
+}
+
+.request-row:hover {
+  background: #f8f9fa;
+}
+
+.request-id {
+  font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.request-status {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+.request-status.status-pending {
+  background: #ffc107;
+  color: #212529;
+}
+
+.request-status.status-processing {
+  background: #17a2b8;
+  color: white;
+}
+
+.request-status.status-completed {
+  background: #28a745;
+  color: white;
+}
+
+.request-status.status-failed {
+  background: #dc3545;
+  color: white;
+}
+
+.request-source {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #9b59b6;
+  color: white;
+  display: inline-block;
 }
 
 /* Request cards */
@@ -624,6 +976,56 @@ main {
     flex-direction: column;
     gap: 10px;
   }
+}
+
+/* Logs Tip Section */
+.logs-tip {
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.logs-tip p {
+  margin-bottom: 15px;
+  color: #495057;
+}
+
+.command-box {
+  display: flex;
+  align-items: center;
+  background: #2c3e50;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin: 15px 0;
+}
+
+.command-box code {
+  flex: 1;
+  color: #ecf0f1;
+  font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9rem;
+}
+
+.copy-btn {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  margin-left: 12px;
+  transition: background-color 0.2s;
+}
+
+.copy-btn:hover {
+  background: #2980b9;
+}
+
+.tip-note {
+  font-size: 0.875rem;
+  color: #6c757d;
+  font-style: italic;
 }
 
 /* Test Provisioning Form */

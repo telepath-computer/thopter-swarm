@@ -214,7 +214,7 @@ Prompt templates support these variables:
 - `{{repository}}` - Full repository name (e.g., "owner/repo")
 - `{{repoName}}` - Repository name only (e.g., "repo")
 - `{{issueNumber}}` - GitHub issue number
-- `{{branchName}}` - Generated branch name for this thopter
+- `{{workBranch}}` - Generated work branch name for this thopter
 
 Have a look at the default prompt to get a feel: `hub/templates/prompts/default.md`
 

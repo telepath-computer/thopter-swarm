@@ -498,7 +498,7 @@ ${request.github.issueBody}
     // Replace template variables
     return template
       .replace(/\{\{repository\}\}/g, request.repository)
-      .replace(/\{\{branchName\}\}/g, branchName)
+      .replace(/\{\{workBranch\}\}/g, branchName)
       .replace(/\{\{repoName\}\}/g, repoName)
       .replace(/\{\{issueNumber\}\}/g, request.github.issueNumber)
       .replace(/\{\{machineId\}\}/g, machineId);
@@ -513,7 +513,7 @@ ${request.github.issueBody}
     const issueContext = {
       source: 'github',
       repository: request.repository,
-      branch: branchName,
+      workBranch: branchName,
       github: {
         issueNumber: request.github.issueNumber,
         issueTitle: request.github.issueTitle,
@@ -522,6 +522,7 @@ ${request.github.issueBody}
         issueAuthor: request.github.issueAuthor,
         mentionAuthor: request.github.mentionAuthor,
         mentionLocation: request.github.mentionLocation,
+        mentionCommentId: request.github.mentionCommentId,
         comments: request.github.comments || []
       }
     };
