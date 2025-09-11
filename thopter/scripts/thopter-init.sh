@@ -111,6 +111,10 @@ fi
 mkdir -p /data/thopter/logs
 chown thopter:thopter /data/thopter/logs
 
+# Create directory for claude-code-log HTML output (webserver working directory)
+mkdir -p /data/thopter/.claude/projects
+chown -R thopter:thopter /data/thopter/.claude
+
 # Start session observer with PM2 (as root, but observer runs as thopter user)
 echo "Starting session observer..."
 /usr/local/bin/start-observer.sh

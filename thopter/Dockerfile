@@ -86,13 +86,19 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN apt-get install -y redis
 RUN npm install -g ioredis
 
+# Install uv package manager for Python
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
 # Copy session observer components
 COPY scripts/observer.js /usr/local/bin/observer.js
+COPY scripts/claude-log-generator.js /usr/local/bin/claude-log-generator.js
 COPY scripts/pm2.config.js /usr/local/bin/pm2.config.js
 COPY scripts/start-observer.sh /usr/local/bin/start-observer.sh
 
 # Set permissions for session observer scripts
 RUN chmod +x /usr/local/bin/observer.js && \
+    chmod +x /usr/local/bin/claude-log-generator.js && \
     chmod +x /usr/local/bin/start-observer.sh
 
 ### # Copy firewall setup script  

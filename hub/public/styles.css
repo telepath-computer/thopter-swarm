@@ -167,6 +167,7 @@ button[type="submit"],
 .control-btn,
 .table-btn,
 .terminal-btn,
+.session-log-btn,
 .view-details-btn,
 .back-btn,
 .kill-btn,
@@ -213,6 +214,19 @@ button[type="submit"],
 .terminal-btn:hover,
 .resume-btn:hover {
   background: #229954;
+  text-decoration: none;
+}
+
+/* Info button style for session logs */
+.btn-info,
+.session-log-btn {
+  background: #3498db;
+  color: white;
+}
+
+.btn-info:hover,
+.session-log-btn:hover {
+  background: #2980b9;
   text-decoration: none;
 }
 
@@ -515,6 +529,15 @@ main {
 
 .table-btn.terminal-btn:hover {
   background: #229954;
+}
+
+.table-btn.session-log-btn {
+  background: #3498db;
+  color: white;
+}
+
+.table-btn.session-log-btn:hover {
+  background: #2980b9;
 }
 
 .table-btn.details-btn {

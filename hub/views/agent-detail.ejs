@@ -87,7 +87,8 @@
         <!-- Agent Actions -->
         <div class="agent-actions-section">
           <div class="action-buttons">
-            <a href="<%= formatters.terminalUrl(agent.id) %>" class="terminal-btn" target="_blank">Web Terminal</a>
+            <a href="<%= formatters.terminalUrl(agent.id) %>" class="terminal-btn" target="_blank">Terminal</a>
+            <a href="<%= formatters.sessionLogUrl(agent.id) %>" class="session-log-btn" target="_blank">Session Log</a>
             <form action="/agent/<%= agent.id %>/kill" method="POST" onsubmit="return confirmKill()" style="display: inline;">
               <button type="submit" class="kill-btn">Kill Agent</button>
             </form>

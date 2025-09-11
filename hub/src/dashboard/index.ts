@@ -101,7 +101,8 @@ router.get('/agent/:id', (req: Request, res: Response) => {
         idleDuration: utils.formatIdleDuration,
         truncateText: utils.truncateText,
         gitHubUrl: utils.getGitHubUrl,
-        terminalUrl: (agentId: string) => `http://${agentId}.vm.${process.env.APP_NAME}.internal:${process.env.WEB_TERMINAL_PORT || '7681'}/`
+        terminalUrl: (agentId: string) => `http://${agentId}.vm.${process.env.APP_NAME}.internal:${process.env.WEB_TERMINAL_PORT || '7681'}/`,
+        sessionLogUrl: (agentId: string) => `http://${agentId}.vm.${process.env.APP_NAME}.internal:7791/`
       }
     });
     
