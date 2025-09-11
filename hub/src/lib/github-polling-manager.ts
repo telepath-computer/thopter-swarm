@@ -107,6 +107,7 @@ class GitHubPollingManager {
     
     logger.debug(`Starting poll cycle for ${repositories.length} repositories`, undefined, 'github-polling');
     
+    let anySuccess = false;
     for (const repository of repositories) {
       if (this.isStopped) {
         logger.debug('Polling stopped, exiting repository loop', undefined, 'github-polling');
@@ -115,13 +116,19 @@ class GitHubPollingManager {
 
       try {
         await this.pollRepository(repository);
+        anySuccess = true; // Mark that at least one repository polled successfully
       } catch (error) {
         logger.error(`Failed to poll repository ${repository}: ${error instanceof Error ? error.message : String(error)}`, undefined, 'github-polling');
       }
     }
 
-    this.lastPollTime = currentTime;
-    logger.debug('Poll cycle completed', undefined, 'github-polling');
+    // Only update lastPollTime if at least one repository was successfully polled
+    if (anySuccess) {
+      this.lastPollTime = currentTime;
+      logger.debug('Poll cycle completed successfully', undefined, 'github-polling');
+    } else {
+      logger.warn('Poll cycle completed with no successful repository polls', undefined, 'github-polling');
+    }
   }
 
   /**
@@ -176,37 +183,39 @@ class GitHubPollingManager {
     const repository = `${owner}/${repo}`;
     
     try {
-      // Get issue details
-      const { data: issue } = await octokit.rest.issues.get({
-        owner,
-        repo,
-        issue_number: issueNumber,
-      });
+      // Fetch issue details and ALL comments upfront in parallel for efficiency
+      const [issueResponse, commentsResponse] = await Promise.all([
+        octokit.rest.issues.get({
+          owner,
+          repo,
+          issue_number: issueNumber,
+        }),
+        octokit.rest.issues.listComments({
+          owner,
+          repo,
+          issue_number: issueNumber,
+          per_page: 100,
+        })
+      ]);
 
-      // Only check issue body if issue was created after our last poll (new issue)
-      if (new Date(issue.created_at) >= since) {
-        await this.extractAndProcessCommands(octokit, repository, issue, issue.body || '', 'body');
-      }
+      const issue = issueResponse.data;
+      const comments = commentsResponse.data;
 
-      // Get comments for this issue updated since last poll
-      const { data: comments } = await octokit.rest.issues.listComments({
-        owner,
-        repo,
-        issue_number: issueNumber,
-        since: since.toISOString(),
-        per_page: 100,
-      });
+      logger.debug(`Processing issue ${repository}#${issueNumber} with ${comments.length} comments for unacknowledged commands`, undefined, 'github-polling');
 
-      logger.debug(`Found ${comments.length} new comments in ${repository}#${issueNumber} since ${since.toISOString()}`, undefined, 'github-polling');
+      // Check issue body for unacknowledged commands
+      // Pass the fetched comments to avoid redundant API calls
+      await this.extractAndProcessCommands(octokit, repository, issue, issue.body || '', 'body', undefined, comments);
 
-      // Process each new comment for /thopter commands
+      // Process each comment for /thopter commands
+      // Pass the fetched comments to avoid redundant API calls
       for (const comment of comments) {
         if (this.isStopped) {
           logger.debug('Polling stopped, exiting comment loop', undefined, 'github-polling');
           break;
         }
 
-        await this.extractAndProcessCommands(octokit, repository, issue, comment.body || '', 'comment', comment.id);
+        await this.extractAndProcessCommands(octokit, repository, issue, comment.body || '', 'comment', comment.id, comments);
       }
     } catch (error) {
       logger.error(`Failed to process issue ${repository}#${issueNumber}: ${error instanceof Error ? error.message : String(error)}`, undefined, 'github-polling');
@@ -222,7 +231,8 @@ class GitHubPollingManager {
     issue: any,
     text: string,
     location: 'body' | 'comment',
-    commentId?: number
+    commentId?: number,
+    allComments?: any[]
   ): Promise<void> {
     // Find ONLY the first /thopter command in the text - ignore any additional ones
     const thopterMatch = text.match(/^\/thopter\s*(.*)$/m);
@@ -250,7 +260,8 @@ class GitHubPollingManager {
     }
 
     // Check if this command instance has already been acknowledged
-    const isAlreadyAcknowledged = await this.isCommandAlreadyAcknowledged(octokit, repository, issue.number, commandInstance);
+    // Use provided comments if available to avoid redundant API call
+    const isAlreadyAcknowledged = await this.isCommandAlreadyAcknowledged(octokit, repository, issue.number, commandInstance, allComments);
     if (isAlreadyAcknowledged) {
       this.processedCommands.add(commandKey);
       return;
@@ -262,13 +273,8 @@ class GitHubPollingManager {
       // Parse command arguments
       const { gc, prompt } = this.parseThopterCommand(commandLine);
 
-      // Fetch all comments to provide full conversation context
-      const { data: allComments } = await octokit.rest.issues.listComments({
-        owner: repository.split('/')[0],
-        repo: repository.split('/')[1],
-        issue_number: issue.number,
-        per_page: 100, // Get all comments for context
-      });
+      // Use the already-fetched comments instead of making another API call
+      const commentsToUse = allComments || [];
 
       // Create GitHub context with full conversation thread
       const github: GitHubContext = {
@@ -281,7 +287,7 @@ class GitHubPollingManager {
         mentionLocation: location,
         mentionCommentId: commentId,
         // Add full conversation thread
-        comments: allComments.map(comment => ({
+        comments: commentsToUse.map(comment => ({
           id: comment.id,
           author: comment.user?.login || '',
           body: comment.body || '',
@@ -334,15 +340,20 @@ class GitHubPollingManager {
   /**
    * Check if a command has already been acknowledged in the issue comments
    */
-  private async isCommandAlreadyAcknowledged(octokit: Octokit, repository: string, issueNumber: number, commandInstance: string): Promise<boolean> {
+  private async isCommandAlreadyAcknowledged(octokit: Octokit, repository: string, issueNumber: number, commandInstance: string, providedComments?: any[]): Promise<boolean> {
     const [owner, repo] = repository.split('/');
     
     try {
-      const { data: comments } = await octokit.rest.issues.listComments({
-        owner,
-        repo,
-        issue_number: issueNumber,
-      });
+      // Use provided comments if available, otherwise fetch them
+      let comments = providedComments;
+      if (!comments) {
+        const { data } = await octokit.rest.issues.listComments({
+          owner,
+          repo,
+          issue_number: issueNumber,
+        });
+        comments = data;
+      }
 
       // Look for our acknowledgment pattern with unique instance ID
       const acknowledgmentPattern = `<!-- thopter-ack:${commandInstance} -->`;
