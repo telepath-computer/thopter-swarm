@@ -109,6 +109,7 @@
                   <th>Task</th>
                   <th></th>
                   <th></th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -178,6 +179,14 @@
                       <% if (agent.webTerminalUrl) { %>
                         <a href="<%= agent.webTerminalUrl %>" class="table-btn terminal-btn" target="_blank" title="Open Web Terminal">
                           Terminal
+                        </a>
+                      <% } %>
+                    </td>
+                    <td class="action-cell">
+                      <% if (agent.webTerminalUrl) { %>
+                        <% const sessionLogUrl = agent.webTerminalUrl.replace(':7681/', ':7791/'); %>
+                        <a href="<%= sessionLogUrl %>" class="table-btn session-log-btn" target="_blank" title="View Session Logs">
+                          Session Log
                         </a>
                       <% } %>
                     </td>
