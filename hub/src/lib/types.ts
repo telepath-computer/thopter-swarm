@@ -55,7 +55,7 @@ export interface AgentState {
   workBranch?: string;
   spawnedAt?: Date;
   lastActivity?: Date;
-  idleSince?: Date;
+  idle_since?: Date;
   screenDump?: string;
   webTerminalUrl?: string;
   hasObserver: boolean;  // False = orphaned

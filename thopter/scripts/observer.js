@@ -22,7 +22,7 @@ class SessionObserver {
     this.pollTimer = null;
     this.issueContext = null;
     this.spawnedAt = new Date().toISOString();
-    this.idleSince = null; // Track when agent went idle
+    this.idle_since = null; // Track when agent went idle
     // Using redis-cli instead of ioredis module
     this.appName = process.env.APP_NAME || 'thopter-swarm';
   }
@@ -175,15 +175,15 @@ class SessionObserver {
       // Track idle duration
       if (state === 'idle' && this.lastState !== 'idle') {
         // Just transitioned to idle - record when it went idle
-        this.idleSince = new Date(this.lastChangeTime).toISOString();
-        payload.idle_since = this.idleSince;
+        this.idle_since = new Date(this.lastChangeTime).toISOString();
+        payload.idle_since = this.idle_since;
       } else if (state === 'running' && this.lastState === 'idle') {
         // Just transitioned to running - clear idle timestamp
-        this.idleSince = null;
+        this.idle_since = null;
         payload.idle_since = null;
-      } else if (state === 'idle' && this.idleSince) {
+      } else if (state === 'idle' && this.idle_since) {
         // Still idle - include the original idle timestamp
-        payload.idle_since = this.idleSince;
+        payload.idle_since = this.idle_since;
       }
 
       const response = await this.postToHub(payload);

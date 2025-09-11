@@ -139,13 +139,13 @@ export function generateTerminalUrl(agentId: string, appName: string, port: numb
 /**
  * Format idle duration in compact format
  */
-export function formatIdleDuration(idleSince: string | Date | undefined, state: string): string {
-  if (state !== 'idle' || !idleSince) {
+export function formatIdleDuration(idle_since: string | Date | undefined, state: string): string {
+  if (state !== 'idle' || !idle_since) {
     return '';
   }
   
   try {
-    const idleStart = idleSince instanceof Date ? idleSince : new Date(idleSince);
+    const idleStart = idle_since instanceof Date ? idle_since : new Date(idle_since);
     const now = new Date();
     const diffMs = now.getTime() - idleStart.getTime();
     
@@ -167,7 +167,7 @@ export function formatIdleDuration(idleSince: string | Date | undefined, state: 
       return `:${seconds < 10 ? '0' + seconds : seconds}`;
     }
   } catch (error) {
-    console.warn('Failed to parse idle_since timestamp:', idleSince, error);
+    console.warn('Failed to parse idle_since timestamp:', idle_since, error);
     return '';
   }
 }

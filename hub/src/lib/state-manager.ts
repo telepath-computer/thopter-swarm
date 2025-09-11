@@ -143,9 +143,9 @@ class StateManager {
     agent.screenDump = status.screen_dump;
     
     if (status.idle_since) {
-      agent.idleSince = new Date(status.idle_since);
+      agent.idle_since = new Date(status.idle_since);
     } else {
-      agent.idleSince = undefined;
+      agent.idle_since = undefined;
     }
     
     // Update source-agnostic metadata

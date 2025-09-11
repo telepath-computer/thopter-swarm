@@ -1,9 +1,5 @@
 FROM ubuntu:22.04
 
-# Build argument for current image tag
-ARG CURRENT_IMAGE
-ENV CURRENT_IMAGE=${CURRENT_IMAGE}
-
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
@@ -122,4 +118,10 @@ RUN chmod +x /usr/local/bin/thopter-init.sh
 # Default command - run init script as root, which transitions to thopter user
 # EXPOSE port matches WEB_TERMINAL_PORT default (can be overridden at runtime)
 EXPOSE 7681
+
+# Build argument for current image tag. Changes every time, so, last to
+# minimize cache busting.
+ARG CURRENT_IMAGE
+ENV CURRENT_IMAGE=${CURRENT_IMAGE}
+
 CMD ["/usr/local/bin/thopter-init.sh"]

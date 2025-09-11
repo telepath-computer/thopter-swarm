@@ -126,7 +126,7 @@
                       <span class="agent-state <%= formatters.stateClass(agent.state) %>">
                         <%= agent.state %>
                       </span>
-                      <% const idleDuration = formatters.idleDuration(agent.idleSince, agent.state); %>
+                      <% const idleDuration = formatters.idleDuration(agent.idle_since, agent.state); %>
                       <% if (idleDuration) { %>
                         <span class="idle-duration">(<%= idleDuration %>)</span>
                       <% } %>
