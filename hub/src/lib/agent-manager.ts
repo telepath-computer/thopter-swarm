@@ -10,9 +10,13 @@ export interface AgentManagerConfig {
 export class AgentManager {
   private provisioner: any;
   private processingLoop: NodeJS.Timeout | null = null;
+  private activeDestroyOperations: Set<string> = new Set();
+  private readonly maxConcurrentDestroys: number;
   
   constructor(config: AgentManagerConfig) {
     this.provisioner = config.provisioner;
+    this.maxConcurrentDestroys = parseInt(process.env.MAX_CONCURRENT_DESTROYS || '5');
+    logger.info(`Agent manager initialized with max concurrent destroys: ${this.maxConcurrentDestroys}`, undefined, 'agent-manager');
   }
   
   /**
@@ -63,24 +67,31 @@ export class AgentManager {
   
   /**
    * Process pending requests in priority order (destroy before provision)
+   * Destroy requests are processed in parallel, provision requests remain serial
    */
   private async processRequests(): Promise<void> {
-    // Priority 1: Process destroy requests first
-    const destroyRequest = stateManager.getNextPendingDestroyRequest();
-    if (destroyRequest) {
-      await this.processDestroyRequest(destroyRequest);
-      return; // Only process one request per cycle
+    // Priority 1: Process destroy requests (parallel)
+    if (this.activeDestroyOperations.size < this.maxConcurrentDestroys) {
+      const availableSlots = this.maxConcurrentDestroys - this.activeDestroyOperations.size;
+      const destroyRequests = stateManager.getNextPendingDestroyRequests(availableSlots);
+      
+      for (const destroyRequest of destroyRequests) {
+        // Process destroy request asynchronously (fire and forget)
+        this.processDestroyRequestAsync(destroyRequest);
+      }
     }
     
-    // Priority 2: Process provision requests
-    const provisionRequest = stateManager.getNextPendingProvisionRequest();
-    if (provisionRequest) {
-      await this.processProvisionRequest(provisionRequest);
-      return; // Only process one request per cycle
+    // Priority 2: Process provision requests (serial, only if no destroys are queued)
+    if (this.activeDestroyOperations.size === 0) {
+      const provisionRequest = stateManager.getNextPendingProvisionRequest();
+      if (provisionRequest) {
+        await this.processProvisionRequest(provisionRequest);
+        return; // Only process one provision request per cycle
+      }
     }
     
-    // No requests to process
-    // logger.debug('No pending requests to process', undefined, 'agent-manager');
+    // No requests to process or destroy operations in progress
+    // logger.debug(`No pending requests to process (${this.activeDestroyOperations.size} destroys active)`, undefined, 'agent-manager');
   }
   
   /**
@@ -144,13 +155,31 @@ export class AgentManager {
   }
   
   /**
+   * Process a destroy request asynchronously
+   */
+  private async processDestroyRequestAsync(request: DestroyRequest): Promise<void> {
+    const requestId = request.requestId;
+    const agentId = request.agentId;
+    
+    // Track this destroy operation
+    this.activeDestroyOperations.add(requestId);
+    
+    try {
+      await this.processDestroyRequest(request);
+    } finally {
+      // Always remove from active operations when done
+      this.activeDestroyOperations.delete(requestId);
+    }
+  }
+  
+  /**
    * Process a destroy request
    */
   private async processDestroyRequest(request: DestroyRequest): Promise<void> {
     const requestId = request.requestId;
     const agentId = request.agentId;
     
-    logger.info(`Processing destroy request: ${requestId} for agent ${agentId}`, agentId, 'agent-manager');
+    logger.info(`Processing destroy request: ${requestId} for agent ${agentId} (${this.activeDestroyOperations.size}/${this.maxConcurrentDestroys} concurrent)`, agentId, 'agent-manager');
     
     try {
       // Update request status to processing
