@@ -601,7 +601,7 @@ ${request.github.issueBody}
         console.log(`  1️⃣ Creating snapshot on Golden Claude...`);
         const execAsync = promisify(exec);
         await execAsync(
-          `fly ssh console -C "tar czf ${gcSnapshotPath} -C /data/thopter ." --machine ${gcMachineId} -t "${this.flyToken}" -a ${this.appName}`,
+          `fly ssh console -C "tar czf ${gcSnapshotPath} -C /data/thopter --exclude='.bashrc' ." --machine ${gcMachineId} -t "${this.flyToken}" -a ${this.appName}`,
           { 
             cwd: process.cwd()
           }

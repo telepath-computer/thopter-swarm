@@ -86,9 +86,9 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN apt-get install -y redis
 RUN npm install -g ioredis
 
-# Install uv package manager for Python
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
+# Install uv package manager for Python, install where non-root users can use it
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/uv sh
+# to use it, you have to `source /uv/env` -- which we do setup in bashrc in init
 
 # Copy session observer components
 COPY scripts/observer.js /usr/local/bin/observer.js

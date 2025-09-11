@@ -18,7 +18,8 @@ module.exports = {
     merge_logs: true
   }, {
     name: 'claude-log-generator',
-    script: '/usr/local/bin/claude-log-generator.js',
+    script: 'bash',
+    args: '-c "source /uv/env && node /usr/local/bin/claude-log-generator.js"',
     cwd: '/data/thopter',
     user: 'thopter',
     instances: 1,

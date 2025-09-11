@@ -3,6 +3,13 @@ set -e
 
 echo "Starting Thopter agent container as PID 1..."
 
+# important: the golden claude copy logic will *bulldoze* files in the homedir,
+# with unpredictable timing relative to this script. for example, .bashrc --
+# which i have explicitly excluded from the tarball snapshot in the copy script
+# over in the provisioner. dont write files here that you expect to also exist
+# in the golden claude, and if you do, you need to exclude them in the
+# provisioner's snapshot logic.
+
 # Wait for /data mount point to be fully ready before proceeding
 echo "Checking data mount point readiness..."
 DATA_MOUNT_READY=false
@@ -106,6 +113,10 @@ if [ -f "/tmp/.env.thopters" ]; then
     echo "fi" >> /data/thopter/.bashrc
     chown thopter:thopter /data/thopter/.bashrc
 fi
+
+echo "" >> /data/thopter/.bashrc
+echo "# make uv available" >> /data/thopter/.bashrc
+echo "source /uv/env" >> /data/thopter/.bashrc
 
 # Ensure logs directory exists with proper ownership for observer
 mkdir -p /data/thopter/logs
