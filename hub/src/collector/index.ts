@@ -27,17 +27,17 @@ export function handleStatusUpdate(req: Request, res: Response): void {
       return;
     }
     
-    // Log the status update
-    logger.debug(
-      `Status update received: ${statusUpdate.state}`,
-      statusUpdate.agent_id,
-      'collector',
-      { 
-        hasGithubContext: !!statusUpdate.github,
-        repository: statusUpdate.repository,
-        screenLength: statusUpdate.screen_dump?.length || 0
-      }
-    );
+    // Log the status update (silenced for debugging)
+    // logger.debug(
+    //   `Status update received: ${statusUpdate.state}`,
+    //   statusUpdate.agent_id,
+    //   'collector',
+    //   { 
+    //     hasGithubContext: !!statusUpdate.github,
+    //     repository: statusUpdate.repository,
+    //     screenLength: statusUpdate.screen_dump?.length || 0
+    //   }
+    // );
     
     // Update state manager with the status
     stateManager.updateAgentFromStatus(statusUpdate);

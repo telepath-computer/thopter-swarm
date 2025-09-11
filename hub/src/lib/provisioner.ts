@@ -296,6 +296,13 @@ export class ThopterProvisioner {
       '--detach'
     ];
 
+    // Add .env.thopters file if it exists on hub
+    const envFilePath = '/data/thopter-env/.env.thopters';
+    if (require('fs').existsSync(envFilePath)) {
+      console.log(`  ✅ Found .env.thopters file, including in machine creation`);
+      machineRunArgs.push('--file-local', `/tmp/.env.thopters=${envFilePath}`);
+    }
+
     console.log(`Executing async: fly ${machineRunArgs.join(' ')}`);
     
     let output: string;

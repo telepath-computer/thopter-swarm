@@ -55,9 +55,10 @@ echo "⚠️  WARNING: This will destroy ALL hub machines!"
 echo ""
 echo "Options:"
 echo "1. Cancel (exit)"
-echo "2. Destroy all hub machines"
+echo "2. Destroy hub machines only (keep volume and data)"
+echo "3. Destroy hub machines AND volume (delete all data)"
 echo ""
-read -p "Choose option (1 or 2): " choice
+read -p "Choose option (1, 2, or 3): " choice
 
 case $choice in
     1)
@@ -65,7 +66,16 @@ case $choice in
         exit 0
         ;;
     2)
-        # Proceed with destruction
+        DESTROY_VOLUME=false
+        ;;
+    3)
+        DESTROY_VOLUME=true
+        echo -e "${RED}${WARNING} This will permanently delete all hub data!${NC}"
+        read -p "Are you sure? (yes/no): " confirm
+        if [ "$confirm" != "yes" ]; then
+            echo -e "${INFO} Operation cancelled"
+            exit 0
+        fi
         ;;
     *)
         echo -e "${RED}${CROSS} Invalid choice${NC}"
@@ -128,6 +138,29 @@ else
     exit 1
 fi
 
+# Handle volume destruction if requested
+if [ "$DESTROY_VOLUME" = true ]; then
+    echo ""
+    echo "3. Destroying hub volume..."
+    HUB_VOLUME_NAME="hub_data"
+    
+    # Check if hub volume exists
+    EXISTING_HUB_VOLUME=$(fly volumes list --json 2>/dev/null | jq -r --arg name "$HUB_VOLUME_NAME" '.[] | select(.name==$name) | .id' | head -n1)
+    
+    if [ -n "$EXISTING_HUB_VOLUME" ]; then
+        echo -e "${INFO} Found hub volume: $HUB_VOLUME_NAME ($EXISTING_HUB_VOLUME)"
+        echo "  Destroying volume..."
+        
+        if fly volume destroy $EXISTING_HUB_VOLUME -y; then
+            echo -e "${CHECK} Hub volume destroyed successfully"
+        else
+            echo -e "${RED}${CROSS} Failed to destroy hub volume${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${INFO} No hub volume found (already destroyed or never created)"
+    fi
+fi
 
 echo ""
 echo "========================================"
@@ -137,7 +170,10 @@ echo ""
 
 echo -e "${GREEN}Cleaned up:${NC}"
 echo "  ✓ All hub machines destroyed"
+if [ "$DESTROY_VOLUME" = true ]; then
+    echo "  ✓ Hub volume destroyed"
+fi
 echo ""
-echo -e "${GREEN}Result: Hub(s) destroyed - you can run fly/recreate-hub.sh to recreate${NC}"
+echo -e "${GREEN}Result: Hub destroyed - you can run fly/recreate-hub.sh to recreate${NC}"
 
 echo ""
