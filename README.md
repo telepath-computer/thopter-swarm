@@ -187,7 +187,12 @@ MY_SERVICE_URL=https://dev.example.com
 NODE_ENV=development
 ```
 
-See [docs/env-thopters.md](docs/env-thopters.md) for detailed documentation.
+**Important notes:**
+- Never include production credentials
+- Only use KEY=value format (no commands)
+- The file is automatically uploaded to hub during `./fly/recreate-hub.sh`
+- Update existing hub with `./fly/upload-env-thopters.sh`
+- New thopters automatically receive these variables during provisioning
 
 #### Alternative: Golden Claude Files
 
