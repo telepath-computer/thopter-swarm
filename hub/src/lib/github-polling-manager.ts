@@ -107,6 +107,7 @@ class GitHubPollingManager {
     
     logger.debug(`Starting poll cycle for ${repositories.length} repositories`, undefined, 'github-polling');
     
+    let anySuccess = false;
     for (const repository of repositories) {
       if (this.isStopped) {
         logger.debug('Polling stopped, exiting repository loop', undefined, 'github-polling');
@@ -115,13 +116,19 @@ class GitHubPollingManager {
 
       try {
         await this.pollRepository(repository);
+        anySuccess = true; // Mark that at least one repository polled successfully
       } catch (error) {
         logger.error(`Failed to poll repository ${repository}: ${error instanceof Error ? error.message : String(error)}`, undefined, 'github-polling');
       }
     }
 
-    this.lastPollTime = currentTime;
-    logger.debug('Poll cycle completed', undefined, 'github-polling');
+    // Only update lastPollTime if at least one repository was successfully polled
+    if (anySuccess) {
+      this.lastPollTime = currentTime;
+      logger.debug('Poll cycle completed successfully', undefined, 'github-polling');
+    } else {
+      logger.warn('Poll cycle completed with no successful repository polls', undefined, 'github-polling');
+    }
   }
 
   /**
@@ -183,23 +190,23 @@ class GitHubPollingManager {
         issue_number: issueNumber,
       });
 
-      // Only check issue body if issue was created after our last poll (new issue)
-      if (new Date(issue.created_at) >= since) {
-        await this.extractAndProcessCommands(octokit, repository, issue, issue.body || '', 'body');
-      }
+      // Always check issue body for unacknowledged commands
+      // This ensures we don't miss commands even if polling failed previously
+      await this.extractAndProcessCommands(octokit, repository, issue, issue.body || '', 'body');
 
-      // Get comments for this issue updated since last poll
+      // Get ALL comments for this issue to check for unacknowledged commands
+      // This is more robust than only checking new comments since last poll
       const { data: comments } = await octokit.rest.issues.listComments({
         owner,
         repo,
         issue_number: issueNumber,
-        since: since.toISOString(),
         per_page: 100,
       });
 
-      logger.debug(`Found ${comments.length} new comments in ${repository}#${issueNumber} since ${since.toISOString()}`, undefined, 'github-polling');
+      logger.debug(`Checking ${comments.length} total comments in ${repository}#${issueNumber} for unacknowledged commands`, undefined, 'github-polling');
 
-      // Process each new comment for /thopter commands
+      // Process each comment for /thopter commands
+      // The extractAndProcessCommands method will skip already acknowledged commands
       for (const comment of comments) {
         if (this.isStopped) {
           logger.debug('Polling stopped, exiting comment loop', undefined, 'github-polling');
