@@ -459,6 +459,21 @@ main {
   color: white;
 }
 
+.state-provisioning {
+  background: #3498db;
+  color: white;
+}
+
+.state-orphaned {
+  background: #9b59b6;
+  color: white;
+}
+
+.state-killing {
+  background: #e67e22;
+  color: white;
+}
+
 .state-failed {
   background: #e74c3c;
   color: white;
@@ -556,6 +571,14 @@ main {
 
 .table-btn.kill-btn:hover {
   background: #c0392b;
+}
+
+.table-btn.kill-btn.disabled,
+.table-btn.kill-btn:disabled {
+  background: #95a5a6 !important;
+  color: #ecf0f1 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
 }
 
 /* Legacy styles - kept for agent detail pages */

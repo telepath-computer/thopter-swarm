@@ -2,13 +2,20 @@ import express, { Request, Response, Router } from 'express';
 import path from 'path';
 import { stateManager } from '../lib/state-manager';
 import { logger } from '../lib/logger';
+import { AgentManager } from '../lib/agent-manager';
 import * as utils from '../lib/utils';
 
 // Create dashboard router
 const router = Router();
 
+// Store agent manager reference
+let agentManager: AgentManager | null = null;
+
 // Configure EJS template engine
-export function setupDashboard(app: express.Application): void {
+export function setupDashboard(app: express.Application, manager?: AgentManager): void {
+  if (manager) {
+    agentManager = manager;
+  }
   // Set view engine and views directory
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '../../views'));
@@ -131,21 +138,26 @@ router.post('/agent/:id/kill', (req: Request, res: Response) => {
       return;
     }
     
-    // Create destroy request via agent manager (we'll need to pass this through the main app)
-    // For now, we'll add the request directly
-    const requestId = utils.generateRequestId('destroy');
-    const destroyRequest = {
-      requestId,
-      source: 'dashboard' as const,
-      createdAt: new Date(),
-      status: 'pending' as const,
-      agentId,
-      reason: 'Manual kill request from dashboard'
-    };
+    // Check if agent manager is available
+    if (!agentManager) {
+      res.status(500).render('error', {
+        error: 'Service unavailable',
+        details: 'Agent manager is not available. Please try again later.'
+      });
+      return;
+    }
     
-    stateManager.addDestroyRequest(destroyRequest);
+    // Create destroy request via agent manager (this now prevents duplicates)
+    const requestId = agentManager.createDestroyRequest(agentId, 'dashboard', 'Manual kill request from dashboard');
     
-    logger.info(`Kill request created for agent ${agentId}`, agentId, 'dashboard');
+    if (!requestId) {
+      // Agent manager refused the request (already killing or duplicate request)
+      logger.warn(`Kill request refused for agent ${agentId} - may already be killing`, agentId, 'dashboard');
+      res.redirect('/?warning=agent-already-killing');
+      return;
+    }
+    
+    logger.info(`Kill request created for agent ${agentId}: ${requestId}`, agentId, 'dashboard');
     
     // Redirect back to dashboard
     res.redirect('/');

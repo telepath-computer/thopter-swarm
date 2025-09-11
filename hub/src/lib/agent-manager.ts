@@ -222,9 +222,32 @@ export class AgentManager {
   }
   
   /**
-   * Create a new destroy request
+   * Create a new destroy request - ensures only one destroy request per agent
    */
-  createDestroyRequest(agentId: string, source: DestroyRequest['source'] = 'dashboard', reason?: string): string {
+  createDestroyRequest(agentId: string, source: DestroyRequest['source'] = 'dashboard', reason?: string): string | null {
+    // Check if agent exists
+    const agent = stateManager.getAgent(agentId);
+    if (!agent) {
+      logger.warn(`Cannot create destroy request for non-existent agent: ${agentId}`, agentId, 'agent-manager');
+      return null;
+    }
+    
+    // Check if agent is already being killed
+    if (agent.state === 'killing') {
+      logger.warn(`Agent already in killing state: ${agentId}`, agentId, 'agent-manager');
+      return null;
+    }
+    
+    // Check if there's already a pending or processing destroy request for this agent
+    const existingRequest = stateManager.getRecentDestroyRequests().find(
+      req => req.agentId === agentId && (req.status === 'pending' || req.status === 'processing')
+    );
+    
+    if (existingRequest) {
+      logger.warn(`Destroy request already exists for agent ${agentId}: ${existingRequest.requestId}`, agentId, 'agent-manager');
+      return null;
+    }
+    
     const requestId = generateRequestId('destroy');
     
     const request: DestroyRequest = {
@@ -235,6 +258,9 @@ export class AgentManager {
       agentId,
       reason
     };
+    
+    // Set agent state to 'killing' to prevent further kill requests
+    agent.state = 'killing';
     
     stateManager.addDestroyRequest(request);
     logger.info(`Created destroy request: ${requestId} for agent ${agentId} (reason: ${reason || 'none'})`, agentId, 'agent-manager');
