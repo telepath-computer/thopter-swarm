@@ -92,25 +92,47 @@ fi
 
 echo ""
 echo "Testing provisioning with sample GitHub issue..."
-echo -e "${YELLOW}Issue #$ISSUE_NUMBER${NC}"
-echo -e "${BLUE}Golden Claude: $GOLDEN_CLAUDE${NC}"
+echo -e "${YELLOW}Issue #42${NC}"
+echo -e "${BLUE}Golden Claude: default${NC}"
 
-# Sample provision request with dynamic issue number
+# Sample provision request with complete mock data
 RESPONSE=$(curl -s -X POST "$HUB_URL/provision" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"repository\": \"test/repo\",
-    \"gc\": \"$GOLDEN_CLAUDE\",
-    \"github\": {
-      \"issueNumber\": \"$ISSUE_NUMBER\",
-      \"issueTitle\": \"Fix authentication bug in user login\",
-      \"issueBody\": \"Users are experiencing login failures when using special characters in passwords. The authentication service is throwing validation errors.\\n\\nSteps to reproduce:\\n1. Create user with password containing @#$%\\n2. Attempt to login\\n3. See error\\n\\nExpected: Login should succeed\\nActual: ValidationError thrown\\n\\n/thopter\",
-      \"issueUrl\": \"https://github.com/test/repo/issues/$ISSUE_NUMBER\",
-      \"issueAuthor\": \"test-user\",
-      \"mentionAuthor\": \"test-provisioner\",
-      \"mentionLocation\": \"body\"
+  -d '{
+    "repository": "telepath-computer/thopter-issue-test",
+    "gc": "default",
+    "prompt": "default",
+    "github": {
+      "issueNumber": "0",
+      "issueTitle": "Dummy issue",
+      "issueBody": "This issue exists only to test provisioning of a thopter instance. Claude, your task is to just say hello and not make any code changes or commits, as proof that the issue handling and provisioning system is working.\n\n/thopter",
+      "issueUrl": "https://github.com/telepath-computer/thopter-issue-test/issues/0",
+      "issueAuthor": "test-user",
+      "mentionCommentId": 123456789,
+      "mentionAuthor": "test-provisioner",
+      "mentionLocation": "body",
+      "assignees": ["test-user", "maintainer"],
+      "labels": ["bug"],
+      "comments": [
+        {
+          "id": 123456789,
+          "author": "test-provisioner",
+          "body": "dummy comment",
+          "createdAt": "2024-01-15T10:30:00Z",
+          "updatedAt": "2024-01-15T10:30:00Z",
+          "url": "https://github.com/telepath-computer/thopter-issue-test/issues/0#issuecomment-123456789"
+        },
+        {
+          "id": 123456790,
+          "author": "test-user",
+          "body": "Claude: when you say hello, impress the room and do it in a haiku form!",
+          "createdAt": "2024-01-15T11:45:00Z",
+          "updatedAt": "2024-01-15T11:45:00Z",
+          "url": "https://github.com/telepath-computer/thopter-issue-test/issues/0#issuecomment-123456790"
+        }
+      ]
     }
-  }")
+  }')
 
 echo ""
 echo "Response:"
@@ -118,17 +140,17 @@ echo "$RESPONSE" | jq '.' || echo "$RESPONSE"
 
 # Check if provisioning was successful
 if echo "$RESPONSE" | jq -e '.success' > /dev/null 2>&1; then
-    AGENT_ID=$(echo "$RESPONSE" | jq -r '.agent.id')
-    WEB_TERMINAL=$(echo "$RESPONSE" | jq -r '.agent.webTerminalUrl')
+    REQUEST_ID=$(echo "$RESPONSE" | jq -r '.requestId')
+    MESSAGE=$(echo "$RESPONSE" | jq -r '.message')
     
     echo ""
-    echo -e "${GREEN}🚁 Thopter provisioned successfully!${NC}"
-    echo -e "${GREEN}Agent ID: $AGENT_ID${NC}"
-    echo -e "${GREEN}Web Terminal: $WEB_TERMINAL${NC}"
+    echo -e "${GREEN}🚁 Provision request created successfully!${NC}"
+    echo -e "${GREEN}Request ID: $REQUEST_ID${NC}"
+    echo -e "${GREEN}Message: $MESSAGE${NC}"
     echo ""
     echo "You can now:"
-    echo "1. Access the thopter via web terminal: $WEB_TERMINAL"
-    echo "2. Check status: ./fly/status.sh"
+    echo "1. Check status: ./fly/status.sh"
+    echo "2. Watch hub dashboard for provisioning progress"
     echo "3. Clean up when done: ./cleanup-thopters.sh"
 else
     echo ""

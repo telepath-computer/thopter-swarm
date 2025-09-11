@@ -164,7 +164,7 @@ class StateManager {
       logger.info(`Agent state transition: ${previousState} → ${agent.state}`, agentId, 'state-manager');
     }
     
-    logger.debug(`Updated agent from status report`, agentId, 'state-manager', { state: agent.state, hasObserver: agent.hasObserver });
+    // logger.debug(`Updated agent from status report`, agentId, 'state-manager', { state: agent.state, hasObserver: agent.hasObserver });
   }
   
   /**

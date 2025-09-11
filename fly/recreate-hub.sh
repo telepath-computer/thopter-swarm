@@ -198,8 +198,27 @@ echo -e "${CHECK} Hub image built and pushed successfully"
 
 echo ""
 
+# Ensure hub volume exists
+echo "4. Ensuring hub volume exists..."
+HUB_VOLUME_NAME="hub_data"
+
+# Check if hub volume exists
+EXISTING_HUB_VOLUME=$(fly volumes list --json 2>/dev/null | jq -r --arg name "$HUB_VOLUME_NAME" '.[] | select(.name==$name) | .id' | head -n1)
+
+if [ -n "$EXISTING_HUB_VOLUME" ]; then
+    echo -e "${CHECK} Hub volume already exists: $HUB_VOLUME_NAME ($EXISTING_HUB_VOLUME)"
+else
+    echo -e "${INFO} Creating hub volume: $HUB_VOLUME_NAME"
+    fly volume create $HUB_VOLUME_NAME --size 10 --region $REGION -y
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}${CROSS} Failed to create hub volume${NC}"
+        exit 1
+    fi
+    echo -e "${CHECK} Hub volume created: $HUB_VOLUME_NAME"
+fi
+
 # Launch hub machine
-echo "4. Launching hub machine..."
+echo "5. Launching hub machine..."
 echo -e "${ROCKET} Starting hub with image: $HUB_IMAGE"
 
 METADATA_SERVICE_HOST=1.redis.kv._metadata.${APP_NAME}.internal
@@ -209,6 +228,7 @@ fly machine run $HUB_IMAGE \
     --vm-size=$HUB_VM_SIZE \
     --autostop=off \
     --region $REGION \
+    --volume $HUB_VOLUME_NAME:/data \
     --env APP_NAME="$APP_NAME" \
     --env REGION="$REGION" \
     --env MAX_THOPTERS="$MAX_THOPTERS" \
@@ -249,7 +269,7 @@ fi
 echo ""
 
 # Wait for hub to be ready
-echo "5. Waiting for hub to start..."
+echo "6. Waiting for hub to start..."
 echo -e "${INFO} Checking if hub process is running..."
 
 # Check if hub is running internally (this doesn't require wireguard)
@@ -269,7 +289,7 @@ if [ "$HEALTH_CHECK_PASSED" = false ]; then
 fi
 
 echo ""
-echo "6. Waiting for hub service discovery..."
+echo "7. Waiting for hub service discovery..."
 echo -e "${INFO} Testing hub service discovery via 1.hub.kv._metadata.${APP_NAME}.internal:${HUB_PORT}"
 HUB_DNS_READY=false
 for i in {1..24}; do
@@ -289,7 +309,7 @@ if [ "$HUB_DNS_READY" = false ]; then
 fi
 
 echo ""
-echo "7. Testing Wireguard connectivity..."
+echo "8. Testing Wireguard connectivity..."
 HUB_URL="http://$HUB_ID.vm.$APP_NAME.internal:$HUB_PORT/health"
 
 if curl -s --connect-timeout 3 "$HUB_URL" | grep -q '"status":"ok"' 2>/dev/null; then
@@ -303,7 +323,7 @@ else
 fi
 
 echo ""
-echo "8. Checking for .env.thopters file..."
+echo "9. Checking for .env.thopters file..."
 if [ -f ".env.thopters" ]; then
     echo -e "${INFO} Found .env.thopters file, uploading to hub..."
     ./fly/upload-env-thopters.sh

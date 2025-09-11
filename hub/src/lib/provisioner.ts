@@ -300,7 +300,7 @@ export class ThopterProvisioner {
     const envFilePath = '/data/thopter-env/.env.thopters';
     if (require('fs').existsSync(envFilePath)) {
       console.log(`  ✅ Found .env.thopters file, including in machine creation`);
-      machineRunArgs.splice(-2, 0, '--file-local', `/data/thopter/.env.thopters=${envFilePath}`);
+      machineRunArgs.push('--file-local', `/tmp/.env.thopters=${envFilePath}`);
     }
 
     console.log(`Executing async: fly ${machineRunArgs.join(' ')}`);
