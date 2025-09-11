@@ -96,6 +96,9 @@ echo "3. Uploading .env.thopters to hub..."
 # Create directory on hub if it doesn't exist
 fly ssh console --machine $HUB_MACHINE -C "mkdir -p /data/thopter-env" 2>/dev/null || true
 
+# Delete existing file first (sftp won't replace files)
+fly ssh console --machine $HUB_MACHINE -C "rm -f /data/thopter-env/.env.thopters" 2>/dev/null || true
+
 # Upload the file using sftp
 echo "put .env.thopters /data/thopter-env/.env.thopters" | fly ssh sftp shell --machine $HUB_MACHINE
 
