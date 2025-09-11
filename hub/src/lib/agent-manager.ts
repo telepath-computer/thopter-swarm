@@ -19,6 +19,11 @@ export class AgentManager {
    * Start the agent manager - begins processing based on current state
    */
   start(): void {
+    if (this.processingLoop) {
+      logger.warn('Agent manager processing loop already started', undefined, 'agent-manager');
+      return;
+    }
+    
     logger.info(`Starting agent manager processing loop`, undefined, 'agent-manager');
     
     // Start the main processing loop
@@ -252,5 +257,17 @@ export class AgentManager {
       clearTimeout(this.processingLoop);
       this.processingLoop = null;
     }
+  }
+  
+  /**
+   * Get current status
+   */
+  getStatus() {
+    const operatingMode = stateManager.getOperatingMode();
+    return {
+      isRunning: !!this.processingLoop && operatingMode === 'running',
+      systemMode: operatingMode,
+      hasProcessingLoop: !!this.processingLoop
+    };
   }
 }

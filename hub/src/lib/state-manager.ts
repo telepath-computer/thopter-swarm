@@ -22,7 +22,7 @@ class StateManager {
   private goldenClaudes: Map<string, GoldenClaudeState> = new Map();
   private provisionRequests: ProvisionRequest[] = [];
   private destroyRequests: DestroyRequest[] = [];
-  private operatingMode: OperatingMode = 'starting';
+  private operatingMode: OperatingMode = 'initializing';
   
   private readonly maxProvisionRequests = 50;
   private readonly maxDestroyRequests = 50;
@@ -66,8 +66,6 @@ class StateManager {
    * Agents will transition out of 'orphaned' state when observers report in
    */
   async bootstrap(): Promise<void> {
-    // Set initial state to 'starting' during bootstrap
-    this.operatingMode = 'starting';
     logger.info('Bootstrapping state from fly.io machines', undefined, 'state-manager');
     
     try {
@@ -104,13 +102,9 @@ class StateManager {
       this.startGoldenClaudeRefresh();
       
       logger.info('Bootstrap completed successfully', undefined, 'state-manager');
-      this.operatingMode = 'running';
-      logger.info('State manager ready - operating mode set to running', undefined, 'state-manager');
       
     } catch (error) {
       logger.error(`Bootstrap failed: ${error instanceof Error ? error.message : String(error)}`, undefined, 'state-manager');
-      this.operatingMode = 'running';
-      logger.info('State manager starting in running mode despite bootstrap error', undefined, 'state-manager');
       throw error;
     }
   }
