@@ -3,6 +3,31 @@ set -e
 
 echo "Starting Thopter agent container as PID 1..."
 
+# Wait for /data mount point to be fully ready before proceeding
+echo "Checking data mount point readiness..."
+DATA_MOUNT_READY=false
+for i in {1..30}; do
+    # Test that we can write and read from the mount point
+    TEST_FILE="/data/.mount-test-$$-$(date +%s%N)"
+    if echo "mount-test-$(date +%s)" > "$TEST_FILE" 2>/dev/null && \
+       [ -f "$TEST_FILE" ] && \
+       read -r test_content < "$TEST_FILE" && \
+       [ -n "$test_content" ] && \
+       rm -f "$TEST_FILE" 2>/dev/null; then
+        echo "Data mount point is ready (attempt $i/30)"
+        DATA_MOUNT_READY=true
+        break
+    else
+        echo "Data mount not ready, waiting... (attempt $i/30)"
+        sleep 2
+    fi
+done
+
+if [ "$DATA_MOUNT_READY" = false ]; then
+    echo "ERROR: Data mount point failed readiness check after 60 seconds"
+    exit 1
+fi
+
 # /data is the fly volume mount which is installed for first command runs and
 # we set the new user's homedir there, because these mounts have much higher
 # performance than the VM's local volumes and claude needs to do active work.
@@ -71,25 +96,14 @@ if [ -f "/tmp/.env.thopters" ]; then
     echo "Moving .env.thopters from /tmp to thopter home directory..."
     mv /tmp/.env.thopters /data/thopter/.env.thopters
     chown thopter:thopter /data/thopter/.env.thopters
-fi
-
-# Source .env.thopters if it exists (developer-provided environment variables)
-# TODO: if i put this before the firewall script it doesn't work. there may be
-# a timing / race condition with respect to the mount being available during
-# initalization? in which case deactivating the firewall script could cause
-# problems in things that depend on that running time...
-if [ -f "/data/thopter/.env.thopters" ]; then
-    echo "Loading developer environment variables from .env.thopters..."
-    # Add sourcing to .bashrc so it's available in all shells
-    if ! grep -q "source.*\.env\.thopters" /data/thopter/.bashrc 2>/dev/null; then
-        echo "" >> /data/thopter/.bashrc
-        echo "# Load developer environment variables" >> /data/thopter/.bashrc
-        echo "if [ -f ~/.env.thopters ]; then" >> /data/thopter/.bashrc
-        echo "    set -a  # Mark all new variables for export" >> /data/thopter/.bashrc
-        echo "    source ~/.env.thopters" >> /data/thopter/.bashrc
-        echo "    set +a  # Turn off auto-export" >> /data/thopter/.bashrc
-        echo "fi" >> /data/thopter/.bashrc
-    fi
+    echo "Sourcing .env.thopters in .bashrc..."
+    echo "" >> /data/thopter/.bashrc
+    echo "# Load developer environment variables" >> /data/thopter/.bashrc
+    echo "if [ -f ~/.env.thopters ]; then" >> /data/thopter/.bashrc
+    echo "    set -a  # Mark all new variables for export" >> /data/thopter/.bashrc
+    echo "    source ~/.env.thopters" >> /data/thopter/.bashrc
+    echo "    set +a  # Turn off auto-export" >> /data/thopter/.bashrc
+    echo "fi" >> /data/thopter/.bashrc
     chown thopter:thopter /data/thopter/.bashrc
 fi
 
