@@ -22,6 +22,24 @@ useradd -m -d /data/thopter -s /bin/bash -U thopter
 mkdir -p /data/thopter/workspace
 chown thopter:thopter /data/thopter/workspace
 
+# Handle prompt file selection and copying
+echo "Setting up prompt file..."
+PROMPT_FILE=${PROMPT_FILE:-default.md}
+
+# Ensure .md extension
+if [[ "$PROMPT_FILE" != *.md ]]; then
+    PROMPT_FILE="${PROMPT_FILE}.md"
+fi
+
+if [ -f "/prompts/$PROMPT_FILE" ]; then
+    echo "Using prompt file: $PROMPT_FILE"
+    cp "/prompts/$PROMPT_FILE" /data/thopter/workspace/prompt.md
+else
+    echo "Prompt file $PROMPT_FILE not found, using default.md"
+    cp "/prompts/default.md" /data/thopter/workspace/prompt.md
+fi
+chown thopter:thopter /data/thopter/workspace/prompt.md
+
 # Create useful aliases for thopter user
 cat > /data/thopter/.bash_aliases << 'EOF'
 # Claude alias with dangerous permissions flag (needed for autonomous operation)
@@ -50,21 +68,20 @@ if [ -d "/data/thopter/.claude" ]; then
     chown -R thopter:thopter /data/thopter/.claude
 fi
 
-# If issue context was injected, fix ownership  
+# If issue context was injected, move to workspace and fix ownership  
 if [ -f "/data/thopter/issue.md" ]; then
-    echo "Fixing issue context ownership for thopter user..."
-    chown thopter:thopter /data/thopter/issue.md
+    echo "Moving issue.md to workspace and fixing ownership..."
+    mv /data/thopter/issue.md /data/thopter/workspace/issue.md
+    chown thopter:thopter /data/thopter/workspace/issue.md
 fi
 
 if [ -f "/data/thopter/issue.json" ]; then
-    echo "Fixing issue.json ownership for thopter user..."
-    chown thopter:thopter /data/thopter/issue.json
+    echo "Moving issue.json to workspace and fixing ownership..."
+    mv /data/thopter/issue.json /data/thopter/workspace/issue.json
+    chown thopter:thopter /data/thopter/workspace/issue.json
 fi
 
-if [ -f "/data/thopter/prompt.md" ]; then
-    echo "Fixing prompt.md ownership for thopter user..."
-    chown thopter:thopter /data/thopter/prompt.md
-fi
+# Note: prompt.md is now handled above in the prompt setup section
 
 # Ensure logs directory exists with proper ownership for observer
 mkdir -p /data/thopter/logs

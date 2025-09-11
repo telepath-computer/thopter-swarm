@@ -91,6 +91,9 @@ COPY scripts/observer.js /usr/local/bin/observer.js
 COPY scripts/pm2.config.js /usr/local/bin/pm2.config.js
 COPY scripts/start-observer.sh /usr/local/bin/start-observer.sh
 
+# Copy prompt templates to be available at runtime
+COPY prompts/*.md /prompts/
+
 # Set permissions for session observer scripts
 RUN chmod +x /usr/local/bin/observer.js && \
     chmod +x /usr/local/bin/start-observer.sh

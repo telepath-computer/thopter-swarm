@@ -151,12 +151,11 @@ export class ThopterProvisioner {
       console.log(`🔧 [${requestId}] Setting up Git configuration and cloning repository...`);
       await this.setupGitAndCloneRepo(machineId, request, requestId);
 
-      // Copy issue and prompt files to the machine after it's ready
+      // Copy issue files to the machine after it's ready
       console.log(`📄 [${requestId}] Copying context files to machine...`);
       const issueContent = this.prepareIssueContent(request);
-      const promptContent = this.preparePromptContent(request, machineId);
       const issueJsonContent = this.prepareIssueJsonContent(request, machineId);
-      await this.copyFilesToMachine(machineId, issueContent, promptContent, issueJsonContent);
+      await this.copyFilesToMachine(machineId, issueContent, issueJsonContent);
       console.log(`📋 [${requestId}] Context files copied successfully`);
 
       // Launch Claude in tmux session (final step)
@@ -290,6 +289,7 @@ export class ThopterProvisioner {
       '--env', `ISSUE_NUMBER=${request.github.issueNumber}`,
       '--env', `GIT_USER_NAME=${repoConfig.userName}`,
       '--env', `GIT_USER_EMAIL=${repoConfig.userEmail}`,
+      '--env', `PROMPT_FILE=${request.prompt || 'default'}`,
       '--env', `DANGEROUSLY_SKIP_FIREWALL=${process.env.DANGEROUSLY_SKIP_FIREWALL || '0'}`,
       '--env', `ALLOWED_DOMAINS=${process.env.ALLOWED_DOMAINS || ''}`,
       '-t', this.flyToken,
@@ -349,31 +349,24 @@ export class ThopterProvisioner {
   }
 
   /**
-   * Copy issue context and prompt files to the thopter machine
+   * Copy issue context files to the thopter machine
    */
-  private async copyFilesToMachine(machineId: string, issueContent: string, promptContent: string, issueJsonContent: string): Promise<void> {
+  private async copyFilesToMachine(machineId: string, issueContent: string, issueJsonContent: string): Promise<void> {
     console.log(`📄 Copying context files to machine ${machineId}`);
 
     // Create temporary files
     const issueFile = `/tmp/issue-${Date.now()}.md`;
-    const promptFile = `/tmp/prompt-${Date.now()}.md`;
     const issueJsonFile = `/tmp/issue-${Date.now()}.json`;
 
     try {
       // Write temporary files
       require('fs').writeFileSync(issueFile, issueContent);
-      require('fs').writeFileSync(promptFile, promptContent);
       require('fs').writeFileSync(issueJsonFile, issueJsonContent);
 
       // Copy files to machine using fly ssh sftp shell
       const execAsync = promisify(exec);
       
       await execAsync(`echo "put ${issueFile} /data/thopter/issue.md" | fly ssh sftp shell --machine ${machineId} -a ${this.appName} -t "${this.flyToken}"`, {
-        cwd: process.cwd(),
-        shell: '/bin/bash'
-      });
-
-      await execAsync(`echo "put ${promptFile} /data/thopter/prompt.md" | fly ssh sftp shell --machine ${machineId} -a ${this.appName} -t "${this.flyToken}"`, {
         cwd: process.cwd(),
         shell: '/bin/bash'
       });
@@ -389,7 +382,6 @@ export class ThopterProvisioner {
       // Clean up temporary files
       try {
         require('fs').unlinkSync(issueFile);
-        require('fs').unlinkSync(promptFile);
         require('fs').unlinkSync(issueJsonFile);
       } catch (error) {
         console.warn('Failed to cleanup temp files:', error);
@@ -467,42 +459,6 @@ ${request.github.issueBody}
     return content;
   }
 
-  /**
-   * Prepare initial prompt for Claude Code
-   */
-  private preparePromptContent(request: ProvisionRequest, machineId: string): string {
-    const branchName = `thopter/${request.github.issueNumber}--${machineId}`;
-    const repoName = request.repository.split('/')[1];
-    
-    // Load template file - use specified prompt or default
-    // Normalize prompt name: strip .md extension, lowercase, then add .md back
-    let promptName = request.prompt || 'default';
-    promptName = promptName.replace(/\.md$/i, '').toLowerCase();
-    
-    // Try to load the requested template, fall back to default if not found
-    let templatePath = join(__dirname, '../../templates/prompts', `${promptName}.md`);
-    let template: string;
-    
-    try {
-      template = readFileSync(templatePath, 'utf8');
-    } catch (error) {
-      if (promptName !== 'default') {
-        console.log(`⚠️ Prompt template "${promptName}.md" not found, falling back to default.md`);
-        templatePath = join(__dirname, '../../templates/prompts', 'default.md');
-        template = readFileSync(templatePath, 'utf8');
-      } else {
-        throw new Error(`Default prompt template not found at ${templatePath}`);
-      }
-    }
-    
-    // Replace template variables
-    return template
-      .replace(/\{\{repository\}\}/g, request.repository)
-      .replace(/\{\{workBranch\}\}/g, branchName)
-      .replace(/\{\{repoName\}\}/g, repoName)
-      .replace(/\{\{issueNumber\}\}/g, request.github.issueNumber)
-      .replace(/\{\{machineId\}\}/g, machineId);
-  }
 
   /**
    * Prepare issue JSON context for observer
@@ -815,7 +771,7 @@ ${request.github.issueBody}
       console.log(`  2️⃣ Launching Claude with instructions...`);
       try {
         await execAsync(
-          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"claude --dangerously-skip-permissions \\\\\\\"read /data/thopter/prompt.md for your instructions\\\\\\\"\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"claude --dangerously-skip-permissions \\\\\\\"read /data/thopter/workspace/prompt.md for your instructions\\\\\\\"\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
           { 
             cwd: process.cwd()
           }
