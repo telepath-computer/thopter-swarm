@@ -106,7 +106,7 @@ RUN chmod +x /usr/local/bin/observer.js && \
 ### RUN chmod +x /usr/local/bin/setup-firewall.sh
 
 # Default tmux configuration with proper terminal support (system-wide)
-RUN echo "set -g mouse off" > /etc/tmux.conf && \
+RUN echo "set -g mouse on" > /etc/tmux.conf && \
     echo "setw -g mode-keys vi" >> /etc/tmux.conf && \
     echo "set -g prefix C-a" >> /etc/tmux.conf && \
     echo "unbind C-b" >> /etc/tmux.conf && \
