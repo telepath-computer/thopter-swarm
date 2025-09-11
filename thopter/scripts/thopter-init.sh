@@ -43,6 +43,8 @@ fi
 # Source .env.thopters if it exists (developer-provided environment variables)
 if [ -f "/data/thopter/.env.thopters" ]; then
     echo "Loading developer environment variables from .env.thopters..."
+    # Ensure proper ownership
+    chown thopter:thopter /data/thopter/.env.thopters
     # Add sourcing to .bashrc so it's available in all shells
     if ! grep -q "source.*\.env\.thopters" /data/thopter/.bashrc 2>/dev/null; then
         echo "" >> /data/thopter/.bashrc
