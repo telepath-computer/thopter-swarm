@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const OUTPUT_DIR = '/data/thopter/.claude/projects';
-const INTERVAL = 60000; // 1 minute
+const INTERVAL = 30000;
 
 // Handle shutdown signals
 let shouldStop = false;
@@ -30,6 +30,10 @@ function runClaudeCodeLog() {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   }
 
+  // Recursively delete existing .html files to force regeneration
+  console.log(`[${new Date().toISOString()}] Cleaning existing .html files...`);
+  deleteHtmlFiles(OUTPUT_DIR);
+
   console.log(`[${new Date().toISOString()}] Running claude-code-log...`);
   
   exec('uvx claude-code-log@latest', {
@@ -44,6 +48,26 @@ function runClaudeCodeLog() {
       if (stdout) console.log(`stdout: ${stdout}`);
     }
   });
+}
+
+function deleteHtmlFiles(dir) {
+  try {
+    const items = fs.readdirSync(dir);
+    
+    for (const item of items) {
+      const fullPath = path.join(dir, item);
+      const stat = fs.statSync(fullPath);
+      
+      if (stat.isDirectory()) {
+        deleteHtmlFiles(fullPath); // Recursively delete in subdirectories
+      } else if (stat.isFile() && item.endsWith('.html')) {
+        fs.unlinkSync(fullPath);
+        console.log(`  Deleted: ${fullPath}`);
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to clean .html files from ${dir}: ${error.message}`);
+  }
 }
 
 // Run immediately on start

@@ -132,6 +132,30 @@ You can create multiple thopters by issuing multiple comments with /thopter comm
 └── thopter/            # Agent containers
 ```
 
+## Session logs
+
+Each thopter automatically generates HTML session logs that provide a convenient way to review the entire interactive session without scrolling through terminal history. The logs include:
+
+- **Complete session transcript**: All Claude Code interactions, commands, and outputs
+- **Timestamped entries**: Easy chronological navigation  
+- **Web accessible**: View logs through your browser on the Fly Wireguard network
+- **Automatic updates**: Logs refresh every 30 seconds with new activity
+
+These are generated using https://github.com/daaain/claude-code-log -- you can thank that project for the lovely page design :)
+
+### Accessing session logs
+
+Session logs are available at `http://{machine-id}.vm.{app-name}.internal:7791` for each running thopter. You can find machine IDs through:
+
+- Hub dashboard at `http://1.hub.kv._metadata.{app-name}.internal:8080`
+- Fly CLI: `fly machines list`
+
+The logs provide an excellent alternative to using terminal scrollback when you need to:
+- Review what Claude accomplished during a long session
+- Share session progress with team members  
+- Debug issues or understand Claude's reasoning process
+- Document successful approaches for future reference
+
 ## Authentication and security
 
 ### GitHub
