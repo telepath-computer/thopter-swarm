@@ -1,4 +1,5 @@
 .env
+.env.thopters
 .env*.local
 fly.toml
 

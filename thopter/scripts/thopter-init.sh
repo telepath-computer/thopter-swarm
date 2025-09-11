@@ -40,6 +40,22 @@ if ! grep -q "source.*\.bash_aliases" /data/thopter/.bashrc 2>/dev/null; then
     chown thopter:thopter /data/thopter/.bashrc
 fi
 
+# Source .env.thopters if it exists (developer-provided environment variables)
+if [ -f "/data/thopter/.env.thopters" ]; then
+    echo "Loading developer environment variables from .env.thopters..."
+    # Add sourcing to .bashrc so it's available in all shells
+    if ! grep -q "source.*\.env\.thopters" /data/thopter/.bashrc 2>/dev/null; then
+        echo "" >> /data/thopter/.bashrc
+        echo "# Load developer environment variables" >> /data/thopter/.bashrc
+        echo "if [ -f ~/.env.thopters ]; then" >> /data/thopter/.bashrc
+        echo "    set -a  # Mark all new variables for export" >> /data/thopter/.bashrc
+        echo "    source ~/.env.thopters" >> /data/thopter/.bashrc
+        echo "    set +a  # Turn off auto-export" >> /data/thopter/.bashrc
+        echo "fi" >> /data/thopter/.bashrc
+    fi
+    chown thopter:thopter /data/thopter/.bashrc
+fi
+
 # Phase 4: Setup network firewall (as root before switching to thopter user)
 echo "Setting up network firewall..."
 /usr/local/bin/firewall.sh

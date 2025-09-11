@@ -173,11 +173,27 @@ Pick your strategy and set up a user with PATs:
 
 ### Handling dev env secrets
 
-If Claude Code or your dev environment needs secrets, the only way right now is to manually set them up in a file in `/data/thopter` on your golden claude(s). The full contents of `/data/thopter` on your golden claude are copied to each new thopter upon provisioning it.
+#### Developer Environment Variables (.env.thopters)
+
+You can provide development environment variables that will be automatically
+loaded in all thopter containers by creating a `.env.thopters` file in your
+project root. This file is uploaded to the hub and distributed to all new
+thopters during provisioning.
+
+Example `.env.thopters`:
+```bash
+ANTHROPIC_API_KEY=sk-ant-api03-...
+MY_SERVICE_URL=https://dev.example.com
+NODE_ENV=development
+```
+
+See [docs/env-thopters.md](docs/env-thopters.md) for detailed documentation.
+
+#### Alternative: Golden Claude Files
+
+If Claude Code or your dev environment needs files (not just environment variables), you can manually set them up in a file in `/data/thopter` on your golden claude(s). The full contents of `/data/thopter` on your golden claude are copied to each new thopter upon provisioning it.
 
 Note: env vars are NOT copied from golden claudes, only the `/data/thopter` folder tree contents.
-
-TODO: support a `.env.thopters` var that is sent to the hub and automatically copied to thopters for secrets.
 
 TODO: add a file `post-checkout.sh` in the thopter base image you can modify, it gets run after the provisioner has done all its git setup, cloning, right before it launches claude. Changes to that file require a rebuild of the thopter image (`rebuild-thopter.sh`) and after that rebuild will affect new thopters.
 

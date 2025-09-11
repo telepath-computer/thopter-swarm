@@ -211,6 +211,25 @@ else
 fi
 
 echo ""
+echo "8. Checking optional .env.thopters file..."
+
+if [ -f ".env.thopters" ]; then
+    # Validate .env.thopters file format
+    if bash -c "set -e; source .env.thopters" 2>/dev/null; then
+        # Check for dangerous patterns
+        if grep -qE '(rm |sudo |eval |exec |source |\./)' .env.thopters; then
+            add_warning ".env.thopters contains potentially dangerous commands - only KEY=value pairs should be used"
+        else
+            show_success ".env.thopters file is valid and will be used for thopter environments"
+        fi
+    else
+        add_warning ".env.thopters file exists but is not valid bash source format"
+    fi
+else
+    show_info "No .env.thopters file found (optional - for developer environment variables)"
+fi
+
+echo ""
 echo "========================================"
 echo "📋 Preflight Summary"
 echo "========================================"

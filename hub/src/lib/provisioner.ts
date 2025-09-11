@@ -159,6 +159,10 @@ export class ThopterProvisioner {
       await this.copyFilesToMachine(machineId, issueContent, promptContent, issueJsonContent);
       console.log(`📋 [${requestId}] Context files copied successfully`);
 
+      // Copy .env.thopters file from hub to thopter if it exists
+      console.log(`🔧 [${requestId}] Checking for .env.thopters file...`);
+      await this.copyEnvThoptersToMachine(machineId, requestId);
+
       // Launch Claude in tmux session (final step)
       console.log(`🚀 [${requestId}] Launching Claude in tmux session...`);
       await this.launchClaudeInTmux(machineId, requestId);
@@ -784,6 +788,62 @@ ${request.github.issueBody}
       console.error(`⚠️ [${requestId}] Git setup failed after ${elapsed}s:`, error);
       console.log(`ℹ️ [${requestId}] Continuing provisioning without repository clone`);
       // Don't throw - provision the agent and let a developer find out what's wrong
+    }
+  }
+
+  /**
+   * Copy .env.thopters file from hub to thopter if it exists
+   */
+  private async copyEnvThoptersToMachine(machineId: string, requestId: string): Promise<void> {
+    const startTime = Date.now();
+    
+    try {
+      const execAsync = promisify(exec);
+      
+      // Check if .env.thopters exists on hub
+      const envFilePath = '/data/thopter-env/.env.thopters';
+      try {
+        const fileExists = require('fs').existsSync(envFilePath);
+        
+        if (!fileExists) {
+          console.log(`  ℹ️ No .env.thopters file found on hub (optional)`);
+          return;
+        }
+        
+        console.log(`  ✅ Found .env.thopters file on hub`);
+        
+        // Copy the file to thopter using sftp
+        console.log(`  📤 Copying .env.thopters to thopter...`);
+        await execAsync(
+          `echo "put ${envFilePath} /data/thopter/.env.thopters" | fly ssh sftp shell --machine ${machineId} -a ${this.appName} -t "${this.flyToken}"`,
+          {
+            cwd: process.cwd(),
+            shell: '/bin/bash'
+          }
+        );
+        
+        // Set proper ownership
+        console.log(`  🔧 Setting file ownership...`);
+        await execAsync(
+          `fly ssh console -C "chown thopter:thopter /data/thopter/.env.thopters" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+          {
+            cwd: process.cwd()
+          }
+        );
+        
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`✅ [${requestId}] .env.thopters copied successfully in ${elapsed}s`);
+        
+      } catch (error) {
+        // File doesn't exist or copy failed - not critical
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`  ℹ️ .env.thopters not copied (${error instanceof Error ? error.message : String(error)})`);
+      }
+      
+    } catch (error) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.error(`⚠️ [${requestId}] .env.thopters copy failed after ${elapsed}s:`, error);
+      // Don't throw - this is an optional step
     }
   }
 

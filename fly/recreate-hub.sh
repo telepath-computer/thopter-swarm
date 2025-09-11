@@ -303,6 +303,18 @@ else
 fi
 
 echo ""
+echo "8. Checking for .env.thopters file..."
+if [ -f ".env.thopters" ]; then
+    echo -e "${INFO} Found .env.thopters file, uploading to hub..."
+    ./fly/upload-env-thopters.sh
+    if [ $? -ne 0 ]; then
+        echo -e "${WARNING} Failed to upload .env.thopters (continuing anyway)"
+    fi
+else
+    echo -e "${INFO} No .env.thopters file found (optional)"
+fi
+
+echo ""
 echo "========================================"
 echo -e "${GREEN}${ROCKET} Hub Deployment Complete!${NC}"
 echo "========================================"
