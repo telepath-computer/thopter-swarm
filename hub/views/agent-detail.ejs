@@ -51,10 +51,14 @@
               </div>
             <% } %>
             
-            <% if (agent.workBranch) { %>
+            <% if (agent.workBranch && agent.repository) { %>
               <div class="detail-row">
                 <div class="detail-label">Work Branch:</div>
-                <div class="detail-value"><%= agent.workBranch %></div>
+                <div class="detail-value">
+                  <a href="<%= formatters.gitHubTreeUrl(agent.repository, agent.workBranch) %>" target="_blank">
+                    <%= agent.workBranch %>
+                  </a>
+                </div>
               </div>
             <% } %>
             
