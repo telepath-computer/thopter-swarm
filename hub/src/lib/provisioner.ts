@@ -109,7 +109,7 @@ export class ThopterProvisioner {
   }
 
   /**
-   * Main provisioning routine - creates a new thopter agent for a GitHub issue
+   * Main provisioning routine - creates a new thopter for a GitHub issue
    */
   async provision(request: ProvisionRequest): Promise<ProvisionResult> {
     const requestId = `${request.repository}#${request.github.issueNumber}`;
@@ -762,7 +762,7 @@ ${request.github.issueBody}
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       console.error(`⚠️ [${requestId}] Git setup failed after ${elapsed}s:`, error);
       console.log(`ℹ️ [${requestId}] Continuing provisioning without repository clone`);
-      // Don't throw - provision the agent and let a developer find out what's wrong
+      // Don't throw - provision the thopter and let a developer find out what's wrong
     }
   }
 
@@ -816,7 +816,7 @@ ${request.github.issueBody}
   }
 
   /**
-   * Destroy a thopter agent and its associated resources
+   * Destroy a thopter and its associated resources
    */
   async destroy(thopterId: string): Promise<DestroyResult> {
     console.log(`🔥 Destroying thopter: ${thopterId}`);
@@ -843,7 +843,7 @@ ${request.github.issueBody}
       console.log(`💥 Destroying machine ${thopterId}...`);
       await this.fly(['machine', 'destroy', thopterId, '-t', this.flyToken, '--force']);
       
-      // Leave volumes in pool for reuse by future agents
+      // Leave volumes in pool for reuse by future thopters
       if (machineDetails?.config?.mounts?.length > 0) {
         console.log(`💾 Volumes left in pool for reuse: ${machineDetails.config.mounts.map((m: any) => m.volume).join(', ')}`);
       }

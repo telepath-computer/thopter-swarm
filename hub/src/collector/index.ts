@@ -12,8 +12,8 @@ export function handleStatusUpdate(req: Request, res: Response): void {
     const statusUpdate: ThopterStatusUpdate = req.body;
     
     // Validate required fields
-    if (!statusUpdate.agent_id) {
-      res.status(400).json({ error: 'Missing required field: agent_id' });
+    if (!statusUpdate.thopter_id) {
+      res.status(400).json({ error: 'Missing required field: thopter_id' });
       return;
     }
     
@@ -46,14 +46,14 @@ export function handleStatusUpdate(req: Request, res: Response): void {
     res.json({ 
       received: true, 
       timestamp: new Date().toISOString(),
-      agent_id: statusUpdate.agent_id,
+      thopter_id: statusUpdate.thopter_id,
       state: statusUpdate.state
     });
     
   } catch (error) {
     logger.error(
       `Status update processing failed: ${error instanceof Error ? error.message : String(error)}`,
-      req.body?.agent_id,
+      req.body?.thopter_id,
       'collector'
     );
     

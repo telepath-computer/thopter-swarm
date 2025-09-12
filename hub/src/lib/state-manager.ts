@@ -180,10 +180,10 @@ class StateManager {
    * Update thopter from observer status report (best-effort metadata)
    */
   updateThopterFromStatus(status: ThopterStatusUpdate): void {
-    let thopter = this.thopters.get(status.agent_id);
+    let thopter = this.thopters.get(status.thopter_id);
     
     if (!thopter) {
-      logger.warn(`Received status for unknown thopter: ${status.agent_id}`, status.agent_id, 'state-manager');
+      logger.warn(`Received status for unknown thopter: ${status.thopter_id}`, status.thopter_id, 'state-manager');
       // Don't auto-create - fly reconciliation will discover it if it exists
       // This prevents phantom thopters from bad status updates
       return;
@@ -194,8 +194,7 @@ class StateManager {
       claudeState: status.state,
       lastActivity: new Date(status.last_activity),
       idleSince: status.idle_since ? new Date(status.idle_since) : undefined,
-      screenDump: status.screen_dump,
-      hasObserver: true
+      screenDump: status.screen_dump
     };
     
     // Update GitHub context if provided (best-effort metadata)
@@ -205,7 +204,7 @@ class StateManager {
     }
     
     // Log successful status update
-    logger.debug(`Updated thopter session state: ${status.agent_id}`, status.agent_id, 'state-manager');
+    logger.debug(`Updated thopter session state: ${status.thopter_id}`, status.thopter_id, 'state-manager');
   }
   
   /**
@@ -461,9 +460,8 @@ class StateManager {
         const name = machine.name.replace(/^gc-/, '');
         
         const gcState: GoldenClaudeState = {
-          id: machine.id,
-          name: name,
           machineId: machine.id,
+          name: name,
           state: machine.state === 'started' ? 'running' : 'stopped',
           webTerminalUrl: machine.state === 'started' 
             ? `http://${machine.id}.vm.${this.appName}.internal:${this.webTerminalPort}/`

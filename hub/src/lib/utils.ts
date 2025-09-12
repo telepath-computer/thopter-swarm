@@ -48,7 +48,7 @@ export function formatAbsoluteTime(timestamp: string | Date): string {
 }
 
 /**
- * Get CSS class for agent state
+ * Get CSS class for thopter state
  */
 export function getStateClass(state: string): string {
   switch (state?.toLowerCase()) {
@@ -132,10 +132,10 @@ export function generateRequestId(type: string): string {
 }
 
 /**
- * Generate web terminal URL for an agent using fly.io internal networking
+ * Generate web terminal URL for a thopter using fly.io internal networking
  */
-export function generateTerminalUrl(agentId: string, appName: string, port: number): string {
-  return `http://${agentId}.vm.${appName}.internal:${port}/`;
+export function generateTerminalUrl(thopterId: string, appName: string, port: number): string {
+  return `http://${thopterId}.vm.${appName}.internal:${port}/`;
 }
 
 /**

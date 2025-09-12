@@ -27,7 +27,7 @@ export interface GitHubContext {
 // Status updates from observers (authoritative source)
 export interface ThopterStatusUpdate {
   // Core status
-  agent_id: string;
+  thopter_id: string;
   state: 'running' | 'idle';
   screen_dump: string;
   last_activity: string;
@@ -66,7 +66,6 @@ export interface ThopterState {
     lastActivity: Date;
     idleSince?: Date;
     screenDump: string;
-    hasObserver: true;
   };
   
   // === GITHUB CONTEXT (nullable, from provisioning) ===
@@ -84,9 +83,8 @@ export interface OrphanStatus {
 
 // Golden Claude state tracking
 export interface GoldenClaudeState {
-  id: string;
-  name: string;  // e.g. "default", "josh", "xyz"
   machineId: string;
+  name: string;  // e.g. "default", "josh", "xyz"
   state: 'running' | 'stopped';
   webTerminalUrl?: string;
 }

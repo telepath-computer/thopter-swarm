@@ -214,7 +214,7 @@ router.post('/agent/:id/kill', (req: Request, res: Response) => {
 
 
 /**
- * Pause agent processing
+ * Pause thopter processing
  */
 router.post('/control/pause', (req: Request, res: Response) => {
   try {
@@ -222,7 +222,7 @@ router.post('/control/pause', (req: Request, res: Response) => {
     
     if (currentMode === 'running') {
       stateManager.setOperatingMode('paused');
-      logger.info('Agent processing paused via dashboard', undefined, 'dashboard');
+      logger.info('Thopter processing paused via dashboard', undefined, 'dashboard');
     } else {
       logger.warn(`Cannot pause from ${currentMode} mode`, undefined, 'dashboard');
     }
@@ -239,7 +239,7 @@ router.post('/control/pause', (req: Request, res: Response) => {
 });
 
 /**
- * Resume agent processing  
+ * Resume thopter processing  
  */
 router.post('/control/resume', (req: Request, res: Response) => {
   try {
@@ -247,7 +247,7 @@ router.post('/control/resume', (req: Request, res: Response) => {
     
     if (currentMode === 'paused') {
       stateManager.setOperatingMode('running');
-      logger.info('Agent processing resumed via dashboard', undefined, 'dashboard');
+      logger.info('Thopter processing resumed via dashboard', undefined, 'dashboard');
     } else {
       logger.warn(`Cannot resume from ${currentMode} mode`, undefined, 'dashboard');
     }

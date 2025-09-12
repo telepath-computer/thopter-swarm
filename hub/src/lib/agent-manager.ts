@@ -195,7 +195,7 @@ export class AgentManager {
     const requestId = request.requestId;
     const thopterId = request.thopterId;
     
-    logger.info(`Processing destroy request: ${requestId} for agent ${thopterId} (${this.activeDestroyOperations.size}/${this.maxConcurrentDestroys} concurrent)`, thopterId, 'agent-manager');
+    logger.info(`Processing destroy request: ${requestId} for thopter ${thopterId} (${this.activeDestroyOperations.size}/${this.maxConcurrentDestroys} concurrent)`, thopterId, 'agent-manager');
     
     try {
       // Update request status to processing
@@ -234,7 +234,7 @@ export class AgentManager {
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Destroy request processing error: ${requestId} for agent ${thopterId} - ${errorMessage}`, thopterId, 'agent-manager');
+      logger.error(`Destroy request processing error: ${requestId} for thopter ${thopterId} - ${errorMessage}`, thopterId, 'agent-manager');
       
       // Mark request as failed
       stateManager.updateDestroyRequest(requestId, {
