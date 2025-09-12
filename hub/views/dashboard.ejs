@@ -351,7 +351,6 @@
           <p>To view real-time logs for this dashboard:</p>
           <div class="command-box">
             <code id="logsCommand">fly logs --machine <%= process.env.FLY_MACHINE_ID || '<hub machine id here>' %></code>
-            <button class="copy-btn" onclick="copyCommand()">Copy</button>
           </div>
         </div>
       </section>
@@ -359,19 +358,5 @@
     </main>
   </div>
 
-  <script>
-    // Copy command to clipboard
-    function copyCommand() {
-      const command = document.getElementById('logsCommand').textContent;
-      navigator.clipboard.writeText(command).then(() => {
-        const btn = event.target;
-        const originalText = btn.textContent;
-        btn.textContent = 'Copied!';
-        setTimeout(() => {
-          btn.textContent = originalText;
-        }, 2000);
-      });
-    }
-  </script>
 </body>
 </html>
