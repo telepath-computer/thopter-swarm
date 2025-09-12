@@ -9,10 +9,10 @@ set -e
 mkdir -p /data/thopter/logs
 chown thopter:thopter /data/thopter/logs
 
-# Agent ID will be auto-detected from hostname if not provided
-AGENT_ID=${AGENT_ID:-$(hostname)}
-if [ -z "$AGENT_ID" ]; then
-    echo "ERROR: Could not determine AGENT_ID from hostname or environment"
+# Thopter ID will be auto-detected from hostname if not provided
+THOPTER_ID=${THOPTER_ID:-$(hostname)}
+if [ -z "$THOPTER_ID" ]; then
+    echo "ERROR: Could not determine THOPTER_ID from hostname or environment"
     exit 1
 fi
 
@@ -22,7 +22,7 @@ if [ -z "$METADATA_SERVICE_HOST" ]; then
 fi
 
 echo "Starting session observer..."
-echo "Agent ID: $AGENT_ID"
+echo "Thopter ID: $THOPTER_ID"
 echo "Metadata Service: $METADATA_SERVICE_HOST"
 echo "Hub connection info will be retrieved from metadata service"
 

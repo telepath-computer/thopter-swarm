@@ -103,6 +103,7 @@ RESPONSE=$(curl -s -X POST "$HUB_URL/provision" \
     "gc": "default",
     "prompt": "default",
     "github": {
+      "repository": "telepath-computer/thopter-issue-test",
       "issueNumber": "0",
       "issueTitle": "Dummy issue",
       "issueBody": "This issue exists only to test provisioning of a thopter instance. Claude, your task is to just say hello and not make any code changes or commits, as proof that the issue handling and provisioning system is working.\n\n/thopter",
