@@ -137,7 +137,9 @@ chown -R thopter:thopter /data/thopter/.claude
 
 # Start session observer with PM2 (as root, but observer runs as thopter user)
 thopter_log "Starting session observer..."
-/usr/local/bin/start-observer.sh
+/usr/local/bin/start-observer.sh 2>&1 | while IFS= read -r line; do
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [OBSERVER] $line" | tee -a /thopter/log
+done
 
 thopter_log "Switching to thopter user and starting NO-INDEX web terminal..."
 
