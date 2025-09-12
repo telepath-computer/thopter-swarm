@@ -1,7 +1,7 @@
 types.ts:                                                   
-  - ✅ CRITICAL TODO: agent_id legacy field must be changed, and the session observer script must be updated. NO LEGACY FIELDS! change ALL CODE that deals with legacy fields.
-  - ✅ TODO: hasObserver can be dropped, as redundant (session data presence = has observer)
-  - ✅ TODO: machineId and id in golden claude state - simplify to just machineId
+  - ✅ DONE: agent_id legacy field changed to thopter_id. Updated ThopterStatusUpdate interface, state-manager, collector, and observer script.
+  - ✅ DONE: hasObserver can be dropped, as redundant (session data presence = has observer)
+  - ✅ DONE: machineId and id in golden claude state - simplified to just machineId
 
 thopter-utils.ts:
   - it's fine. calling getOrphanStatus() is fine, it's not making fly calls, it's just simple js checks. run it liberally i don't care.
@@ -15,37 +15,37 @@ state-manager.ts:
   - ✅ RESOLVED: memory leaks / circular buffers are NOT a concern. Standard javascript garbage collection handles FIFO queue with .shift() properly.
 
 agent-manager.ts:
-  - ✅ TODO: go ahead and rename 'agent' language to 'thopter'
+  - ✅ DONE: go ahead and rename 'agent' language to 'thopter'
   - ✅ CONFIRMED: it's fine for destroy handling to block new thopter provisioning if that's what you're worried about.
   - ✅ RESOLVED: NO race condition. State updates use PATCH semantics - reconciliation preserves github context via existing?.github fallback.
   - ✅ CONFIRMED: capacity check timing is acceptable, does not have to be perfect. provisioning of a machine is a blocking operation before the next agent loop.
 
 provisioner.ts:
-  - ✅ TODO: go ahead and rename 'agent' language to 'thopter'
+  - ✅ DONE: go ahead and rename 'agent' language to 'thopter'
 
 collector/index.ts:
-  - ✅ CRITICAL TODO: use of agent_id: no. stop using legacy fields. change the session observer and the collector. NO LEGACY FIELDS!!!!
+  - ✅ DONE: changed agent_id to thopter_id throughout collector and observer script. NO LEGACY FIELDS eliminated!
 
 dashboard/index.ts:
-  - ✅ TODO: go ahead and rename 'agent' language to 'thopter'
+  - ✅ DONE: go ahead and rename 'agent' language to 'thopter'
   - ✅ RESOLVED: expensive categorization and grouping operations are acceptable. Pure javascript operations, no fly calls or exec.
-  - ✅ TODO: use helpers in the template for consistency
+  - ✅ DONE: use helpers in the template for consistency
 
 index.ts:
-  - ✅ TODO: go ahead and rename 'agent' language to 'thopter' (keeping AgentManager class name only)
+  - ✅ DONE: go ahead and rename 'agent' language to 'thopter' (keeping AgentManager class name only)
 
 github-polling-manager.ts:
   - ✅ DEFERRED: Memory Growth: Line 19 - processedCommands: this is okay for now, will open a ticket for later to deal with this.
-  - ✅ TODO: go ahead and rename 'agent' language to 'thopter' (keeping AgentManager class name only)
+  - ✅ DONE: go ahead and rename 'agent' language to 'thopter' (keeping AgentManager class name only)
 
 utils.ts:
-  - ✅ TODO: go ahead and rename 'agent' language to 'thopter'
-  - ✅ TODO: ensure no legacy state attributes (agentId etc)
+  - ✅ DONE: go ahead and rename 'agent' language to 'thopter'
+  - ✅ DONE: ensure no legacy state attributes (agentId -> thopterId)
 
 views/dashboard.ejs:
-  - ✅ TODO: completely review and update to correct schema and helpers
+  - ✅ DONE: completely rewritten for new schema. Now uses healthyGroups/orphanedGroups/stoppedGroups, helper functions, and proper ThopterState structure.
 
 views/agent-detail.ejs:
-  - ✅ TODO: completely review and update to correct schema and helpers
+  - ✅ DONE: completely rewritten for new schema. Shows all sections (fly, hub, session, github) and uses helper functions properly.
 
 
