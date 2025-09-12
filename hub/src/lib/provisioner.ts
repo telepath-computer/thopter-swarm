@@ -114,12 +114,17 @@ export class ThopterProvisioner {
   private async logToThopterAsync(machineId: string, message: string): Promise<void> {
     try {
       const execAsync = promisify(exec);
-      // Sanitize message to prevent shell injection and quote issues
-      const sanitizedMessage = message.replace(/['"\\$`]/g, '');
       
-      // Use sh -c to execute shell commands properly with -C flag
+      // Build the complete log entry in JavaScript with timestamp
+      const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      const logEntry = `${timestamp} [PROVISIONER] ${message}\n`;
+      
+      // Base64 encode the log entry to avoid all quoting issues
+      const encoded = Buffer.from(logEntry).toString('base64');
+      
+      // Simple command with no backslashes or complex quoting
       await execAsync(
-        `fly ssh console -C "sh -c 'echo \\"\\$(date \\'+%Y-%m-%d %H:%M:%S\\') [PROVISIONER] ${sanitizedMessage}\\" >> /thopter/log'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+        `fly ssh console -C "sh -c 'echo ${encoded} | base64 -d >> /thopter/log'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
         { 
           cwd: process.cwd()
         }
