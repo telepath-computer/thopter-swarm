@@ -130,8 +130,11 @@ class StateManager {
     }
     
     // Update from status report - observer data is authoritative
+    // EXCEPT when agent is in 'killing' state, preserve that state
     const previousState = agent.state;
-    agent.state = status.state === 'running' ? 'running' : 'idle';
+    if (agent.state !== 'killing') {
+      agent.state = status.state === 'running' ? 'running' : 'idle';
+    }
     agent.hasObserver = true;
     agent.lastActivity = new Date(status.last_activity);
     agent.screenDump = status.screen_dump;
