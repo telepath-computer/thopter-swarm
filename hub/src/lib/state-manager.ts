@@ -246,6 +246,13 @@ class StateManager {
   }
   
   /**
+   * Get multiple pending destroy requests for parallel processing
+   */
+  getNextPendingDestroyRequests(limit: number): DestroyRequest[] {
+    return this.destroyRequests.filter(r => r.status === 'pending').slice(0, limit);
+  }
+  
+  /**
    * Add a new agent to state (used when provisioner creates agent)
    */
   addAgent(agentId: string, machineId: string, repository?: string, workBranch?: string, github?: GitHubContext): AgentState {
