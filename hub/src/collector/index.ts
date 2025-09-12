@@ -5,7 +5,7 @@ import { logger } from '../lib/logger';
 
 /**
  * Handle POST /status requests from thopter observers
- * This is the main entry point for status updates from agents
+ * This is the main entry point for status updates from thopters
  */
 export function handleStatusUpdate(req: Request, res: Response): void {
   try {

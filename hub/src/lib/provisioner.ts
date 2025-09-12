@@ -26,18 +26,18 @@ const createFlyWrapper = (appName: string) => {
 
 export interface ProvisionResult {
   success: boolean;
-  agentId: string;
+  thopterId: string;
   machineId?: string;
   machineName?: string;
-  region?: string;
-  image?: string;
+  region: string;    // Always known by provisioner
+  image: string;     // Always known by provisioner  
   error?: string;
   webTerminalUrl?: string;
 }
 
 export interface DestroyResult {
   success: boolean;
-  agentId: string;
+  thopterId: string;
   error?: string;
 }
 
@@ -126,7 +126,9 @@ export class ThopterProvisioner {
       if (activeThopters >= this.maxAgents) {
         return {
           success: false,
-          agentId: 'capacity-exceeded',
+          thopterId: 'capacity-exceeded',
+          region: this.region,
+          image: 'capacity-exceeded',
           error: `Maximum thopters (${this.maxAgents}) already running. Active: ${activeThopters}`
         };
       }
@@ -169,7 +171,7 @@ export class ThopterProvisioner {
       console.log(`✅ [${requestId}] Thopter ${machineId} provisioned successfully`);
       return {
         success: true,
-        agentId: machineId, // Agent ID is the machine ID
+        thopterId: machineId, // Thopter ID is the machine ID
         machineId,
         machineName: `thopter-${machineId}`,
         region: this.region,
@@ -181,7 +183,9 @@ export class ThopterProvisioner {
       console.error(`❌ [${requestId}] Provisioning failed:`, error);
       return {
         success: false,
-        agentId: 'provision-failed',
+        thopterId: 'provision-failed',
+        region: this.region,
+        image: 'provision-failed',
         error: error instanceof Error ? error.message : String(error)
       };
     }
@@ -852,8 +856,8 @@ ${request.github.issueBody}
   /**
    * Destroy a thopter agent and its associated resources
    */
-  async destroy(agentId: string): Promise<DestroyResult> {
-    console.log(`🔥 Destroying thopter agent: ${agentId}`);
+  async destroy(thopterId: string): Promise<DestroyResult> {
+    console.log(`🔥 Destroying thopter: ${thopterId}`);
     
     try {
       // Get machine details to find associated volume
@@ -861,38 +865,38 @@ ${request.github.issueBody}
       try {
         const machineOutput = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
         const machines = JSON.parse(machineOutput);
-        machineDetails = machines.find((m: any) => m.id === agentId);
+        machineDetails = machines.find((m: any) => m.id === thopterId);
       } catch (error) {
-        console.warn(`Could not get machine details for ${agentId}:`, error);
+        console.warn(`Could not get machine details for ${thopterId}:`, error);
       }
       
       // Stop and destroy the machine
-      console.log(`🛑 Stopping machine ${agentId}...`);
+      console.log(`🛑 Stopping machine ${thopterId}...`);
       try {
-        await this.fly(['machine', 'stop', agentId, '-t', this.flyToken]);
+        await this.fly(['machine', 'stop', thopterId, '-t', this.flyToken]);
       } catch (error) {
         console.warn(`Machine stop failed (continuing with destroy):`, error);
       }
       
-      console.log(`💥 Destroying machine ${agentId}...`);
-      await this.fly(['machine', 'destroy', agentId, '-t', this.flyToken, '--force']);
+      console.log(`💥 Destroying machine ${thopterId}...`);
+      await this.fly(['machine', 'destroy', thopterId, '-t', this.flyToken, '--force']);
       
       // Leave volumes in pool for reuse by future agents
       if (machineDetails?.config?.mounts?.length > 0) {
         console.log(`💾 Volumes left in pool for reuse: ${machineDetails.config.mounts.map((m: any) => m.volume).join(', ')}`);
       }
       
-      console.log(`✅ Thopter ${agentId} destroyed successfully`);
+      console.log(`✅ Thopter ${thopterId} destroyed successfully`);
       return {
         success: true,
-        agentId
+        thopterId
       };
       
     } catch (error) {
-      console.error(`❌ Failed to destroy thopter ${agentId}:`, error);
+      console.error(`❌ Failed to destroy thopter ${thopterId}:`, error);
       return {
         success: false,
-        agentId,
+        thopterId,
         error: error instanceof Error ? error.message : String(error)
       };
     }

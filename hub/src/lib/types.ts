@@ -99,7 +99,7 @@ export interface ProvisionRequest {
   completedAt?: Date;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
-  agentId?: string;  // Set after agent is created
+  thopterId?: string;  // Set after thopter is created
   
   // Required for provisioning
   repository: string;
@@ -119,8 +119,8 @@ export interface DestroyRequest {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
   
-  // Target agent
-  agentId: string;
+  // Target thopter
+  thopterId: string;
   reason?: string;  // Why destroying (idle, user request, etc)
 }
 
@@ -129,7 +129,7 @@ export interface LogEvent {
   timestamp: Date;
   level: 'info' | 'warn' | 'error' | 'debug';
   message: string;
-  agentId?: string;
+  thopterId?: string;
   source?: string;
   context?: any;
 }

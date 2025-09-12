@@ -4,12 +4,12 @@ class Logger {
   private logs: LogEvent[] = [];
   private readonly maxLogs = 100;
   
-  private addLog(level: LogEvent['level'], message: string, agentId?: string, source?: string, context?: any): void {
+  private addLog(level: LogEvent['level'], message: string, thopterId?: string, source?: string, context?: any): void {
     const logEvent: LogEvent = {
       timestamp: new Date(),
       level,
       message,
-      agentId,
+      thopterId,
       source,
       context
     };
@@ -22,7 +22,7 @@ class Logger {
     
     // Also log to console with formatting
     const timestamp = logEvent.timestamp.toISOString();
-    const prefix = agentId ? `[${agentId}]` : '';
+    const prefix = thopterId ? `[${thopterId}]` : '';
     const sourcePrefix = source ? `{${source}}` : '';
     const levelPrefix = level.toUpperCase().padEnd(5);
     
@@ -33,20 +33,20 @@ class Logger {
     }
   }
   
-  info(message: string, agentId?: string, source?: string, context?: any): void {
-    this.addLog('info', message, agentId, source, context);
+  info(message: string, thopterId?: string, source?: string, context?: any): void {
+    this.addLog('info', message, thopterId, source, context);
   }
   
-  warn(message: string, agentId?: string, source?: string, context?: any): void {
-    this.addLog('warn', message, agentId, source, context);
+  warn(message: string, thopterId?: string, source?: string, context?: any): void {
+    this.addLog('warn', message, thopterId, source, context);
   }
   
-  error(message: string, agentId?: string, source?: string, context?: any): void {
-    this.addLog('error', message, agentId, source, context);
+  error(message: string, thopterId?: string, source?: string, context?: any): void {
+    this.addLog('error', message, thopterId, source, context);
   }
   
-  debug(message: string, agentId?: string, source?: string, context?: any): void {
-    this.addLog('debug', message, agentId, source, context);
+  debug(message: string, thopterId?: string, source?: string, context?: any): void {
+    this.addLog('debug', message, thopterId, source, context);
   }
   
   getRecentLogs(limit?: number): LogEvent[] {

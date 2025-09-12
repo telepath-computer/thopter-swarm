@@ -108,8 +108,8 @@ class StateManager {
             id: machine.id,
             name: machine.name,
             machineState: machine.state,
-            region: machine.region,
-            image: machine.image_ref?.tag || 'unknown',
+            region: machine.region || existing?.fly?.region || 'unknown',
+            image: machine.image_ref?.tag || existing?.fly?.image || 'unknown',
             createdAt: new Date(machine.created_at)
           },
           
@@ -185,7 +185,7 @@ class StateManager {
     if (!thopter) {
       logger.warn(`Received status for unknown thopter: ${status.agent_id}`, status.agent_id, 'state-manager');
       // Don't auto-create - fly reconciliation will discover it if it exists
-      // This prevents phantom agents from bad status updates
+      // This prevents phantom thopters from bad status updates
       return;
     }
     
@@ -229,7 +229,7 @@ class StateManager {
     const request = this.provisionRequests.find(r => r.requestId === requestId);
     if (request) {
       Object.assign(request, updates);
-      logger.info(`Updated provision request: ${requestId} (status: ${request.status})`, request.agentId, 'state-manager');
+      logger.info(`Updated provision request: ${requestId} (status: ${request.status})`, request.thopterId, 'state-manager');
     } else {
       logger.warn(`Provision request not found: ${requestId}`, undefined, 'state-manager');
     }
@@ -261,7 +261,7 @@ class StateManager {
       this.destroyRequests.shift();
     }
     
-    logger.info(`Added destroy request: ${request.requestId} for thopter ${request.agentId}`, request.agentId, 'state-manager');
+    logger.info(`Added destroy request: ${request.requestId} for thopter ${request.thopterId}`, request.thopterId, 'state-manager');
   }
   
   /**
@@ -271,7 +271,7 @@ class StateManager {
     const request = this.destroyRequests.find(r => r.requestId === requestId);
     if (request) {
       Object.assign(request, updates);
-      logger.info(`Updated destroy request: ${requestId} (status: ${request.status})`, request.agentId, 'state-manager');
+      logger.info(`Updated destroy request: ${requestId} (status: ${request.status})`, request.thopterId, 'state-manager');
     } else {
       logger.warn(`Destroy request not found: ${requestId}`, undefined, 'state-manager');
     }
@@ -302,15 +302,15 @@ class StateManager {
   /**
    * Add a new thopter to state (used when provisioner creates thopter)
    */
-  addThopter(machineId: string, machineName: string, region: string, image: string, github?: GitHubContext): ThopterState {
+  addThopter(machineId: string, machineName: string, region: string, image: string, github?: GitHubContext, createdAt?: Date): ThopterState {
     const thopter: ThopterState = {
       fly: {
         id: machineId,
         name: machineName,
-        machineState: 'started', // Assume started when first created
+        machineState: 'started', // Provisioner knows it created a started machine
         region: region,
         image: image,
-        createdAt: new Date()
+        createdAt: createdAt || new Date() // Use actual creation time if available
       },
       hub: {
         killRequested: false

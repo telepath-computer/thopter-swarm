@@ -53,7 +53,7 @@ export function getOrphanStatus(thopter: ThopterState): OrphanStatus {
     
     if (machineAgeMs < startupGracePeriodMs) {
       // Still in startup grace period, not an orphan yet
-      return { isOrphan: false };
+      return { isOrphan: false, reason: undefined };
     }
     
     return { isOrphan: true, reason: 'no_observer' };
@@ -72,7 +72,7 @@ export function getOrphanStatus(thopter: ThopterState): OrphanStatus {
   }
   
   // Healthy: machine started and observer actively reporting
-  return { isOrphan: false };
+  return { isOrphan: false, reason: undefined };
 }
 
 /**

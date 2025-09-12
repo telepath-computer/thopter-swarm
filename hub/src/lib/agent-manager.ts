@@ -120,20 +120,20 @@ export class AgentManager {
         stateManager.updateProvisionRequest(requestId, {
           status: 'completed',
           completedAt: new Date(),
-          agentId: result.agentId
+          thopterId: result.thopterId
         });
         
         // Add thopter to state with fly information
         // Observer will later populate session state when it reports in
         stateManager.addThopter(
           result.machineId,
-          result.machineName || `thopter-${result.agentId}`,
-          result.region || 'unknown',
-          result.image || 'unknown',
+          result.machineName || `thopter-${result.thopterId}`,
+          result.region,
+          result.image,
           request.github
         );
         
-        logger.info(`Provision request completed: ${requestId} → agent ${result.agentId}`, result.agentId, 'agent-manager');
+        logger.info(`Provision request completed: ${requestId} → thopter ${result.thopterId}`, result.thopterId, 'agent-manager');
         
       } else {
         // Update request to failed
@@ -164,7 +164,7 @@ export class AgentManager {
    */
   private async processDestroyRequestAsync(request: DestroyRequest): Promise<void> {
     const requestId = request.requestId;
-    const agentId = request.agentId;
+    const thopterId = request.thopterId;
     
     // Track this destroy operation
     this.activeDestroyOperations.add(requestId);
@@ -182,9 +182,9 @@ export class AgentManager {
    */
   private async processDestroyRequest(request: DestroyRequest): Promise<void> {
     const requestId = request.requestId;
-    const agentId = request.agentId;
+    const thopterId = request.thopterId;
     
-    logger.info(`Processing destroy request: ${requestId} for agent ${agentId} (${this.activeDestroyOperations.size}/${this.maxConcurrentDestroys} concurrent)`, agentId, 'agent-manager');
+    logger.info(`Processing destroy request: ${requestId} for agent ${thopterId} (${this.activeDestroyOperations.size}/${this.maxConcurrentDestroys} concurrent)`, thopterId, 'agent-manager');
     
     try {
       // Update request status to processing
@@ -193,7 +193,7 @@ export class AgentManager {
       });
       
       // Call provisioner destroy method
-      const result = await this.provisioner.destroy(agentId);
+      const result = await this.provisioner.destroy(thopterId);
       
       if (result.success) {
         // Update request to completed
@@ -203,9 +203,9 @@ export class AgentManager {
         });
         
         // Remove thopter from state
-        stateManager.removeThopter(agentId);
+        stateManager.removeThopter(thopterId);
         
-        logger.info(`Destroy request completed: ${requestId} for thopter ${agentId}`, agentId, 'agent-manager');
+        logger.info(`Destroy request completed: ${requestId} for thopter ${thopterId}`, thopterId, 'agent-manager');
         
       } else {
         // Update request to failed
@@ -216,14 +216,14 @@ export class AgentManager {
         });
 
         // Clear the kill requested flag so the user can try again
-        stateManager.setKillRequested(agentId, false);
+        stateManager.setKillRequested(thopterId, false);
 
-        logger.error(`Destroy request failed: ${requestId} for thopter ${agentId} - ${result.error}`, agentId, 'agent-manager');
+        logger.error(`Destroy request failed: ${requestId} for thopter ${thopterId} - ${result.error}`, thopterId, 'agent-manager');
       }
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Destroy request processing error: ${requestId} for agent ${agentId} - ${errorMessage}`, agentId, 'agent-manager');
+      logger.error(`Destroy request processing error: ${requestId} for agent ${thopterId} - ${errorMessage}`, thopterId, 'agent-manager');
       
       // Mark request as failed
       stateManager.updateDestroyRequest(requestId, {
@@ -277,7 +277,7 @@ export class AgentManager {
     
     // Check if there's already a pending or processing destroy request for this thopter
     const existingRequest = stateManager.getRecentDestroyRequests().find(
-      req => req.agentId === thopterId && (req.status === 'pending' || req.status === 'processing')
+      req => req.thopterId === thopterId && (req.status === 'pending' || req.status === 'processing')
     );
     
     if (existingRequest) {
@@ -292,7 +292,7 @@ export class AgentManager {
       source,
       createdAt: new Date(),
       status: 'pending',
-      agentId: thopterId, // Keep agentId for backward compatibility with request interface
+      thopterId: thopterId, // Keep thopterId for backward compatibility with request interface
       reason
     };
     
