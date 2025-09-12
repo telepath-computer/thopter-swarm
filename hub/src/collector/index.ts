@@ -40,7 +40,7 @@ export function handleStatusUpdate(req: Request, res: Response): void {
     // );
     
     // Update state manager with the status
-    stateManager.updateAgentFromStatus(statusUpdate);
+    stateManager.updateThopterFromStatus(statusUpdate);
     
     // Respond with success
     res.json({ 

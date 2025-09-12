@@ -123,13 +123,13 @@ export class AgentManager {
           agentId: result.agentId
         });
         
-        // Add agent to state in 'provisioning' state
-        // Observer will later transition it to 'running' or 'idle'
-        stateManager.addAgent(
-          result.agentId,
+        // Add thopter to state with fly information
+        // Observer will later populate session state when it reports in
+        stateManager.addThopter(
           result.machineId,
-          request.repository,
-          request.workBranch,
+          result.machineName || `thopter-${result.agentId}`,
+          result.region || 'unknown',
+          result.image || 'unknown',
           request.github
         );
         
@@ -202,10 +202,10 @@ export class AgentManager {
           completedAt: new Date()
         });
         
-        // Remove agent from state
-        stateManager.removeAgent(agentId);
+        // Remove thopter from state
+        stateManager.removeThopter(agentId);
         
-        logger.info(`Destroy request completed: ${requestId} for agent ${agentId}`, agentId, 'agent-manager');
+        logger.info(`Destroy request completed: ${requestId} for thopter ${agentId}`, agentId, 'agent-manager');
         
       } else {
         // Update request to failed
@@ -215,13 +215,10 @@ export class AgentManager {
           error: result.error
         });
 
-        // clear the killing' state so the user can try again
-        const agent = stateManager.getAgent(agentId);
-        if (agent) {
-          agent.state = 'idle';
-        }
+        // Clear the kill requested flag so the user can try again
+        stateManager.setKillRequested(agentId, false);
 
-        logger.error(`Destroy request failed: ${requestId} for agent ${agentId} - ${result.error}`, agentId, 'agent-manager');
+        logger.error(`Destroy request failed: ${requestId} for thopter ${agentId} - ${result.error}`, agentId, 'agent-manager');
       }
       
     } catch (error) {
@@ -262,29 +259,29 @@ export class AgentManager {
   }
   
   /**
-   * Create a new destroy request - ensures only one destroy request per agent
+   * Create a new destroy request - ensures only one destroy request per thopter
    */
-  createDestroyRequest(agentId: string, source: DestroyRequest['source'] = 'dashboard', reason?: string): string | null {
-    // Check if agent exists
-    const agent = stateManager.getAgent(agentId);
-    if (!agent) {
-      logger.warn(`Cannot create destroy request for non-existent agent: ${agentId}`, agentId, 'agent-manager');
+  createDestroyRequest(thopterId: string, source: DestroyRequest['source'] = 'dashboard', reason?: string): string | null {
+    // Check if thopter exists
+    const thopter = stateManager.getThopter(thopterId);
+    if (!thopter) {
+      logger.warn(`Cannot create destroy request for non-existent thopter: ${thopterId}`, thopterId, 'agent-manager');
       return null;
     }
     
-    // Check if agent is already being killed
-    if (agent.state === 'killing') {
-      logger.warn(`Agent already in killing state: ${agentId}`, agentId, 'agent-manager');
+    // Check if thopter is already being killed
+    if (thopter.hub.killRequested) {
+      logger.warn(`Thopter already has kill request: ${thopterId}`, thopterId, 'agent-manager');
       return null;
     }
     
-    // Check if there's already a pending or processing destroy request for this agent
+    // Check if there's already a pending or processing destroy request for this thopter
     const existingRequest = stateManager.getRecentDestroyRequests().find(
-      req => req.agentId === agentId && (req.status === 'pending' || req.status === 'processing')
+      req => req.agentId === thopterId && (req.status === 'pending' || req.status === 'processing')
     );
     
     if (existingRequest) {
-      logger.warn(`Destroy request already exists for agent ${agentId}: ${existingRequest.requestId}`, agentId, 'agent-manager');
+      logger.warn(`Destroy request already exists for thopter ${thopterId}: ${existingRequest.requestId}`, thopterId, 'agent-manager');
       return null;
     }
     
@@ -295,15 +292,15 @@ export class AgentManager {
       source,
       createdAt: new Date(),
       status: 'pending',
-      agentId,
+      agentId: thopterId, // Keep agentId for backward compatibility with request interface
       reason
     };
     
-    // Set agent state to 'killing' to prevent further kill requests
-    agent.state = 'killing';
+    // Set kill requested flag to prevent further kill requests
+    stateManager.setKillRequested(thopterId, true);
     
     stateManager.addDestroyRequest(request);
-    logger.info(`Created destroy request: ${requestId} for agent ${agentId} (reason: ${reason || 'none'})`, agentId, 'agent-manager');
+    logger.info(`Created destroy request: ${requestId} for thopter ${thopterId} (reason: ${reason || 'none'})`, thopterId, 'agent-manager');
     
     return requestId;
   }

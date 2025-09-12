@@ -286,6 +286,7 @@ class GitHubPollingManager {
 
       // Create GitHub context with full conversation thread
       const github: GitHubContext = {
+        repository: repository,
         issueNumber: issue.number.toString(),
         issueTitle: issue.title,
         issueBody: issue.body || '',

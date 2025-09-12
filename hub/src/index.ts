@@ -27,7 +27,7 @@ async function startHub() {
       logger.info(`Received ${signal}, initiating graceful shutdown`, undefined, 'hub');
       
       // Tell components to shutdown
-      stateManager.handleShutdownWithCleanup();
+      stateManager.handleShutdown();
       agentManager.handleShutdown();
       gitHubPollingManager.stop();
       
@@ -61,10 +61,10 @@ async function startHub() {
       throw new Error(`Metadata service connection failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     
-    // Bootstrap state manager from fly.io (required)
-    logger.info('Bootstrapping state from fly.io machines', undefined, 'hub');
-    await stateManager.bootstrap();
-    logger.info('State bootstrap completed successfully', undefined, 'hub');
+    // Start fly-first reconciliation system (required)
+    logger.info('Starting fly-first reconciliation system', undefined, 'hub');
+    await stateManager.startReconciliation();
+    logger.info('Fly-first reconciliation system started', undefined, 'hub');
     
     // Phase 3: Service Activation
     logger.info('Phase 3: Starting services', undefined, 'hub');

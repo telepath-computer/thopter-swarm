@@ -28,6 +28,9 @@ export interface ProvisionResult {
   success: boolean;
   agentId: string;
   machineId?: string;
+  machineName?: string;
+  region?: string;
+  image?: string;
   error?: string;
   webTerminalUrl?: string;
 }
@@ -117,14 +120,14 @@ export class ThopterProvisioner {
     
     try {
       // Check if we're at max capacity
-      console.log(`🔍 [${requestId}] Checking agent capacity...`);
-      const activeAgents = await this.getActiveAgentCount();
-      console.log(`📊 [${requestId}] Active agents: ${activeAgents}/${this.maxAgents}`);
-      if (activeAgents >= this.maxAgents) {
+      console.log(`🔍 [${requestId}] Checking thopter capacity...`);
+      const activeThopters = await this.getActiveThopterCount();
+      console.log(`📊 [${requestId}] Active thopters: ${activeThopters}/${this.maxAgents}`);
+      if (activeThopters >= this.maxAgents) {
         return {
           success: false,
           agentId: 'capacity-exceeded',
-          error: `Maximum agents (${this.maxAgents}) already running. Active: ${activeAgents}`
+          error: `Maximum thopters (${this.maxAgents}) already running. Active: ${activeThopters}`
         };
       }
 
@@ -168,6 +171,9 @@ export class ThopterProvisioner {
         success: true,
         agentId: machineId, // Agent ID is the machine ID
         machineId,
+        machineName: `thopter-${machineId}`,
+        region: this.region,
+        image: (await metadataClient.getThopterImage()) || 'unknown',
         webTerminalUrl
       };
 
@@ -219,9 +225,9 @@ export class ThopterProvisioner {
   }
 
   /**
-   * Get count of currently active thopter agents
+   * Get count of currently active thopters
    */
-  private async getActiveAgentCount(): Promise<number> {
+  private async getActiveThopterCount(): Promise<number> {
     try {
       const output = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
       const machines = JSON.parse(output);
@@ -231,7 +237,7 @@ export class ThopterProvisioner {
       
       return thopterMachines.length;
     } catch (error) {
-      console.warn('Failed to get active agent count:', error);
+      console.warn('Failed to get active thopter count:', error);
       return 0; // Assume 0 if we can't check
     }
   }
