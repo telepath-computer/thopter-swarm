@@ -89,7 +89,8 @@ router.get('/', (req: Request, res: Response) => {
         logLevelClass: utils.getLogLevelClass,
         idleDuration: utils.formatIdleDuration,
         truncateText: utils.truncateText,
-        gitHubUrl: utils.getGitHubUrl
+        gitHubUrl: utils.getGitHubUrl,
+        gitHubTreeUrl: utils.getGitHubTreeUrl
       }
     });
     
@@ -127,6 +128,7 @@ router.get('/agent/:id', (req: Request, res: Response) => {
         idleDuration: utils.formatIdleDuration,
         truncateText: utils.truncateText,
         gitHubUrl: utils.getGitHubUrl,
+        gitHubTreeUrl: utils.getGitHubTreeUrl,
         terminalUrl: (agentId: string) => `http://${agentId}.vm.${process.env.APP_NAME}.internal:${process.env.WEB_TERMINAL_PORT || '7681'}/`,
         sessionLogUrl: (agentId: string) => `http://${agentId}.vm.${process.env.APP_NAME}.internal:7791/`
       }
