@@ -12,16 +12,18 @@ Monitors GitHub issues for `/thopter` commands and automatically provisions Fly 
 
 ## Current limitations
 
-This is v0.1 for internal testing with several constraints:
+This is v0.1 for internal testing with many constraints:
 
-- **Unstable provisioning**: expect thopters not to launch sometimes. Be ready to look at hub machine logs (`fly logs --machine NNN`)
-- **Weird DNS names**: like the dashboard lives at 1.hub.kv._metadata.{appname}.internal
+- **Unstable provisioning**: expect thopters to fail to launch or to get stuck sometimes. Be ready to look at hub machine logs (`fly logs --machine NNN`). Use `fly/status.sh` and the fly.io admin console's machines page for help.
+- **Weird DNS names**: the dashboard lives at 1.hub.kv._metadata.{appname}.internal (but at least it's persistent across hub server redeployment)
 - **Manual lifecycle**: Agents must be killed manually; idle agents block new ones at MAX_AGENTS
 - **No PR workflow**: Agents push to `thopter/*` branches but don't create PRs yet
 - **Auth fragility**: Claude Code credentials expire frequently, requiring re-authentication
 - **GitHub polling scale**: Not suitable for large repositories with hundreds of active issues.
-- **Awkward GitHub integration** to protect against rogue agents: heavy-handeds rulesets required that punish normal users and normal workflows
+- **Awkward GitHub integration** tricky rulesets required to protect against rogue agents
 - **Guides/docs needed**: Lots of details warrant further documentation and explanation.
+- **Immature workflow for daily use**: e.g. thopters can't report completion status to GitHub ("idle" state on the dashboard is the signal for completion), can't comment on issues, can't read/write PRs yet, etc.
+- Expect bugs and broken edge cases. PRs welcome :)
 
 ## Quick start of a new swarm setup
 
@@ -290,7 +292,7 @@ We use this to maintain an authenticated max plan per team member and assign iss
 
 1. **Issue mention detected**: GitHub polling loop finds a new `/thopter` mention in an issue on an integrated repo, and fires off an internal request for provisioning.
 2. **Provisioning**: Fly machine created from base image in `thopter/Dockerfile`, with a volume mounted to `/data/thopter` for claude configs and dev workspace.
-2. **Setup**: Golden Claude homedir copied for authentication and anything else (dev secrets etc)
+2. **Initialization**: Golden Claude homedir copied over, `.env.thopters` file sourced in `.bashrc`, firewall initiated, tmux session started, web terminal (gotty) server launched, dashboard status observer and html session logs generator processes launched (via pm2)
 3. **Repository**: Git repo cloned, issue files (prompt.md, issue.json) created in workspace
 4. **Launch**: Claude Code started in tmux session with web terminal access, pointed to prompt file as first instruction
 5. **Monitoring**: Status reported to hub's HTTP collector via observer script, dashboard shows agent details ongoing
