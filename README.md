@@ -33,10 +33,16 @@ Assuming you will want to commit changes, like new prompt templates, and collab 
 
 Authenticate the fly CLI, create an app to contain your swarm, issue certs:
 ```bash
+
+# install flyctl if you haven't:
+curl -L https://fly.io/install.sh
+# or
+brew install flyctl
+
 fly auth login
 fly apps create --org <your-org> --name <app-name> --save
 fly ssh issue             # for console access (tbh not sure if this is needed)
-fly wireguard create      # for private networking
+fly wireguard create      # for private networking. be sure to use a .conf extension, e.g. swarm.conf
 fly tokens create deploy  # save for .env
 ```
 
@@ -71,9 +77,9 @@ Access the golden claude web terminal (in the output of `recreate-gc.sh`) and ru
 
 First invite them to your fly.io org, then they can:
 ```bash
+brew install flyctl
 fly auth login
-fly ssh issue
-fly wireguard create
+fly wireguard create # be sure to use a .conf extension e.g. swarm.conf
 ```
 
 This gives them access to the dashboard, the ability to ssh and see logs on machines, etc.
@@ -107,8 +113,9 @@ You can create multiple thopters by issuing multiple comments with /thopter comm
 
 **Golden Claudes** - Authentication template
 - Persistent instances with authenticated homedir
-- Homedir contents copied to new thopters
+- Homedir contents copied to new thopters (except `.bashrc` as thopter initialization depends on it)
 - Tmux sessions with web terminal access for auth setup
+- The Claude credentials time out. You have to hop back in, run claude, and `/login` every couple of days, then quit claude.
 - **IMPORTANT:** don't leave Claude Code running in these machines. The filesystem needs to be static during copy to new thopters, and Claude Code runs background stuff that breaks that.
 
 **Thopters** - Autonomous agents

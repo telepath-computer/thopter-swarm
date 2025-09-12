@@ -215,7 +215,7 @@ class GitHubPollingManager {
           break;
         }
 
-        await this.extractAndProcessCommands(octokit, repository, issue, comment.body || '', 'comment', comment.id, comments);
+        await this.extractAndProcessCommands(octokit, repository, issue, comment.body || '', 'comment', comment.id, comments, comment);
       }
     } catch (error) {
       logger.error(`Failed to process issue ${repository}#${issueNumber}: ${error instanceof Error ? error.message : String(error)}`, undefined, 'github-polling');
@@ -232,7 +232,8 @@ class GitHubPollingManager {
     text: string,
     location: 'body' | 'comment',
     commentId?: number,
-    allComments?: any[]
+    allComments?: any[],
+    comment?: any
   ): Promise<void> {
     // Find ONLY the first /thopter command in the text - ignore any additional ones
     const thopterMatch = text.match(/^\/thopter\s*(.*)$/m);
@@ -276,6 +277,16 @@ class GitHubPollingManager {
       // Use the already-fetched comments instead of making another API call
       const commentsToUse = allComments || [];
 
+      // Determine who mentioned /thopter
+      let mentionAuthor = '';
+      if (location === 'body') {
+        // Command was in the issue body, so the issue author mentioned it
+        mentionAuthor = issue.user?.login || '';
+      } else if (location === 'comment' && comment) {
+        // Command was in a comment, so the comment author mentioned it
+        mentionAuthor = comment.user?.login || '';
+      }
+
       // Create GitHub context with full conversation thread
       const github: GitHubContext = {
         issueNumber: issue.number.toString(),
@@ -283,7 +294,7 @@ class GitHubPollingManager {
         issueBody: issue.body || '',
         issueUrl: issue.html_url,
         issueAuthor: issue.user?.login || '',
-        mentionAuthor: '', // We'll set this when we know who mentioned
+        mentionAuthor,
         mentionLocation: location,
         mentionCommentId: commentId,
         // Add full conversation thread

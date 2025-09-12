@@ -330,6 +330,26 @@ main {
   padding-bottom: 10px;
 }
 
+/* User group styling */
+.user-group {
+  margin-bottom: 30px;
+}
+
+.user-group:last-child {
+  margin-bottom: 0;
+}
+
+.user-group-header {
+  color: #2c3e50;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 15px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #3498db;
+}
+
 /* Empty states */
 .empty-state {
   text-align: center;

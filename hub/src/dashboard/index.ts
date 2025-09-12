@@ -39,6 +39,24 @@ router.get('/', (req: Request, res: Response) => {
     const logs = stateManager.getRecentLogs(50);
     const operatingMode = stateManager.getOperatingMode();
     
+    // Group agents by mentionAuthor (the user who created them)
+    const agentsByUser = new Map<string, typeof agents>();
+    for (const agent of agents) {
+      const mentionAuthor = agent.github?.mentionAuthor || 'unknown';
+      if (!agentsByUser.has(mentionAuthor)) {
+        agentsByUser.set(mentionAuthor, []);
+      }
+      agentsByUser.get(mentionAuthor)!.push(agent);
+    }
+    
+    // Convert to array of groups, sorted by username
+    const agentGroups = Array.from(agentsByUser.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([user, userAgents]) => ({
+        user,
+        agents: userAgents
+      }));
+    
     // Sort requests by creation date (newest first)
     provisionRequests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     destroyRequests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -53,6 +71,7 @@ router.get('/', (req: Request, res: Response) => {
     
     res.render('dashboard', {
       agents,
+      agentGroups,
       goldenClaudes,
       provisionRequests,
       destroyRequests,

@@ -98,116 +98,123 @@
             <p>Agents will appear here when they are spawned and running.</p>
           </div>
         <% } else { %>
-          <div class="table-container">
-            <table class="agents-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Status</th>
-                  <th>Age</th>
-                  <th>Last Ping</th>
-                  <th>Task</th>
-                  <th></th>
-                  <th></th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <% agents.forEach(agent => { %>
-                  <tr class="agent-row">
-                    <td class="agent-id-cell">
-                      <a href="/agent/<%= agent.id %>" class="agent-id-link">
-                        <%= agent.id %>
-                      </a>
-                      <% if (!agent.hasObserver) { %>
-                        <span class="orphaned-indicator" title="No observer data - agent may not be responding">⚠️</span>
-                      <% } %>
-                    </td>
-                    <td class="status-cell">
-                      <span class="agent-state <%= formatters.stateClass(agent.state) %>">
-                        <%= agent.state %>
-                      </span>
-                      <% const idleDuration = formatters.idleDuration(agent.idle_since, agent.state); %>
-                      <% if (idleDuration) { %>
-                        <span class="idle-duration">(<%= idleDuration %>)</span>
-                      <% } %>
-                    </td>
-                    <td class="age-cell">
-                      <% if (agent.spawnedAt) { %>
-                        <span title="<%= formatters.absoluteTime(agent.spawnedAt) %>">
-                          <%= formatters.relativeTime(agent.spawnedAt) %>
-                        </span>
-                      <% } else { %>
-                        <span class="no-data">—</span>
-                      <% } %>
-                    </td>
-                    <td class="activity-cell">
-                      <% if (agent.lastActivity) { %>
-                        <span title="<%= formatters.absoluteTime(agent.lastActivity) %>">
-                          <%= formatters.relativeTime(agent.lastActivity) %>
-                        </span>
-                      <% } else { %>
-                        <span class="no-data">—</span>
-                      <% } %>
-                    </td>
-                    <td class="repo-issue-cell">
-                      <div class="repo-issue-content">
-                        <% if (agent.repository) { %>
-                          <div class="repo-line">
-                            <a href="<%= formatters.gitHubUrl(agent.repository) %>" target="_blank">
-                              <%= agent.repository %>
+          <% agentGroups.forEach(group => { %>
+            <div class="user-group">
+              <h3 class="user-group-header">
+                👤 <%= group.user %> (<%= group.agents.length %> agent<%= group.agents.length === 1 ? '' : 's' %>)
+              </h3>
+              <div class="table-container">
+                <table class="agents-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Status</th>
+                      <th>Age</th>
+                      <th>Last Ping</th>
+                      <th>Task</th>
+                      <th></th>
+                      <th></th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% group.agents.forEach(agent => { %>
+                      <tr class="agent-row">
+                        <td class="agent-id-cell">
+                          <a href="/agent/<%= agent.id %>" class="agent-id-link">
+                            <%= agent.id %>
+                          </a>
+                          <% if (!agent.hasObserver) { %>
+                            <span class="orphaned-indicator" title="No observer data - agent may not be responding">⚠️</span>
+                          <% } %>
+                        </td>
+                        <td class="status-cell">
+                          <span class="agent-state <%= formatters.stateClass(agent.state) %>">
+                            <%= agent.state %>
+                          </span>
+                          <% const idleDuration = formatters.idleDuration(agent.idle_since, agent.state); %>
+                          <% if (idleDuration) { %>
+                            <span class="idle-duration">(<%= idleDuration %>)</span>
+                          <% } %>
+                        </td>
+                        <td class="age-cell">
+                          <% if (agent.spawnedAt) { %>
+                            <span title="<%= formatters.absoluteTime(agent.spawnedAt) %>">
+                              <%= formatters.relativeTime(agent.spawnedAt) %>
+                            </span>
+                          <% } else { %>
+                            <span class="no-data">—</span>
+                          <% } %>
+                        </td>
+                        <td class="activity-cell">
+                          <% if (agent.lastActivity) { %>
+                            <span title="<%= formatters.absoluteTime(agent.lastActivity) %>">
+                              <%= formatters.relativeTime(agent.lastActivity) %>
+                            </span>
+                          <% } else { %>
+                            <span class="no-data">—</span>
+                          <% } %>
+                        </td>
+                        <td class="repo-issue-cell">
+                          <div class="repo-issue-content">
+                            <% if (agent.repository) { %>
+                              <div class="repo-line">
+                                <a href="<%= formatters.gitHubUrl(agent.repository) %>" target="_blank">
+                                  <%= agent.repository %>
+                                </a>
+                              </div>
+                            <% } else { %>
+                              <div class="repo-line no-data">—</div>
+                            <% } %>
+                            <% if (agent.github && agent.github.issueNumber) { %>
+                              <div class="issue-line">
+                                <a href="<%= formatters.gitHubUrl(agent.repository, agent.github.issueNumber) %>" target="_blank">
+                                  #<%= agent.github.issueNumber %>: <%= formatters.truncateText(agent.github.issueTitle, 50) %>
+                                </a>
+                              </div>
+                            <% } %>
+                            <% if (agent.workBranch) { %>
+                              <div class="branch-line">
+                                <span class="branch-name"><%= agent.workBranch %></span>
+                              </div>
+                            <% } %>
+                          </div>
+                        </td>
+                        <td class="action-cell">
+                          <% if (agent.webTerminalUrl) { %>
+                            <a href="<%= agent.webTerminalUrl %>" class="table-btn terminal-btn" target="_blank" title="Open Web Terminal">
+                              Terminal
                             </a>
-                          </div>
-                        <% } else { %>
-                          <div class="repo-line no-data">—</div>
-                        <% } %>
-                        <% if (agent.github && agent.github.issueNumber) { %>
-                          <div class="issue-line">
-                            <a href="<%= formatters.gitHubUrl(agent.repository, agent.github.issueNumber) %>" target="_blank">
-                              #<%= agent.github.issueNumber %>: <%= formatters.truncateText(agent.github.issueTitle, 50) %>
+                          <% } %>
+                        </td>
+                        <td class="action-cell">
+                          <% if (agent.webTerminalUrl) { %>
+                            <% const sessionLogUrl = agent.webTerminalUrl.replace(':7681/', ':7791/'); %>
+                            <a href="<%= sessionLogUrl %>" class="table-btn session-log-btn" target="_blank" title="View Session Logs">
+                              Session Log
                             </a>
-                          </div>
-                        <% } %>
-                        <% if (agent.workBranch) { %>
-                          <div class="branch-line">
-                            <span class="branch-name"><%= agent.workBranch %></span>
-                          </div>
-                        <% } %>
-                      </div>
-                    </td>
-                    <td class="action-cell">
-                      <% if (agent.webTerminalUrl) { %>
-                        <a href="<%= agent.webTerminalUrl %>" class="table-btn terminal-btn" target="_blank" title="Open Web Terminal">
-                          Terminal
-                        </a>
-                      <% } %>
-                    </td>
-                    <td class="action-cell">
-                      <% if (agent.webTerminalUrl) { %>
-                        <% const sessionLogUrl = agent.webTerminalUrl.replace(':7681/', ':7791/'); %>
-                        <a href="<%= sessionLogUrl %>" class="table-btn session-log-btn" target="_blank" title="View Session Logs">
-                          Session Log
-                        </a>
-                      <% } %>
-                    </td>
-                    <td class="action-cell">
-                      <% if (agent.state === 'killing') { %>
-                        <button class="table-btn kill-btn disabled" disabled title="Agent is being killed">
-                          Killing...
-                        </button>
-                      <% } else { %>
-                        <form action="/agent/<%= agent.id %>/kill" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to kill this agent? This action cannot be undone.');">
-                          <button type="submit" class="table-btn kill-btn" title="Kill Agent">
-                            Kill
-                          </button>
-                        </form>
-                      <% } %>
-                    </td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-          </div>
+                          <% } %>
+                        </td>
+                        <td class="action-cell">
+                          <% if (agent.state === 'killing') { %>
+                            <button class="table-btn kill-btn disabled" disabled title="Agent is being killed">
+                              Killing...
+                            </button>
+                          <% } else { %>
+                            <form action="/agent/<%= agent.id %>/kill" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to kill this agent? This action cannot be undone.');">
+                              <button type="submit" class="table-btn kill-btn" title="Kill Agent">
+                                Kill
+                              </button>
+                            </form>
+                          <% } %>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <% }); %>
         <% } %>
       </section>
 
