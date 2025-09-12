@@ -43,7 +43,6 @@ export interface DestroyResult {
 export class ThopterProvisioner {
   private readonly appName: string;
   private readonly region: string;
-  private readonly maxAgents: number;
   private readonly webTerminalPort: number;
   private readonly hubHost: string;
   private readonly hubStatusPort: number;
@@ -56,7 +55,6 @@ export class ThopterProvisioner {
     this.appName = process.env.APP_NAME!;
     this.region = process.env.REGION!;
     // THOPTER_IMAGE now comes from metadata service, not environment
-    this.maxAgents = parseInt(process.env.MAX_THOPTERS || process.env.MAX_AGENTS!);
     this.webTerminalPort = parseInt(process.env.WEB_TERMINAL_PORT!);
     // Hub host should be auto-detected from current machine hostname or environment
     this.hubHost = process.env.HUB_HOST || this.getHubHost();
@@ -118,17 +116,6 @@ export class ThopterProvisioner {
     console.log(`🚁 [${requestId}] Starting provisioning for issue: ${request.github.issueTitle}`);
     
     try {
-      // Check if we're at max capacity
-      console.log(`🔍 [${requestId}] Checking thopter capacity...`);
-      const activeThopters = await this.getActiveThopterCount();
-      console.log(`📊 [${requestId}] Active thopters: ${activeThopters}/${this.maxAgents}`);
-      if (activeThopters >= this.maxAgents) {
-        return {
-          success: false,
-          error: `Maximum thopters (${this.maxAgents}) already running. Active: ${activeThopters}`
-        };
-      }
-
       // Ensure we have an available volume for the thopter
       console.log(`💾 [${requestId}] Ensuring available volume...`);
       const volumeName = await this.ensureAvailableVolume();
@@ -220,23 +207,6 @@ export class ThopterProvisioner {
     }
   }
 
-  /**
-   * Get count of currently active thopters
-   */
-  private async getActiveThopterCount(): Promise<number> {
-    try {
-      const output = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
-      const machines = JSON.parse(output);
-      const thopterMachines = machines.filter((m: any) => 
-        m.name && m.name.startsWith('thopter-') && m.state === 'started'
-      );
-      
-      return thopterMachines.length;
-    } catch (error) {
-      console.warn('Failed to get active thopter count:', error);
-      return 0; // Assume 0 if we can't check
-    }
-  }
 
 
   /**

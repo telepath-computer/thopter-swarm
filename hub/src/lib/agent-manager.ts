@@ -12,11 +12,13 @@ export class AgentManager {
   private processingLoop: NodeJS.Timeout | null = null;
   private activeDestroyOperations: Set<string> = new Set();
   private readonly maxConcurrentDestroys: number;
+  private readonly maxThopters: number;
   
   constructor(config: AgentManagerConfig) {
     this.provisioner = config.provisioner;
     this.maxConcurrentDestroys = parseInt(process.env.MAX_CONCURRENT_DESTROYS || '5');
-    logger.info(`Agent manager initialized with max concurrent destroys: ${this.maxConcurrentDestroys}`, undefined, 'agent-manager');
+    this.maxThopters = parseInt(process.env.MAX_THOPTERS || process.env.MAX_AGENTS || '10');
+    logger.info(`Agent manager initialized with max concurrent destroys: ${this.maxConcurrentDestroys}, max thopters: ${this.maxThopters}`, undefined, 'agent-manager');
   }
   
   /**
@@ -107,12 +109,21 @@ export class AgentManager {
     logger.info(`Processing provision request: ${requestId}`, undefined, 'agent-manager');
     
     try {
+      // Check capacity using state manager data (authoritative)
+      const activeThopters = stateManager.getAllThopters()
+        .filter(t => t.fly.machineState === 'started').length;
+        
+      if (activeThopters >= this.maxThopters) {
+        logger.info(`Provision request ${requestId} deferred - at capacity (${activeThopters}/${this.maxThopters})`, undefined, 'agent-manager');
+        return; // Keep request pending, retry next cycle
+      }
+      
       // Update request status to processing
       stateManager.updateProvisionRequest(requestId, {
         status: 'processing'
       });
       
-      // Call provisioner with rich ProvisionRequest
+      // Call provisioner with rich ProvisionRequest (no capacity check needed)
       const result = await this.provisioner.provision(request);
       
       if (result.success && result.thopterId && result.machineId && result.region && result.image) {
