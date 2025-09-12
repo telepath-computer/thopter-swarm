@@ -117,8 +117,8 @@ export interface LogEvent {
   context?: any;
 }
 
-// Operating modes for agent manager
-export type OperatingMode = 'starting' | 'running' | 'paused' | 'stopping';
+// Operating modes for system state management
+export type OperatingMode = 'initializing' | 'starting' | 'running' | 'paused' | 'stopping';
 
 // GitHub Integration Configuration
 export interface GitHubRepositoryConfig {

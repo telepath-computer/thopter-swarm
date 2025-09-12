@@ -18,8 +18,6 @@ class GitHubPollingManager {
   private readonly intervalMs: number;
   private processedCommands: Set<string> = new Set();
   private lastPollTime: Date | null = null;
-  private isRunning = false;
-  private isStopped = false;
   private agentManager: AgentManager | null = null;
 
   constructor() {
@@ -38,13 +36,10 @@ class GitHubPollingManager {
    * Start polling GitHub repositories for /thopter commands
    */
   start(): void {
-    if (this.isRunning) {
+    if (this.pollingTimeout) {
       logger.warn('GitHub polling already started', undefined, 'github-polling');
       return;
     }
-
-    this.isStopped = false;
-    this.isRunning = true;
 
     const repositories = stateManager.getConfiguredRepositories();
     logger.info(`Starting GitHub polling for ${repositories.length} repositories (${this.intervalMs/1000}s interval)`, undefined, 'github-polling');
@@ -59,38 +54,37 @@ class GitHubPollingManager {
    * Stop polling
    */
   stop(): void {
-    if (!this.isRunning) {
-      return;
-    }
-
-    this.isStopped = true;
-    this.isRunning = false;
-
     if (this.pollingTimeout) {
       clearTimeout(this.pollingTimeout);
       this.pollingTimeout = null;
+      logger.info('GitHub polling stopped', undefined, 'github-polling');
     }
-
-    logger.info('GitHub polling stopped', undefined, 'github-polling');
   }
 
   /**
    * Schedule the next polling run
    */
   private scheduleNextPoll(delay: number): void {
-    if (this.isStopped) {
+    // Check if system is stopping
+    const operatingMode = stateManager.getOperatingMode();
+    if (operatingMode === 'stopping') {
       return;
     }
 
     this.pollingTimeout = setTimeout(async () => {
-      if (this.isStopped) {
+      // Re-check operating mode before polling
+      const currentMode = stateManager.getOperatingMode();
+      if (currentMode === 'stopping') {
         return;
       }
 
-      try {
-        await this.pollAllRepositories();
-      } catch (error) {
-        logger.error(`Polling failed: ${error instanceof Error ? error.message : String(error)}`, undefined, 'github-polling');
+      // Only poll if system is in running mode
+      if (currentMode === 'running') {
+        try {
+          await this.pollAllRepositories();
+        } catch (error) {
+          logger.error(`Polling failed: ${error instanceof Error ? error.message : String(error)}`, undefined, 'github-polling');
+        }
       }
 
       // Schedule next poll after this one completes
@@ -109,8 +103,9 @@ class GitHubPollingManager {
     
     let anySuccess = false;
     for (const repository of repositories) {
-      if (this.isStopped) {
-        logger.debug('Polling stopped, exiting repository loop', undefined, 'github-polling');
+      // Check if system is stopping during loop
+      if (stateManager.getOperatingMode() === 'stopping') {
+        logger.debug('System stopping, exiting repository loop', undefined, 'github-polling');
         break;
       }
 
@@ -164,8 +159,9 @@ class GitHubPollingManager {
       logger.debug(`Found ${issues.length} updated issues in ${repository} since ${since.toISOString()}`, undefined, 'github-polling');
 
       for (const issue of issues) {
-        if (this.isStopped) {
-          logger.debug('Polling stopped, exiting issue loop', undefined, 'github-polling');
+        // Check if system is stopping during loop
+        if (stateManager.getOperatingMode() === 'stopping') {
+          logger.debug('System stopping, exiting issue loop', undefined, 'github-polling');
           break;
         }
 
@@ -210,8 +206,9 @@ class GitHubPollingManager {
       // Process each comment for /thopter commands
       // Pass the fetched comments to avoid redundant API calls
       for (const comment of comments) {
-        if (this.isStopped) {
-          logger.debug('Polling stopped, exiting comment loop', undefined, 'github-polling');
+        // Check if system is stopping during loop
+        if (stateManager.getOperatingMode() === 'stopping') {
+          logger.debug('System stopping, exiting comment loop', undefined, 'github-polling');
           break;
         }
 
@@ -410,9 +407,10 @@ A thopter will be provisioned to work on this issue. You can track progress in t
    * Get current polling status
    */
   getStatus() {
+    const operatingMode = stateManager.getOperatingMode();
     return {
-      isRunning: this.isRunning,
-      isStopped: this.isStopped,
+      isRunning: !!this.pollingTimeout && operatingMode === 'running',
+      systemMode: operatingMode,
       intervalMs: this.intervalMs,
       lastPollTime: this.lastPollTime,
       configuredRepositories: stateManager.getConfiguredRepositories(),
