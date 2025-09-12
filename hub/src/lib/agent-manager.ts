@@ -115,7 +115,7 @@ export class AgentManager {
       // Call provisioner with rich ProvisionRequest
       const result = await this.provisioner.provision(request);
       
-      if (result.success) {
+      if (result.success && result.thopterId && result.machineId && result.region && result.image) {
         // Update request to completed
         stateManager.updateProvisionRequest(requestId, {
           status: 'completed',

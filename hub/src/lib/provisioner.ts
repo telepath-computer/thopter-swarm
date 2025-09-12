@@ -26,13 +26,12 @@ const createFlyWrapper = (appName: string) => {
 
 export interface ProvisionResult {
   success: boolean;
-  thopterId: string;
-  machineId?: string;
-  machineName?: string;
-  region: string;    // Always known by provisioner
-  image: string;     // Always known by provisioner  
-  error?: string;
-  webTerminalUrl?: string;
+  thopterId?: string;    // Only present if thopter was created
+  machineId?: string;    // Only present if thopter was created
+  machineName?: string;  // Only present if thopter was created
+  region?: string;       // Only present if thopter was created
+  image?: string;        // Only present if thopter was created
+  error?: string;        // Only present on failure
 }
 
 export interface DestroyResult {
@@ -126,9 +125,6 @@ export class ThopterProvisioner {
       if (activeThopters >= this.maxAgents) {
         return {
           success: false,
-          thopterId: 'capacity-exceeded',
-          region: this.region,
-          image: 'capacity-exceeded',
           error: `Maximum thopters (${this.maxAgents}) already running. Active: ${activeThopters}`
         };
       }
@@ -175,17 +171,13 @@ export class ThopterProvisioner {
         machineId,
         machineName: `thopter-${machineId}`,
         region: this.region,
-        image: (await metadataClient.getThopterImage()) || 'unknown',
-        webTerminalUrl
+        image: (await metadataClient.getThopterImage()) || 'unknown'
       };
 
     } catch (error) {
       console.error(`❌ [${requestId}] Provisioning failed:`, error);
       return {
         success: false,
-        thopterId: 'provision-failed',
-        region: this.region,
-        image: 'provision-failed',
         error: error instanceof Error ? error.message : String(error)
       };
     }
