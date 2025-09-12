@@ -196,11 +196,17 @@
                           <% } %>
                         </td>
                         <td class="action-cell">
-                          <form action="/agent/<%= agent.id %>/kill" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to kill this agent? This action cannot be undone.');">
-                            <button type="submit" class="table-btn kill-btn" title="Kill Agent">
-                              Kill
+                          <% if (agent.state === 'killing') { %>
+                            <button class="table-btn kill-btn disabled" disabled title="Agent is being killed">
+                              Killing...
                             </button>
-                          </form>
+                          <% } else { %>
+                            <form action="/agent/<%= agent.id %>/kill" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to kill this agent? This action cannot be undone.');">
+                              <button type="submit" class="table-btn kill-btn" title="Kill Agent">
+                                Kill
+                              </button>
+                            </form>
+                          <% } %>
                         </td>
                       </tr>
                     <% }); %>

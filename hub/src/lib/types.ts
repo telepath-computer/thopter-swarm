@@ -48,7 +48,7 @@ export interface ThopterStatusUpdate {
 export interface AgentState {
   id: string;
   machineId: string;
-  state: 'provisioning' | 'running' | 'idle' | 'failed' | 'orphaned';
+  state: 'provisioning' | 'running' | 'idle' | 'failed' | 'orphaned' | 'killing';
   
   // Core fields
   repository?: string;

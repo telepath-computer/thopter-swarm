@@ -87,7 +87,7 @@ async function startHub() {
     hubApp.use(express.urlencoded({ extended: true }));
     
     // Setup dashboard with EJS templates
-    setupDashboard(hubApp);
+    setupDashboard(hubApp, agentManager);
     
     // Health check endpoint
     hubApp.get('/health', (req, res) => {

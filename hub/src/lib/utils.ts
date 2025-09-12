@@ -60,6 +60,8 @@ export function getStateClass(state: string): string {
       return 'state-provisioning';
     case 'orphaned':
       return 'state-orphaned';
+    case 'killing':
+      return 'state-killing';
     case 'failed':
     case 'error':
       return 'state-failed';
