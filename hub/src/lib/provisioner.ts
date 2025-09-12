@@ -114,8 +114,12 @@ export class ThopterProvisioner {
   private async logToThopterAsync(machineId: string, message: string): Promise<void> {
     try {
       const execAsync = promisify(exec);
+      // Sanitize message to prevent shell injection and quote issues
+      const sanitizedMessage = message.replace(/['"\\$`]/g, '');
+      
+      // Use sh -c to execute shell commands properly with -C flag
       await execAsync(
-        `fly ssh console -C "echo \\"\$(date '+%Y-%m-%d %H:%M:%S') [PROVISIONER] ${message}\\" >> /thopter/log" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+        `fly ssh console -C "sh -c 'echo \\"\\$(date \\'+%Y-%m-%d %H:%M:%S\\') [PROVISIONER] ${sanitizedMessage}\\" >> /thopter/log'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
         { 
           cwd: process.cwd()
         }
