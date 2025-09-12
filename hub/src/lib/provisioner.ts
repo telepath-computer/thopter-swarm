@@ -410,7 +410,7 @@ export class ThopterProvisioner {
   private async waitForThopterReady(machineId: string): Promise<string> {
     console.log(`⏳ Waiting for thopter ${machineId} to be ready...`);
     
-    const maxDuration = 30000; // 30 seconds total
+    const maxDuration = 120000; // 120 seconds total
     const startTime = Date.now();
     let attempts = 0;
 
@@ -435,7 +435,7 @@ export class ThopterProvisioner {
       await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between attempts
     }
 
-    throw new Error(`Thopter ${machineId} failed to become ready within 30 seconds`);
+    throw new Error(`Thopter ${machineId} failed to become ready within ${maxDuration/1000} seconds`);
   }
 
   /**
