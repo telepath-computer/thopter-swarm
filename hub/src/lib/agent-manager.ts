@@ -215,13 +215,12 @@ export class AgentManager {
           error: result.error
         });
 
-        // XXX we should handle this with some kind of 'stuck' agent state.
-        // perhaps we delete the agent completely and have a separate task that
-        // periodically repopulates the agent list from a bootstrap-like
-        // operation. as it stands right now, this agent will be stuck in
-        // 'killing' state with (1) no available actions to take (2) no way to
-        // remove it besides restarting the server.
-        
+        // clear the killing' state so the user can try again
+        const agent = stateManager.getAgent(agentId);
+        if (agent) {
+          agent.state = 'idle';
+        }
+
         logger.error(`Destroy request failed: ${requestId} for agent ${agentId} - ${result.error}`, agentId, 'agent-manager');
       }
       
