@@ -102,6 +102,9 @@ class StateManager {
       for (const machine of thopterMachines) {
         const existing = this.thopters.get(machine.id);
         
+        // TODO i'd prefer to use something like { ...existing, fly: { ... } }
+        // that blanket preserves existing keys instead of manually preserving
+        // existing keys.
         const thopterState: ThopterState = {
           // === FLY DATA (authoritative) ===
           fly: {
@@ -118,8 +121,8 @@ class StateManager {
             killRequested: existing?.hub?.killRequested || false
           },
           
-          // === SESSION STATE (preserve if valid, clear if stale) ===
-          session: this.preserveValidSession(existing?.session),
+          // === SESSION STATE (preserve existing) ===
+          session: existing?.session,
           
           // === GITHUB CONTEXT (preserve existing) ===
           github: existing?.github
@@ -140,16 +143,6 @@ class StateManager {
   private async getFlyMachines(): Promise<any[]> {
     const output = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
     return JSON.parse(output);
-  }
-  
-  private preserveValidSession(session?: ThopterState['session']): ThopterState['session'] {
-    if (!session) return undefined;
-    
-    // Clear stale sessions during reconciliation
-    const staleThresholdMs = 5 * 60 * 1000; // 5 minutes for reconciliation
-    const timeSinceUpdate = Date.now() - session.lastActivity.getTime();
-    
-    return timeSinceUpdate < staleThresholdMs ? session : undefined;
   }
   
   private logThopterChanges(oldThopters: Map<string, ThopterState>, newThopters: Map<string, ThopterState>): void {
@@ -378,7 +371,7 @@ class StateManager {
     return this.operatingMode;
   }
   
-  setOperatingMode(mode: OperatingMode): void {
+  setOperatingMode(mode: OperatingMode): void /* syntax fix comment */ {
     const previousMode = this.operatingMode;
     this.operatingMode = mode;
     
@@ -390,7 +383,7 @@ class StateManager {
   /**
    * Handle shutdown - set mode to stopping and clean up intervals
    */
-  handleShutdown(): void {
+  handleShutdown(): void /* syntax fix comment */ {
     logger.info('State manager shutting down - setting mode to stopping', undefined, 'state-manager');
     this.setOperatingMode('stopping');
     
@@ -497,7 +490,7 @@ class StateManager {
   /**
    * Start periodic refresh of Golden Claude state
    */
-  startGoldenClaudeRefresh(): void {
+  startGoldenClaudeRefresh(): void /*this comment fixes neovim syntax highlighting*/ {
     // Refresh every 30 seconds
     this.gcRefreshInterval = setInterval(() => {
       this.bootstrapGoldenClaudes().catch(error => {

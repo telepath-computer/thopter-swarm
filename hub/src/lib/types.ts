@@ -91,6 +91,7 @@ export interface GoldenClaudeState {
 
 // Separate request types for provisioning and destroying
 export interface ProvisionRequest {
+  // TODO this could be cleaned up a bit, e.g. github payload already includes repo, workBranch should be derived, etc.
   requestId: string;
   source: 'github';  // Only source for now
   createdAt: Date;
