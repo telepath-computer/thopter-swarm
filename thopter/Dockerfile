@@ -117,6 +117,11 @@ RUN echo "set -g mouse on" > /etc/tmux.conf && \
 COPY scripts/firewall.sh /usr/local/bin/firewall.sh
 RUN chmod +x /usr/local/bin/firewall.sh
 
+# Create thopter log directory for capturing initialization and provisioning events
+RUN mkdir -p /thopter && \
+    touch /thopter/log && \
+    chmod 666 /thopter/log
+
 # Create init script that transitions from root to thopter user
 COPY scripts/thopter-init.sh /usr/local/bin/thopter-init.sh
 RUN chmod +x /usr/local/bin/thopter-init.sh

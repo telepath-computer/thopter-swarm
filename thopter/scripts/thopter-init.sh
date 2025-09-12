@@ -1,7 +1,14 @@
 #!/bin/bash
 set -e
 
-echo "Starting Thopter agent container as PID 1..."
+# Logging function that outputs to both stdout and /thopter/log
+# Captures both stdout and stderr to the log file
+thopter_log() {
+    local message="$(date '+%Y-%m-%d %H:%M:%S') [THOPTER-INIT] $*"
+    echo "$message" | tee -a /thopter/log
+}
+
+thopter_log "Starting Thopter agent container as PID 1..."
 
 # important: the golden claude copy logic will *bulldoze* files in the homedir,
 # with unpredictable timing relative to this script. for example, .bashrc --
@@ -11,7 +18,7 @@ echo "Starting Thopter agent container as PID 1..."
 # provisioner's snapshot logic.
 
 # Wait for /data mount point to be fully ready before proceeding
-echo "Checking data mount point readiness..."
+thopter_log "Checking data mount point readiness..."
 DATA_MOUNT_READY=false
 for i in {1..30}; do
     # Test that we can write and read from the mount point
@@ -21,17 +28,17 @@ for i in {1..30}; do
        read -r test_content < "$TEST_FILE" && \
        [ -n "$test_content" ] && \
        rm -f "$TEST_FILE" 2>/dev/null; then
-        echo "Data mount point is ready (attempt $i/30)"
+        thopter_log "Data mount point is ready (attempt $i/30)"
         DATA_MOUNT_READY=true
         break
     else
-        echo "Data mount not ready, waiting... (attempt $i/30)"
+        thopter_log "Data mount not ready, waiting... (attempt $i/30)"
         sleep 2
     fi
 done
 
 if [ "$DATA_MOUNT_READY" = false ]; then
-    echo "ERROR: Data mount point failed readiness check after 60 seconds"
+    thopter_log "ERROR: Data mount point failed readiness check after 60 seconds"
     exit 1
 fi
 
@@ -73,37 +80,39 @@ if ! grep -q "source.*\.bash_aliases" /data/thopter/.bashrc 2>/dev/null; then
 fi
 
 # Phase 4: Setup network firewall (as root before switching to thopter user)
-echo "Setting up network firewall..."
-/usr/local/bin/firewall.sh
+thopter_log "Setting up network firewall..."
+/usr/local/bin/firewall.sh 2>&1 | while IFS= read -r line; do
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [FIREWALL] $line" | tee -a /thopter/log
+done
 
 # If credentials were injected during container setup, fix ownership
 if [ -d "/data/thopter/.claude" ]; then
-    echo "Fixing Claude credentials ownership for thopter user..."
+    thopter_log "Fixing Claude credentials ownership for thopter user..."
     chown -R thopter:thopter /data/thopter/.claude
 fi
 
 # If issue context was injected, fix ownership  
 if [ -f "/data/thopter/issue.md" ]; then
-    echo "Fixing issue context ownership for thopter user..."
+    thopter_log "Fixing issue context ownership for thopter user..."
     chown thopter:thopter /data/thopter/issue.md
 fi
 
 if [ -f "/data/thopter/issue.json" ]; then
-    echo "Fixing issue.json ownership for thopter user..."
+    thopter_log "Fixing issue.json ownership for thopter user..."
     chown thopter:thopter /data/thopter/issue.json
 fi
 
 if [ -f "/data/thopter/prompt.md" ]; then
-    echo "Fixing prompt.md ownership for thopter user..."
+    thopter_log "Fixing prompt.md ownership for thopter user..."
     chown thopter:thopter /data/thopter/prompt.md
 fi
 
 # Move .env.thopters from /tmp if it exists (provided during machine creation)
 if [ -f "/tmp/.env.thopters" ]; then
-    echo "Moving .env.thopters from /tmp to thopter home directory..."
+    thopter_log "Moving .env.thopters from /tmp to thopter home directory..."
     mv /tmp/.env.thopters /data/thopter/.env.thopters
     chown thopter:thopter /data/thopter/.env.thopters
-    echo "Sourcing .env.thopters in .bashrc..."
+    thopter_log "Sourcing .env.thopters in .bashrc..."
     echo "" >> /data/thopter/.bashrc
     echo "# Load developer environment variables" >> /data/thopter/.bashrc
     echo "if [ -f ~/.env.thopters ]; then" >> /data/thopter/.bashrc
@@ -127,10 +136,10 @@ mkdir -p /data/thopter/.claude/projects
 chown -R thopter:thopter /data/thopter/.claude
 
 # Start session observer with PM2 (as root, but observer runs as thopter user)
-echo "Starting session observer..."
+thopter_log "Starting session observer..."
 /usr/local/bin/start-observer.sh
 
-echo "Switching to thopter user and starting NO-INDEX web terminal..."
+thopter_log "Switching to thopter user and starting NO-INDEX web terminal..."
 
 # Switch to thopter user and start tmux + gotty using runuser to preserve environment
 # runuser is designed for service scripts and preserves more environment than su
