@@ -196,6 +196,13 @@ export function getGitHubUrl(repository: string, issueNumber?: string): string {
 }
 
 /**
+ * Generate GitHub tree URL for repository branch
+ */
+export function getGitHubTreeUrl(repository: string, branch: string): string {
+  return `https://github.com/${repository}/tree/${branch}`;
+}
+
+/**
  * Get the service discovery URL for the hub dashboard
  */
 export function getDashboardUrl(): string {

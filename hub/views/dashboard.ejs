@@ -173,9 +173,11 @@
                                 </a>
                               </div>
                             <% } %>
-                            <% if (agent.workBranch) { %>
+                            <% if (agent.workBranch && agent.repository) { %>
                               <div class="branch-line">
-                                <span class="branch-name"><%= agent.workBranch %></span>
+                                <a href="<%= formatters.gitHubTreeUrl(agent.repository, agent.workBranch) %>" target="_blank" class="branch-name">
+                                  <%= agent.workBranch %>
+                                </a>
                               </div>
                             <% } %>
                           </div>
