@@ -187,9 +187,6 @@ router.post('/agent/:id/kill', (req: Request, res: Response) => {
       return;
     }
     
-    // Set kill requested flag
-    stateManager.setKillRequested(thopterId, true);
-    
     // Create destroy request via agent manager (this now prevents duplicates)
     const requestId = agentManager.createDestroyRequest(thopterId, 'dashboard', 'Manual kill request from dashboard');
     
