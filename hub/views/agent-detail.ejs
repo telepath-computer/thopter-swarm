@@ -148,7 +148,7 @@
                 <div class="detail-row">
                   <div class="detail-label">Work Branch:</div>
                   <div class="detail-value">
-                    <span class="branch-name"><%= helpers.getWorkBranch(thopter) %></span>
+                    <span class="branch-name"><a href="<%= formatters.gitHubTreeUrl(thopter.github.repository, helpers.getWorkBranch(thopter)) %>" target="_blank"><%= helpers.getWorkBranch(thopter) %></a></span>
                   </div>
                 </div>
                 

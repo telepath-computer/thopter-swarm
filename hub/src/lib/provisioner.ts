@@ -110,6 +110,35 @@ export class ThopterProvisioner {
 
   /**
    * Main provisioning routine - creates a new thopter for a GitHub issue
+   * Log an entry to the thopter's log file via SSH
+   */
+  private async logToThopterAsync(machineId: string, message: string): Promise<void> {
+    try {
+      const execAsync = promisify(exec);
+      
+      // Build the complete log entry in JavaScript with timestamp
+      const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      const logEntry = `${timestamp} [PROVISIONER] ${message}\n`;
+      
+      // Base64 encode the log entry to avoid all quoting issues
+      const encoded = Buffer.from(logEntry).toString('base64');
+      
+      // Simple command with no backslashes or complex quoting
+      await execAsync(
+        `fly ssh console -C "sh -c 'echo ${encoded} | base64 -d >> /thopter/log'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+        { 
+          cwd: process.cwd()
+        }
+      );
+    } catch (error) {
+      // Don't let logging failures break provisioning
+      console.warn(`Failed to log to thopter ${machineId}:`, error);
+    }
+  }
+
+  /**
+   * Main provisioning routine - creates a new thopter agent for a GitHub issue
+>>>>>>> origin/main
    */
   async provision(request: ProvisionRequest): Promise<ProvisionResult> {
     const requestId = `${request.repository}#${request.github.issueNumber}`;
@@ -131,25 +160,36 @@ export class ThopterProvisioner {
       const webTerminalUrl = await this.waitForThopterReady(machineId);
       console.log(`🌐 [${requestId}] Machine ready. Web terminal: ${webTerminalUrl}`);
 
+      // Log provisioning start to machine
+      await this.logToThopterAsync(machineId, `Starting provisioning for issue ${request.github.issueNumber}: ${request.github.issueTitle}`);
+
       // Copy Golden Claude data if available (optional step)
       console.log(`🏆 [${requestId}] Checking for Golden Claude data...`);
+      await this.logToThopterAsync(machineId, "Checking for Golden Claude data to copy");
       await this.copyGoldenClaudeData(machineId, requestId, request.gc);
+      await this.logToThopterAsync(machineId, "Golden Claude data copy operation completed");
 
       // Setup Git configuration and clone repository
       console.log(`🔧 [${requestId}] Setting up Git configuration and cloning repository...`);
+      await this.logToThopterAsync(machineId, `Setting up Git configuration and cloning repository ${request.repository}`);
       await this.setupGitAndCloneRepo(machineId, request, requestId);
+      await this.logToThopterAsync(machineId, "Git configuration and repository clone completed");
 
       // Copy issue and prompt files to the machine after it's ready
       console.log(`📄 [${requestId}] Copying context files to machine...`);
+      await this.logToThopterAsync(machineId, "Copying context files (issue.md, prompt.md, issue.json) to machine");
       const issueContent = this.prepareIssueContent(request);
       const promptContent = this.preparePromptContent(request, machineId);
       const issueJsonContent = this.prepareIssueJsonContent(request, machineId);
       await this.copyFilesToMachine(machineId, issueContent, promptContent, issueJsonContent);
       console.log(`📋 [${requestId}] Context files copied successfully`);
+      await this.logToThopterAsync(machineId, "Context files copied successfully");
 
       // Launch Claude in tmux session (final step)
       console.log(`🚀 [${requestId}] Launching Claude in tmux session...`);
+      await this.logToThopterAsync(machineId, "Launching Claude in tmux session");
       await this.launchClaudeInTmux(machineId, requestId);
+      await this.logToThopterAsync(machineId, `Provisioning completed successfully. Thopter ${machineId} is ready to work on issue ${request.github.issueNumber}`);
 
       console.log(`✅ [${requestId}] Thopter ${machineId} provisioned successfully`);
       return {

@@ -162,9 +162,11 @@
                               </div>
                             <% } %>
                             <% const workBranch = helpers.getWorkBranch(thopter); %>
-                            <% if (workBranch) { %>
+                            <% if (workBranch && thopter.github && thopter.github.repository) { %>
                               <div class="branch-line">
-                                <span class="branch-name"><%= workBranch %></span>
+                                <a href="<%= formatters.gitHubTreeUrl(thopter.github.repository, workBranch) %>" target="_blank" class="branch-name">
+                                  <%= workBranch %>
+                                </a>
                               </div>
                             <% } %>
                           </div>
@@ -280,6 +282,14 @@
                                 </a>
                               </div>
                             <% } %>
+                            <% const workBranch = helpers.getWorkBranch(thopter); %>
+                            <% if (workBranch && thopter.github && thopter.github.repository) { %>
+                              <div class="branch-line">
+                                <a href="<%= formatters.gitHubTreeUrl(thopter.github.repository, workBranch) %>" target="_blank" class="branch-name">
+                                  <%= workBranch %>
+                                </a>
+                              </div>
+                            <% } %>
                           </div>
                         </td>
                         <td class="action-cell">
@@ -356,6 +366,14 @@
                               <div class="issue-line">
                                 <a href="<%= formatters.gitHubUrl(thopter.github.repository, thopter.github.issueNumber) %>" target="_blank">
                                   #<%= thopter.github.issueNumber %>: <%= formatters.truncateText(thopter.github.issueTitle, 50) %>
+                                </a>
+                              </div>
+                            <% } %>
+                            <% const workBranch = helpers.getWorkBranch(thopter); %>
+                            <% if (workBranch && thopter.github && thopter.github.repository) { %>
+                              <div class="branch-line">
+                                <a href="<%= formatters.gitHubTreeUrl(thopter.github.repository, workBranch) %>" target="_blank" class="branch-name">
+                                  <%= workBranch %>
                                 </a>
                               </div>
                             <% } %>

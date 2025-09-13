@@ -95,7 +95,8 @@ router.get('/', (req: Request, res: Response) => {
         logLevelClass: utils.getLogLevelClass,
         idleDuration: utils.formatIdleDuration,
         truncateText: utils.truncateText,
-        gitHubUrl: utils.getGitHubUrl
+        gitHubUrl: utils.getGitHubUrl,
+        gitHubTreeUrl: utils.getGitHubTreeUrl
       },
       helpers: {
         getOrphanStatus,
@@ -140,6 +141,7 @@ router.get('/agent/:id', (req: Request, res: Response) => {
         idleDuration: utils.formatIdleDuration,
         truncateText: utils.truncateText,
         gitHubUrl: utils.getGitHubUrl,
+        gitHubTreeUrl: utils.getGitHubTreeUrl,
         terminalUrl: (thopterId: string) => `http://${thopterId}.vm.${process.env.APP_NAME}.internal:${process.env.WEB_TERMINAL_PORT || '7681'}/`,
         sessionLogUrl: (thopterId: string) => `http://${thopterId}.vm.${process.env.APP_NAME}.internal:7791/`
       },
