@@ -154,6 +154,13 @@ export class ThopterProvisioner {
       console.log(`🚀 [${requestId}] Creating thopter machine...`);
       const machineId = await this.createThopterMachine(request, volumeName);
       console.log(`🆔 [${requestId}] Machine created with ID: ${machineId}`);
+
+      // Pre-register GitHub context for the machine so if the state manager
+      // discovers it before provisioning is complete, it can show the github
+      // related details to help identify it.
+      if (request.github) {
+        stateManager.expectThopter(machineId, request.github);
+      }
       
       // Wait for machine to be ready and web terminal to start
       console.log(`⏳ [${requestId}] Waiting for machine to be ready...`);
@@ -328,6 +335,7 @@ export class ThopterProvisioner {
     console.log(`Machine creation output:`, output);
 
     // Extract machine ID from output - look for "Machine ID: " pattern first, then fallback to hex pattern
+    // TODO: i don't love this parsing approach, it's brittle
     let machineId: string;
     const machineIdLineMatch = output.match(/Machine ID:\s+([a-f0-9]{14})/);
     if (machineIdLineMatch) {

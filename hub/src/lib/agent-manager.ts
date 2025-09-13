@@ -126,11 +126,6 @@ export class AgentManager {
       // Call provisioner with rich ProvisionRequest (no capacity check needed)
       const result = await this.provisioner.provision(request);
       
-      // Pre-register GitHub context for any machine that was created (success or partial)
-      if (result.machineId && request.github) {
-        stateManager.expectThopter(result.machineId, request.github);
-      }
-      
       if (result.success && result.thopterId && result.machineId && result.region && result.image) {
         // Update request to completed
         stateManager.updateProvisionRequest(requestId, {
@@ -141,6 +136,9 @@ export class AgentManager {
         
         // Add thopter to state with fly information
         // Observer will later populate session state when it reports in
+        // note - the provisioner also tells the state manager to expect a
+        // thopter, and we initiate a state reconciliation below. this
+        // addThopter call is probably not needed but it doesn't hurt.
         stateManager.addThopter(
           result.machineId,
           result.machineName || `thopter-${result.thopterId}`,
