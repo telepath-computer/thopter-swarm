@@ -42,11 +42,13 @@ if [ "$DATA_MOUNT_READY" = false ]; then
     exit 1
 fi
 
+thopter_log "chmod 755 /data"
 # /data is the fly volume mount which is installed for first command runs and
 # we set the new user's homedir there, because these mounts have much higher
 # performance than the VM's local volumes and claude needs to do active work.
 chmod 755 /data
 
+thopter_log "rm -rf /data/*"
 # clear the volume mounted data dir as the volumes are reused across images
 # unpredictably. also note that cloning a machine does not copy the contents of
 # the data volume, the clone just grabs any available data volume with the same
@@ -54,13 +56,18 @@ chmod 755 /data
 # the sense that workers end up sharing the leftovers of each other's work, yet,
 # we also can't reliably copy data (like from a golden claude to an instance
 # agent).
+# TODO: i have seen this hang forever, stuck on cleaning up uv cache
+# directories. i have no idea how that is possible or what to do about it.
 rm -rf /data/*
 
+thopter_log "useradd thopter"
 useradd -m -d /data/thopter -s /bin/bash -U thopter
 
+thopter_log "create workspace dir"
 mkdir -p /data/thopter/workspace
 chown thopter:thopter /data/thopter/workspace
 
+thopter_log "create yolo-claude alias"
 # Create useful aliases for thopter user
 cat > /data/thopter/.bash_aliases << 'EOF'
 # Claude alias with dangerous permissions flag (needed for autonomous operation)
@@ -123,15 +130,18 @@ if [ -f "/tmp/.env.thopters" ]; then
     chown thopter:thopter /data/thopter/.bashrc
 fi
 
+thopter_log "add uv env setup to bashrc"
 echo "" >> /data/thopter/.bashrc
 echo "# make uv available" >> /data/thopter/.bashrc
 echo "source /uv/env" >> /data/thopter/.bashrc
 
-# Ensure logs directory exists with proper ownership for observer
+# Ensure logs directory exists with proper ownership for pm2 service logging
+thopter_log "create and chmod /data/thopter/logs (for pm2)"
 mkdir -p /data/thopter/logs
 chown thopter:thopter /data/thopter/logs
 
 # Create directory for claude-code-log HTML output (webserver working directory)
+thopter_log "chmod .claude dir"
 mkdir -p /data/thopter/.claude/projects
 chown -R thopter:thopter /data/thopter/.claude
 
