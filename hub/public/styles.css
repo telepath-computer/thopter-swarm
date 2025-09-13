@@ -307,7 +307,7 @@ main {
   gap: 30px;
 }
 
-.agents-section,
+.thopters-section,
 .requests-section,
 .golden-claudes-section,
 .logs-section,
@@ -318,7 +318,7 @@ main {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.agents-section h2,
+.thopters-section h2,
 .requests-section h2,
 .golden-claudes-section h2,
 .logs-section h2,
@@ -417,15 +417,15 @@ main {
   color: #6c757d;
 }
 
-/* Agents table */
-.agents-table {
+/* Thopters table */
+.thopters-table {
   width: 100%;
   border-collapse: collapse;
   background: white;
   font-size: 0.9rem;
 }
 
-.agents-table th {
+.thopters-table th {
   background: #f8f9fa;
   color: #2c3e50;
   font-weight: 600;
@@ -435,18 +435,18 @@ main {
   white-space: nowrap;
 }
 
-.agents-table td {
+.thopters-table td {
   padding: 12px 8px;
   border-bottom: 1px solid #e9ecef;
   vertical-align: middle;
 }
 
-.agent-row:hover {
+.thopter-row:hover {
   background: #f8f9fa;
 }
 
 
-.agent-id-link {
+.thopter-id-link {
   font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 0.85rem;
   color: #0066cc;
@@ -454,12 +454,12 @@ main {
   transition: color 0.2s;
 }
 
-.agent-id-link:hover {
+.thopter-id-link:hover {
   color: #004499;
   text-decoration: underline;
 }
 
-.agent-state {
+.thopter-state {
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.75rem;
@@ -601,7 +601,7 @@ main {
   opacity: 0.7;
 }
 
-/* Legacy styles - kept for agent detail pages */
+/* Legacy styles - kept for thopter detail pages */
 .view-details-btn {
   background: #34495e;
   color: white;
@@ -781,7 +781,7 @@ main {
   justify-content: center;
 }
 
-/* Agent Detail Page Styles */
+/* Thopter Detail Page Styles */
 .header-nav {
   display: flex;
   align-items: center;
@@ -807,7 +807,7 @@ main {
   background: #6c7b7d;
 }
 
-.agent-detail-section {
+.thopter-detail-section {
   background: white;
   padding: 25px;
   border-radius: 8px;
@@ -815,7 +815,7 @@ main {
   margin-bottom: 20px;
 }
 
-.agent-detail-section h2 {
+.thopter-detail-section h2 {
   color: #2c3e50;
   font-size: 1.4rem;
   margin-bottom: 20px;
@@ -823,7 +823,7 @@ main {
   padding-bottom: 10px;
 }
 
-.agent-detail-info {
+.thopter-detail-info {
   margin-bottom: 25px;
 }
 
@@ -859,7 +859,7 @@ main {
   line-height: 1.4;
 }
 
-.agent-actions-section {
+.thopter-actions-section {
   text-align: center;
   padding-top: 20px;
   border-top: 1px solid #ecf0f1;
@@ -888,7 +888,7 @@ main {
   background: #c0392b;
 }
 
-.agent-actions-section .terminal-btn {
+.thopter-actions-section .terminal-btn {
   padding: 12px 24px;
   font-size: 1rem;
   font-weight: 600;
@@ -978,17 +978,17 @@ main {
     gap: 15px;
   }
   
-  .agents-table {
+  .thopters-table {
     font-size: 0.8rem;
   }
   
-  .agents-table th,
-  .agents-table td {
+  .thopters-table th,
+  .thopters-table td {
     padding: 8px 4px;
   }
   
   
-  .agent-id-link {
+  .thopter-id-link {
     font-size: 0.8rem;
   }
   
@@ -1032,7 +1032,7 @@ main {
     max-height: 400px;
   }
   
-  .agent-actions {
+  .thopter-actions {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;

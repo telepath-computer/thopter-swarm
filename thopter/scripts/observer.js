@@ -9,7 +9,7 @@ const path = require('path');
 class SessionObserver {
   constructor() {
     // Auto-detect agent ID from hostname (fly sets hostname to machine ID) or fall back to env var
-    this.agentId = process.env.AGENT_ID || require('os').hostname();
+    this.thopterId = process.env.THOPTER_ID || require('os').hostname();
     this.metadataServiceHost = process.env.METADATA_SERVICE_HOST;
     this.hubHost = null; // Will be read from metadata service
     this.hubStatusPort = null; // Will be read from metadata service
@@ -28,8 +28,8 @@ class SessionObserver {
   }
 
   async initialize() {
-    if (!this.agentId) {
-      throw new Error('AGENT_ID environment variable is required');
+    if (!this.thopterId) {
+      throw new Error('THOPTER_ID environment variable is required');
     }
 
     if (!this.metadataServiceHost) {
@@ -45,7 +45,7 @@ class SessionObserver {
     // Load issue context from JSON file if available
     await this.loadIssueContext();
 
-    console.log(`[SessionObserver] Starting observer for agent: ${this.agentId}`);
+    console.log(`[SessionObserver] Starting observer for agent: ${this.thopterId}`);
     console.log(`[SessionObserver] Hub endpoint: http://${this.hubHost}:${this.hubStatusPort}/status`);
     console.log(`[SessionObserver] Poll interval: ${this.POLL_INTERVAL}ms`);
     if (this.issueContext) {
@@ -157,7 +157,7 @@ class SessionObserver {
 
       const now = new Date().toISOString();
       const payload = {
-        agent_id: this.agentId,
+        thopter_id: this.thopterId,
         state: state,
         screen_dump: screenDump,
         last_activity: now,
@@ -245,7 +245,7 @@ class SessionObserver {
       // Try to report the error to hub
       try {
         await this.postToHub({
-          agent_id: this.agentId,
+          thopter_id: this.thopterId,
           state: 'error',
           error: tmuxError.message,
           timestamp: new Date().toISOString()
@@ -285,7 +285,7 @@ class SessionObserver {
       // Send final status update
       try {
         await this.postToHub({
-          agent_id: this.agentId,
+          thopter_id: this.thopterId,
           state: 'stopped',
           timestamp: new Date().toISOString()
         });

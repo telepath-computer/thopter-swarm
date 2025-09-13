@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
-import { AgentState, ProvisionRequest, DestroyRequest, LogEvent, OperatingMode, ThopterStatusUpdate, GoldenClaudeState, GitHubIntegrationConfig, GitHubContext } from './types';
+import { ThopterState, ProvisionRequest, DestroyRequest, LogEvent, OperatingMode, ThopterStatusUpdate, GoldenClaudeState, GitHubIntegrationConfig, GitHubContext } from './types';
+import { isValidThopterPattern } from './thopter-utils';
 import { logger } from './logger';
 import tinyspawn from 'tinyspawn';
 
@@ -18,8 +19,9 @@ const createFlyWrapper = (appName: string) => {
 };
 
 class StateManager {
-  private agents: Map<string, AgentState> = new Map();
+  private thopters: Map<string, ThopterState> = new Map();
   private goldenClaudes: Map<string, GoldenClaudeState> = new Map();
+  private expectedThopters: Map<string, GitHubContext> = new Map(); // Pre-register GitHub context
   private provisionRequests: ProvisionRequest[] = [];
   private destroyRequests: DestroyRequest[] = [];
   private operatingMode: OperatingMode = 'initializing';
@@ -27,6 +29,7 @@ class StateManager {
   private readonly maxProvisionRequests = 50;
   private readonly maxDestroyRequests = 50;
   
+  private reconcileInterval: NodeJS.Timeout | null = null;
   private gcRefreshInterval: NodeJS.Timeout | null = null;
   
   private readonly appName: string;
@@ -38,7 +41,7 @@ class StateManager {
   constructor() {
     this.appName = process.env.APP_NAME!;
     this.flyToken = process.env.FLY_DEPLOY_KEY!;
-    this.webTerminalPort = parseInt(process.env.WEB_TERMINAL_PORT || '8080');
+    this.webTerminalPort = parseInt(process.env.WEB_TERMINAL_PORT || '7681');
     
     if (!this.appName || !this.flyToken) {
       throw new Error('APP_NAME and FLY_DEPLOY_KEY environment variables are required');
@@ -62,106 +65,154 @@ class StateManager {
   }
   
   /**
-   * Bootstrap state by querying fly.io machines and adding them as 'orphaned'
-   * Agents will transition out of 'orphaned' state when observers report in
+   * Start fly-first reconciliation system
    */
-  async bootstrap(): Promise<void> {
-    logger.info('Bootstrapping state from fly.io machines', undefined, 'state-manager');
+  async startReconciliation(): Promise<void> {
+    logger.info('Starting fly-first reconciliation system', undefined, 'state-manager');
     
+    // Initial sync with fly
+    await this.reconcileWithFly();
+    
+    // Continuous reconciliation every 30 seconds
+    this.reconcileInterval = setInterval(() => {
+      this.reconcileWithFly().catch(error => {
+        logger.error(`Fly reconciliation failed: ${error.message}`, undefined, 'state-manager');
+      });
+    }, 30000);
+    
+    // Start Golden Claude refresh
+    this.startGoldenClaudeRefresh();
+    
+    logger.info('Fly-first reconciliation system started', undefined, 'state-manager');
+  }
+  
+  /**
+   * Trigger immediate reconciliation (e.g., after provisioning)
+   */
+  async triggerReconciliation(): Promise<void> {
+    logger.debug('Triggering immediate reconciliation', undefined, 'state-manager');
+    await this.reconcileWithFly();
+  }
+
+  /**
+   * Reconcile thopter state with fly machines (fly machines are authoritative)
+   */
+  private async reconcileWithFly(): Promise<void> {
     try {
-      const output = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
-      
-      const machines = JSON.parse(output);
-      logger.info(`Found ${machines.length} total machines`, undefined, 'state-manager');
-      
-      // Filter for thopter machines (not the hub itself)
-      const thopterMachines = machines.filter((m: any) => 
-        m.name && m.name.startsWith('thopter-') && m.state === 'started'
+      // Fly machines are the single source of truth
+      const flyMachines = await this.getFlyMachines();
+      const thopterMachines = flyMachines.filter((m: any) => 
+        m.name && isValidThopterPattern(m.name)
       );
       
-      logger.info(`Found ${thopterMachines.length} thopter machines`, undefined, 'state-manager');
+      const newThopters = new Map<string, ThopterState>();
       
-      // Add each thopter machine as 'orphaned' until observer reports in
+      // Build state from fly data + preserved session/context
       for (const machine of thopterMachines) {
-        const agentState: AgentState = {
-          id: machine.id,
-          machineId: machine.id,
-          state: 'orphaned',
-          hasObserver: false,
-          webTerminalUrl: `http://${machine.id}.vm.${this.appName}.internal:${this.webTerminalPort}/`
+        const existing = this.thopters.get(machine.id);
+        
+        // TODO i'd prefer to use something like { ...existing, fly: { ... } }
+        // that blanket preserves existing keys instead of manually preserving
+        // existing keys.
+        const thopterState: ThopterState = {
+          // === FLY DATA (authoritative) ===
+          fly: {
+            id: machine.id,
+            name: machine.name,
+            machineState: machine.state,
+            region: machine.region || existing?.fly?.region || 'unknown',
+            image: machine.image_ref?.tag || existing?.fly?.image || 'unknown',
+            createdAt: new Date(machine.created_at)
+          },
+          
+          // === HUB MANAGEMENT (preserve existing) ===
+          hub: {
+            killRequested: existing?.hub?.killRequested || false
+          },
+          
+          // === SESSION STATE (preserve existing) ===
+          session: existing?.session,
+          
+          // === GITHUB CONTEXT (preserve existing or use expected) ===
+          github: existing?.github || this.expectedThopters.get(machine.id)
         };
         
-        this.agents.set(machine.id, agentState);
-        logger.info(`Added orphaned agent: ${machine.id}`, machine.id, 'state-manager');
+        newThopters.set(machine.id, thopterState);
+        
+        // Clean up expected entry if it was used
+        if (this.expectedThopters.has(machine.id)) {
+          this.expectedThopters.delete(machine.id);
+          logger.debug(`Consumed expected GitHub context for thopter: ${machine.id}`, machine.id, 'state-manager');
+        }
       }
       
-      // Bootstrap Golden Claudes
-      await this.bootstrapGoldenClaudes();
-      
-      // Start periodic GC refresh
-      this.startGoldenClaudeRefresh();
-      
-      logger.info('Bootstrap completed successfully', undefined, 'state-manager');
+      // Log changes and update
+      this.logThopterChanges(this.thopters, newThopters);
+      this.thopters = newThopters;
       
     } catch (error) {
-      logger.error(`Bootstrap failed: ${error instanceof Error ? error.message : String(error)}`, undefined, 'state-manager');
-      throw error;
+      logger.error(`Fly reconciliation failed: ${error instanceof Error ? error.message : String(error)}`, undefined, 'state-manager');
+    }
+  }
+  
+  private async getFlyMachines(): Promise<any[]> {
+    const output = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
+    return JSON.parse(output);
+  }
+  
+  private logThopterChanges(oldThopters: Map<string, ThopterState>, newThopters: Map<string, ThopterState>): void {
+    // Log new thopters
+    for (const [id, thopter] of newThopters) {
+      if (!oldThopters.has(id)) {
+        logger.info(`Discovered new thopter: ${thopter.fly.name} (${id}) - ${thopter.fly.machineState}`, id, 'state-manager');
+      }
+    }
+    
+    // Log removed thopters
+    for (const [id, thopter] of oldThopters) {
+      if (!newThopters.has(id)) {
+        logger.info(`Thopter no longer exists: ${thopter.fly.name} (${id}) - removed from tracking`, id, 'state-manager');
+      }
+    }
+    
+    // Log state changes
+    for (const [id, newThopter] of newThopters) {
+      const oldThopter = oldThopters.get(id);
+      if (oldThopter && oldThopter.fly.machineState !== newThopter.fly.machineState) {
+        logger.info(`Thopter machine state changed: ${oldThopter.fly.machineState} → ${newThopter.fly.machineState}`, id, 'state-manager');
+      }
     }
   }
   
   /**
-   * Update agent state from observer status report (authoritative source)
+   * Update thopter from observer status report (best-effort metadata)
    */
-  updateAgentFromStatus(status: ThopterStatusUpdate): void {
-    const agentId = status.agent_id;
-    let agent = this.agents.get(agentId);
+  updateThopterFromStatus(status: ThopterStatusUpdate): void {
+    let thopter = this.thopters.get(status.thopter_id);
     
-    if (!agent) {
-      // Agent not known - this shouldn't normally happen after bootstrap
-      logger.warn(`Received status for unknown agent: ${agentId}`, agentId, 'state-manager');
-      agent = {
-        id: agentId,
-        machineId: agentId,
-        state: 'orphaned',
-        hasObserver: false,
-        webTerminalUrl: `http://${agentId}.vm.${this.appName}.internal:${this.webTerminalPort}/`
-      };
-      this.agents.set(agentId, agent);
+    if (!thopter) {
+      logger.warn(`Received status for unknown thopter: ${status.thopter_id}`, status.thopter_id, 'state-manager');
+      // Don't auto-create - fly reconciliation will discover it if it exists
+      // This prevents phantom thopters from bad status updates
+      return;
     }
     
-    // Update from status report - observer data is authoritative
-    // EXCEPT when agent is in 'killing' state, preserve that state
-    const previousState = agent.state;
-    if (agent.state !== 'killing') {
-      agent.state = status.state === 'running' ? 'running' : 'idle';
-    }
-    agent.hasObserver = true;
-    agent.lastActivity = new Date(status.last_activity);
-    agent.screenDump = status.screen_dump;
+    // Update session state (best-effort metadata)
+    thopter.session = {
+      claudeState: status.state,
+      lastActivity: new Date(status.last_activity),
+      idleSince: status.idle_since ? new Date(status.idle_since) : undefined,
+      screenDump: status.screen_dump
+    };
     
-    if (status.idle_since) {
-      agent.idle_since = new Date(status.idle_since);
-    } else {
-      agent.idle_since = undefined;
-    }
-    
-    // Update source-agnostic metadata
-    if (status.repository) agent.repository = status.repository;
-    if (status.workBranch) agent.workBranch = status.workBranch;
-    if (status.spawned_at) agent.spawnedAt = new Date(status.spawned_at);
-    
-    // Update GitHub context if present
+    // Update GitHub context if provided (best-effort metadata)
+    // Note: status.github should include repository field now
     if (status.github) {
-      agent.source = 'github';
-      agent.github = status.github;  // Use GitHubContext directly
+      thopter.github = status.github;
     }
     
-    // Log state transitions
-    if (previousState !== agent.state) {
-      logger.info(`Agent state transition: ${previousState} → ${agent.state}`, agentId, 'state-manager');
-    }
-    
-    // logger.debug(`Updated agent from status report`, agentId, 'state-manager', { state: agent.state, hasObserver: agent.hasObserver });
+    // Log successful status update
+    logger.debug(`Updated thopter session state: ${status.thopter_id}`, status.thopter_id, 'state-manager');
   }
   
   /**
@@ -185,7 +236,7 @@ class StateManager {
     const request = this.provisionRequests.find(r => r.requestId === requestId);
     if (request) {
       Object.assign(request, updates);
-      logger.info(`Updated provision request: ${requestId} (status: ${request.status})`, request.agentId, 'state-manager');
+      logger.info(`Updated provision request: ${requestId} (status: ${request.status})`, request.thopterId, 'state-manager');
     } else {
       logger.warn(`Provision request not found: ${requestId}`, undefined, 'state-manager');
     }
@@ -217,7 +268,7 @@ class StateManager {
       this.destroyRequests.shift();
     }
     
-    logger.info(`Added destroy request: ${request.requestId} for agent ${request.agentId}`, request.agentId, 'state-manager');
+    logger.info(`Added destroy request: ${request.requestId} for thopter ${request.thopterId}`, request.thopterId, 'state-manager');
   }
   
   /**
@@ -227,7 +278,7 @@ class StateManager {
     const request = this.destroyRequests.find(r => r.requestId === requestId);
     if (request) {
       Object.assign(request, updates);
-      logger.info(`Updated destroy request: ${requestId} (status: ${request.status})`, request.agentId, 'state-manager');
+      logger.info(`Updated destroy request: ${requestId} (status: ${request.status})`, request.thopterId, 'state-manager');
     } else {
       logger.warn(`Destroy request not found: ${requestId}`, undefined, 'state-manager');
     }
@@ -256,57 +307,77 @@ class StateManager {
   }
   
   /**
-   * Add a new agent to state (used when provisioner creates agent)
+   * Pre-register a thopter with GitHub context before it's discovered by reconciliation
    */
-  addAgent(agentId: string, machineId: string, repository?: string, workBranch?: string, github?: GitHubContext): AgentState {
-    const agent: AgentState = {
-      id: agentId,
-      machineId,
-      state: 'provisioning',
-      hasObserver: false,
-      repository,
-      workBranch,
-      webTerminalUrl: `http://${machineId}.vm.${this.appName}.internal:${this.webTerminalPort}/`,
-      spawnedAt: new Date()
-    };
+  expectThopter(machineId: string, github: GitHubContext): void {
+    this.expectedThopters.set(machineId, github);
+    logger.info(`Pre-registered thopter with GitHub context: ${github.repository}#${github.issueNumber}`, machineId, 'state-manager');
+  }
 
-    // Add GitHub context if provided
-    if (github) {
-      agent.source = 'github';
-      agent.github = github;
-    }
+  /**
+   * Add a new thopter to state (used when provisioner creates thopter)
+   */
+  addThopter(machineId: string, machineName: string, region: string, image: string, github?: GitHubContext, createdAt?: Date): ThopterState {
+    const thopter: ThopterState = {
+      fly: {
+        id: machineId,
+        name: machineName,
+        machineState: 'started', // Provisioner knows it created a started machine
+        region: region,
+        image: image,
+        createdAt: createdAt || new Date() // Use actual creation time if available
+      },
+      hub: {
+        killRequested: false
+      },
+      session: undefined, // Will be populated when observer reports in
+      github: github
+    };
     
-    this.agents.set(agentId, agent);
-    logger.info(`Added new agent in provisioning state${github ? ' with GitHub context' : ''}`, agentId, 'state-manager');
+    this.thopters.set(machineId, thopter);
+    logger.info(`Added new thopter to state${github ? ' with GitHub context' : ''}`, machineId, 'state-manager');
     
-    return agent;
+    return thopter;
   }
   
   /**
-   * Remove an agent from state (used when agent is destroyed)
+   * Remove a thopter from state (used when thopter is destroyed)
    */
-  removeAgent(agentId: string): void {
-    const agent = this.agents.get(agentId);
-    if (agent) {
-      this.agents.delete(agentId);
-      logger.info(`Removed agent from state`, agentId, 'state-manager');
+  removeThopter(thopterId: string): void {
+    const thopter = this.thopters.get(thopterId);
+    if (thopter) {
+      this.thopters.delete(thopterId);
+      logger.info(`Removed thopter from state`, thopterId, 'state-manager');
     } else {
-      logger.warn(`Agent not found for removal: ${agentId}`, agentId, 'state-manager');
+      logger.warn(`Thopter not found for removal: ${thopterId}`, thopterId, 'state-manager');
     }
   }
   
   /**
-   * Get all agents
+   * Set kill requested flag for a thopter
    */
-  getAllAgents(): AgentState[] {
-    return [...this.agents.values()];
+  setKillRequested(thopterId: string, requested: boolean = true): void {
+    const thopter = this.thopters.get(thopterId);
+    if (thopter) {
+      thopter.hub.killRequested = requested;
+      logger.info(`Set kill requested: ${requested}`, thopterId, 'state-manager');
+    } else {
+      logger.warn(`Thopter not found for kill request: ${thopterId}`, thopterId, 'state-manager');
+    }
   }
   
   /**
-   * Get agent by ID
+   * Get all thopters
    */
-  getAgent(agentId: string): AgentState | undefined {
-    return this.agents.get(agentId);
+  getAllThopters(): ThopterState[] {
+    return [...this.thopters.values()];
+  }
+  
+  /**
+   * Get thopter by ID
+   */
+  getThopter(thopterId: string): ThopterState | undefined {
+    return this.thopters.get(thopterId);
   }
   
   /**
@@ -323,7 +394,7 @@ class StateManager {
     return this.operatingMode;
   }
   
-  setOperatingMode(mode: OperatingMode): void {
+  setOperatingMode(mode: OperatingMode): void /* syntax fix comment */ {
     const previousMode = this.operatingMode;
     this.operatingMode = mode;
     
@@ -333,20 +404,27 @@ class StateManager {
   }
   
   /**
-   * Handle shutdown - set mode to stopping
+   * Handle shutdown - set mode to stopping and clean up intervals
    */
-  handleShutdown(): void {
+  handleShutdown(): void /* syntax fix comment */ {
     logger.info('State manager shutting down - setting mode to stopping', undefined, 'state-manager');
     this.setOperatingMode('stopping');
+    
+    if (this.reconcileInterval) {
+      clearInterval(this.reconcileInterval);
+      this.reconcileInterval = null;
+    }
+    
+    this.stopGoldenClaudeRefresh();
   }
   
   /**
    * Get summary statistics
    */
   getStats() {
-    const agents = this.getAllAgents();
-    const agentsByState = agents.reduce((acc, agent) => {
-      acc[agent.state] = (acc[agent.state] || 0) + 1;
+    const thopters = this.getAllThopters();
+    const thoptersByMachineState = thopters.reduce((acc, thopter) => {
+      acc[thopter.fly.machineState] = (acc[thopter.fly.machineState] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     
@@ -361,8 +439,8 @@ class StateManager {
     }, {} as Record<string, number>);
     
     return {
-      totalAgents: agents.length,
-      agentsByState,
+      totalThopters: thopters.length,
+      thoptersByMachineState,
       totalProvisionRequests: this.provisionRequests.length,
       provisionRequestsByStatus,
       totalDestroyRequests: this.destroyRequests.length,
@@ -398,9 +476,8 @@ class StateManager {
         const name = machine.name.replace(/^gc-/, '');
         
         const gcState: GoldenClaudeState = {
-          id: machine.id,
-          name: name,
           machineId: machine.id,
+          name: name,
           state: machine.state === 'started' ? 'running' : 'stopped',
           webTerminalUrl: machine.state === 'started' 
             ? `http://${machine.id}.vm.${this.appName}.internal:${this.webTerminalPort}/`
@@ -436,7 +513,7 @@ class StateManager {
   /**
    * Start periodic refresh of Golden Claude state
    */
-  startGoldenClaudeRefresh(): void {
+  startGoldenClaudeRefresh(): void /*this comment fixes neovim syntax highlighting*/ {
     // Refresh every 30 seconds
     this.gcRefreshInterval = setInterval(() => {
       this.bootstrapGoldenClaudes().catch(error => {
@@ -474,14 +551,6 @@ class StateManager {
   }
   
   /**
-   * Update shutdown handler to clean up GC refresh
-   */
-  handleShutdownWithCleanup(): void {
-    this.stopGoldenClaudeRefresh();
-    this.handleShutdown();
-  }
-  
-  /**
    * Get GitHub configuration for a specific repository
    */
   getGitHubConfig(repository: string) {
@@ -494,6 +563,7 @@ class StateManager {
   getConfiguredRepositories(): string[] {
     return Object.keys(this.gitHubConfig.repositories);
   }
+  
 }
 
 // Export singleton instance

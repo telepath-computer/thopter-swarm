@@ -26,22 +26,23 @@ const createFlyWrapper = (appName: string) => {
 
 export interface ProvisionResult {
   success: boolean;
-  agentId: string;
-  machineId?: string;
-  error?: string;
-  webTerminalUrl?: string;
+  thopterId?: string;    // Only present if thopter was created
+  machineId?: string;    // Only present if thopter was created
+  machineName?: string;  // Only present if thopter was created
+  region?: string;       // Only present if thopter was created
+  image?: string;        // Only present if thopter was created
+  error?: string;        // Only present on failure
 }
 
 export interface DestroyResult {
   success: boolean;
-  agentId: string;
+  thopterId: string;
   error?: string;
 }
 
 export class ThopterProvisioner {
   private readonly appName: string;
   private readonly region: string;
-  private readonly maxAgents: number;
   private readonly webTerminalPort: number;
   private readonly hubHost: string;
   private readonly hubStatusPort: number;
@@ -54,7 +55,6 @@ export class ThopterProvisioner {
     this.appName = process.env.APP_NAME!;
     this.region = process.env.REGION!;
     // THOPTER_IMAGE now comes from metadata service, not environment
-    this.maxAgents = parseInt(process.env.MAX_THOPTERS || process.env.MAX_AGENTS!);
     this.webTerminalPort = parseInt(process.env.WEB_TERMINAL_PORT!);
     // Hub host should be auto-detected from current machine hostname or environment
     this.hubHost = process.env.HUB_HOST || this.getHubHost();
@@ -109,6 +109,7 @@ export class ThopterProvisioner {
   }
 
   /**
+   * Main provisioning routine - creates a new thopter for a GitHub issue
    * Log an entry to the thopter's log file via SSH
    */
   private async logToThopterAsync(machineId: string, message: string): Promise<void> {
@@ -137,24 +138,13 @@ export class ThopterProvisioner {
 
   /**
    * Main provisioning routine - creates a new thopter agent for a GitHub issue
+>>>>>>> origin/main
    */
   async provision(request: ProvisionRequest): Promise<ProvisionResult> {
     const requestId = `${request.repository}#${request.github.issueNumber}`;
     console.log(`🚁 [${requestId}] Starting provisioning for issue: ${request.github.issueTitle}`);
     
     try {
-      // Check if we're at max capacity
-      console.log(`🔍 [${requestId}] Checking agent capacity...`);
-      const activeAgents = await this.getActiveAgentCount();
-      console.log(`📊 [${requestId}] Active agents: ${activeAgents}/${this.maxAgents}`);
-      if (activeAgents >= this.maxAgents) {
-        return {
-          success: false,
-          agentId: 'capacity-exceeded',
-          error: `Maximum agents (${this.maxAgents}) already running. Active: ${activeAgents}`
-        };
-      }
-
       // Ensure we have an available volume for the thopter
       console.log(`💾 [${requestId}] Ensuring available volume...`);
       const volumeName = await this.ensureAvailableVolume();
@@ -164,6 +154,13 @@ export class ThopterProvisioner {
       console.log(`🚀 [${requestId}] Creating thopter machine...`);
       const machineId = await this.createThopterMachine(request, volumeName);
       console.log(`🆔 [${requestId}] Machine created with ID: ${machineId}`);
+
+      // Pre-register GitHub context for the machine so if the state manager
+      // discovers it before provisioning is complete, it can show the github
+      // related details to help identify it.
+      if (request.github) {
+        stateManager.expectThopter(machineId, request.github);
+      }
       
       // Wait for machine to be ready and web terminal to start
       console.log(`⏳ [${requestId}] Waiting for machine to be ready...`);
@@ -204,16 +201,17 @@ export class ThopterProvisioner {
       console.log(`✅ [${requestId}] Thopter ${machineId} provisioned successfully`);
       return {
         success: true,
-        agentId: machineId, // Agent ID is the machine ID
+        thopterId: machineId, // Thopter ID is the machine ID
         machineId,
-        webTerminalUrl
+        machineName: `thopter-${machineId}`,
+        region: this.region,
+        image: (await metadataClient.getThopterImage()) || 'unknown'
       };
 
     } catch (error) {
       console.error(`❌ [${requestId}] Provisioning failed:`, error);
       return {
         success: false,
-        agentId: 'provision-failed',
         error: error instanceof Error ? error.message : String(error)
       };
     }
@@ -256,23 +254,6 @@ export class ThopterProvisioner {
     }
   }
 
-  /**
-   * Get count of currently active thopter agents
-   */
-  private async getActiveAgentCount(): Promise<number> {
-    try {
-      const output = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
-      const machines = JSON.parse(output);
-      const thopterMachines = machines.filter((m: any) => 
-        m.name && m.name.startsWith('thopter-') && m.state === 'started'
-      );
-      
-      return thopterMachines.length;
-    } catch (error) {
-      console.warn('Failed to get active agent count:', error);
-      return 0; // Assume 0 if we can't check
-    }
-  }
 
 
   /**
@@ -354,6 +335,7 @@ export class ThopterProvisioner {
     console.log(`Machine creation output:`, output);
 
     // Extract machine ID from output - look for "Machine ID: " pattern first, then fallback to hex pattern
+    // TODO: i don't love this parsing approach, it's brittle
     let machineId: string;
     const machineIdLineMatch = output.match(/Machine ID:\s+([a-f0-9]{14})/);
     if (machineIdLineMatch) {
@@ -559,17 +541,7 @@ ${request.github.issueBody}
       source: 'github',
       repository: request.repository,
       workBranch: branchName,
-      github: {
-        issueNumber: request.github.issueNumber,
-        issueTitle: request.github.issueTitle,
-        issueBody: request.github.issueBody,
-        issueUrl: request.github.issueUrl,
-        issueAuthor: request.github.issueAuthor,
-        mentionAuthor: request.github.mentionAuthor,
-        mentionLocation: request.github.mentionLocation,
-        mentionCommentId: request.github.mentionCommentId,
-        comments: request.github.comments || []
-      }
+      github: request.github  // Use the complete GitHubContext object directly
     };
     
     return JSON.stringify(issueContext, null, 2);
@@ -828,7 +800,7 @@ ${request.github.issueBody}
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       console.error(`⚠️ [${requestId}] Git setup failed after ${elapsed}s:`, error);
       console.log(`ℹ️ [${requestId}] Continuing provisioning without repository clone`);
-      // Don't throw - provision the agent and let a developer find out what's wrong
+      // Don't throw - provision the thopter and let a developer find out what's wrong
     }
   }
 
@@ -882,10 +854,10 @@ ${request.github.issueBody}
   }
 
   /**
-   * Destroy a thopter agent and its associated resources
+   * Destroy a thopter and its associated resources
    */
-  async destroy(agentId: string): Promise<DestroyResult> {
-    console.log(`🔥 Destroying thopter agent: ${agentId}`);
+  async destroy(thopterId: string): Promise<DestroyResult> {
+    console.log(`🔥 Destroying thopter: ${thopterId}`);
     
     try {
       // Get machine details to find associated volume
@@ -893,38 +865,38 @@ ${request.github.issueBody}
       try {
         const machineOutput = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
         const machines = JSON.parse(machineOutput);
-        machineDetails = machines.find((m: any) => m.id === agentId);
+        machineDetails = machines.find((m: any) => m.id === thopterId);
       } catch (error) {
-        console.warn(`Could not get machine details for ${agentId}:`, error);
+        console.warn(`Could not get machine details for ${thopterId}:`, error);
       }
       
       // Stop and destroy the machine
-      console.log(`🛑 Stopping machine ${agentId}...`);
+      console.log(`🛑 Stopping machine ${thopterId}...`);
       try {
-        await this.fly(['machine', 'stop', agentId, '-t', this.flyToken]);
+        await this.fly(['machine', 'stop', thopterId, '-t', this.flyToken]);
       } catch (error) {
         console.warn(`Machine stop failed (continuing with destroy):`, error);
       }
       
-      console.log(`💥 Destroying machine ${agentId}...`);
-      await this.fly(['machine', 'destroy', agentId, '-t', this.flyToken, '--force']);
+      console.log(`💥 Destroying machine ${thopterId}...`);
+      await this.fly(['machine', 'destroy', thopterId, '-t', this.flyToken, '--force']);
       
-      // Leave volumes in pool for reuse by future agents
+      // Leave volumes in pool for reuse by future thopters
       if (machineDetails?.config?.mounts?.length > 0) {
         console.log(`💾 Volumes left in pool for reuse: ${machineDetails.config.mounts.map((m: any) => m.volume).join(', ')}`);
       }
       
-      console.log(`✅ Thopter ${agentId} destroyed successfully`);
+      console.log(`✅ Thopter ${thopterId} destroyed successfully`);
       return {
         success: true,
-        agentId
+        thopterId
       };
       
     } catch (error) {
-      console.error(`❌ Failed to destroy thopter ${agentId}:`, error);
+      console.error(`❌ Failed to destroy thopter ${thopterId}:`, error);
       return {
         success: false,
-        agentId,
+        thopterId,
         error: error instanceof Error ? error.message : String(error)
       };
     }

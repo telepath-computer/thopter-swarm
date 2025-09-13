@@ -158,28 +158,28 @@ if [ "$FOUND_APP_MACHINES" = false ]; then
     echo -e "  ${INFO} No platform app machines found"
 fi
 
-# 6. Agent Thopters (non-hub, non-gc machines)
+# 6. Thopters (non-hub, non-gc machines)
 echo ""
-echo -e "${BLUE}Agent Thopters:${NC}"
-FOUND_AGENTS=false
+echo -e "${BLUE}Thopters:${NC}"
+FOUND_THOPTERS=false
 
 while IFS= read -r machine_name; do
     if [ -n "$machine_name" ]; then
-        FOUND_AGENTS=true
-        AGENT_ID=$(fly machines list --json | jq -r ".[] | select(.name==\"$machine_name\") | .id")
-        AGENT_STATE=$(fly machines list --json | jq -r ".[] | select(.name==\"$machine_name\") | .state")
-        AGENT_REGION=$(fly machines list --json | jq -r ".[] | select(.name==\"$machine_name\") | .region")
+        FOUND_THOPTERS=true
+        THOPTER_ID=$(fly machines list --json | jq -r ".[] | select(.name==\"$machine_name\") | .id")
+        THOPTER_STATE=$(fly machines list --json | jq -r ".[] | select(.name==\"$machine_name\") | .state")
+        THOPTER_REGION=$(fly machines list --json | jq -r ".[] | select(.name==\"$machine_name\") | .region")
         
-        if [ "$AGENT_STATE" = "started" ]; then
-            echo -e "  ${ROCKET} $machine_name ($AGENT_ID) running in $AGENT_REGION - http://$AGENT_ID.vm.${APP_NAME:-thopter-swarm}.internal:${WEB_TERMINAL_PORT:-7681}/"
+        if [ "$THOPTER_STATE" = "started" ]; then
+            echo -e "  ${ROCKET} $machine_name ($THOPTER_ID) running in $THOPTER_REGION - http://$THOPTER_ID.vm.${APP_NAME:-thopter-swarm}.internal:${WEB_TERMINAL_PORT:-7681}/"
         else
-            echo -e "  ${WARNING} $machine_name ($AGENT_ID) $AGENT_STATE in $AGENT_REGION"
+            echo -e "  ${WARNING} $machine_name ($THOPTER_ID) $THOPTER_STATE in $THOPTER_REGION"
         fi
     fi
 done < <(fly machines list --json | jq -r '.[] | select(.name | startswith("thopter-")) | .name' 2>/dev/null || true)
 
-if [ "$FOUND_AGENTS" = false ]; then
-    echo -e "  ${INFO} No agent thopters running"
+if [ "$FOUND_THOPTERS" = false ]; then
+    echo -e "  ${INFO} No thopters running"
 fi
 
 # 7. Resource Summary
@@ -191,13 +191,13 @@ TOTAL_MACHINES=$(fly machines list --json | jq '. | length' 2>/dev/null || echo 
 HUB_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("hub-"))] | length' 2>/dev/null || echo "0")
 METADATA_COUNT=$(fly machines list --json | jq '[.[] | select(.name=="metadata")] | length' 2>/dev/null || echo "0")
 GC_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("gc-"))] | length' 2>/dev/null || echo "0")
-AGENT_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("thopter-"))] | length' 2>/dev/null || echo "0")
+THOPTER_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("thopter-"))] | length' 2>/dev/null || echo "0")
 APP_COUNT=$(fly machines list --json | jq '[.[] | select(.config.env.FLY_PROCESS_GROUP == "app")] | length' 2>/dev/null || echo "0")
 
-echo -e "  ${INFO} Machines: $TOTAL_MACHINES total (hub: $HUB_COUNT, metadata: $METADATA_COUNT, golden: $GC_COUNT, agents: $AGENT_COUNT, platform: $APP_COUNT)"
+echo -e "  ${INFO} Machines: $TOTAL_MACHINES total (hub: $HUB_COUNT, metadata: $METADATA_COUNT, golden: $GC_COUNT, thopters: $THOPTER_COUNT, platform: $APP_COUNT)"
 
 # Check for unknown/unclassified machines
-EXPECTED_COUNT=$((HUB_COUNT + METADATA_COUNT + GC_COUNT + AGENT_COUNT + APP_COUNT))
+EXPECTED_COUNT=$((HUB_COUNT + METADATA_COUNT + GC_COUNT + THOPTER_COUNT + APP_COUNT))
 if [ "$TOTAL_MACHINES" -gt "$EXPECTED_COUNT" ]; then
     UNKNOWN_COUNT=$((TOTAL_MACHINES - EXPECTED_COUNT))
     echo ""

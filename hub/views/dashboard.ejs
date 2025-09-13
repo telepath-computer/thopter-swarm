@@ -88,23 +88,18 @@
         <% } %>
       </section>
 
-      <!-- Active Agents Section -->
-      <section class="agents-section">
-        <h2>Active Agents (<%= agents.length %>)</h2>
-        
-        <% if (agents.length === 0) { %>
-          <div class="empty-state">
-            <p>No active agents found.</p>
-            <p>Agents will appear here when they are spawned and running.</p>
-          </div>
-        <% } else { %>
-          <% agentGroups.forEach(group => { %>
+      <!-- Healthy Thopters Section -->
+      <% if (healthyGroups.length > 0) { %>
+        <section class="thopters-section">
+          <h2>Healthy Thopters</h2>
+          
+          <% healthyGroups.forEach(group => { %>
             <div class="user-group">
               <h3 class="user-group-header">
-                👤 <%= group.user %> (<%= group.agents.length %> agent<%= group.agents.length === 1 ? '' : 's' %>)
+                👤 <%= group.user %> (<%= group.thopters.length %> thopter<%= group.thopters.length === 1 ? '' : 's' %>)
               </h3>
               <div class="table-container">
-                <table class="agents-table">
+                <table class="thopters-table">
                   <thead>
                     <tr>
                       <th>ID</th>
@@ -118,38 +113,31 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <% group.agents.forEach(agent => { %>
-                      <tr class="agent-row">
-                        <td class="agent-id-cell">
-                          <a href="/agent/<%= agent.id %>" class="agent-id-link">
-                            <%= agent.id %>
+                    <% group.thopters.forEach(thopter => { %>
+                      <tr class="thopter-row">
+                        <td class="thopter-id-cell">
+                          <a href="/agent/<%= thopter.fly.id %>" class="thopter-id-link">
+                            <%= thopter.fly.id %>
                           </a>
-                          <% if (!agent.hasObserver) { %>
-                            <span class="orphaned-indicator" title="No observer data - agent may not be responding">⚠️</span>
-                          <% } %>
                         </td>
                         <td class="status-cell">
-                          <span class="agent-state <%= formatters.stateClass(agent.state) %>">
-                            <%= agent.state %>
+                          <span class="thopter-state <%= formatters.stateClass(thopter.session?.claudeState || 'idle') %>">
+                            <%= thopter.session?.claudeState || 'idle' %>
                           </span>
-                          <% const idleDuration = formatters.idleDuration(agent.idle_since, agent.state); %>
+                          <% const idleDuration = formatters.idleDuration(thopter.session?.idleSince, thopter.session?.claudeState || 'idle'); %>
                           <% if (idleDuration) { %>
                             <span class="idle-duration">(<%= idleDuration %>)</span>
                           <% } %>
                         </td>
                         <td class="age-cell">
-                          <% if (agent.spawnedAt) { %>
-                            <span title="<%= formatters.absoluteTime(agent.spawnedAt) %>">
-                              <%= formatters.relativeTime(agent.spawnedAt) %>
-                            </span>
-                          <% } else { %>
-                            <span class="no-data">—</span>
-                          <% } %>
+                          <span title="<%= formatters.absoluteTime(thopter.fly.createdAt) %>">
+                            <%= formatters.relativeTime(thopter.fly.createdAt) %>
+                          </span>
                         </td>
                         <td class="activity-cell">
-                          <% if (agent.lastActivity) { %>
-                            <span title="<%= formatters.absoluteTime(agent.lastActivity) %>">
-                              <%= formatters.relativeTime(agent.lastActivity) %>
+                          <% if (thopter.session?.lastActivity) { %>
+                            <span title="<%= formatters.absoluteTime(thopter.session.lastActivity) %>">
+                              <%= formatters.relativeTime(thopter.session.lastActivity) %>
                             </span>
                           <% } else { %>
                             <span class="no-data">—</span>
@@ -157,54 +145,52 @@
                         </td>
                         <td class="repo-issue-cell">
                           <div class="repo-issue-content">
-                            <% if (agent.repository) { %>
+                            <% if (helpers.getRepository(thopter)) { %>
                               <div class="repo-line">
-                                <a href="<%= formatters.gitHubUrl(agent.repository) %>" target="_blank">
-                                  <%= agent.repository %>
+                                <a href="<%= formatters.gitHubUrl(helpers.getRepository(thopter)) %>" target="_blank">
+                                  <%= helpers.getRepository(thopter) %>
                                 </a>
                               </div>
                             <% } else { %>
                               <div class="repo-line no-data">—</div>
                             <% } %>
-                            <% if (agent.github && agent.github.issueNumber) { %>
+                            <% if (thopter.github && thopter.github.issueNumber) { %>
                               <div class="issue-line">
-                                <a href="<%= formatters.gitHubUrl(agent.repository, agent.github.issueNumber) %>" target="_blank">
-                                  #<%= agent.github.issueNumber %>: <%= formatters.truncateText(agent.github.issueTitle, 50) %>
+                                <a href="<%= formatters.gitHubUrl(thopter.github.repository, thopter.github.issueNumber) %>" target="_blank">
+                                  #<%= thopter.github.issueNumber %>: <%= formatters.truncateText(thopter.github.issueTitle, 50) %>
                                 </a>
                               </div>
                             <% } %>
-                            <% if (agent.workBranch && agent.repository) { %>
+                            <% const workBranch = helpers.getWorkBranch(thopter); %>
+                            <% if (workBranch && thopter.github && thopter.github.repository) { %>
                               <div class="branch-line">
-                                <a href="<%= formatters.gitHubTreeUrl(agent.repository, agent.workBranch) %>" target="_blank" class="branch-name">
-                                  <%= agent.workBranch %>
+                                <a href="<%= formatters.gitHubTreeUrl(thopter.github.repository, workBranch) %>" target="_blank" class="branch-name">
+                                  <%= workBranch %>
                                 </a>
                               </div>
                             <% } %>
                           </div>
                         </td>
                         <td class="action-cell">
-                          <% if (agent.webTerminalUrl) { %>
-                            <a href="<%= agent.webTerminalUrl %>" class="table-btn terminal-btn" target="_blank" title="Open Web Terminal">
-                              Terminal
-                            </a>
-                          <% } %>
+                          <% const terminalUrl = helpers.getWebTerminalUrl(thopter, process.env.APP_NAME, 7681); %>
+                          <a href="<%= terminalUrl %>" class="table-btn terminal-btn" target="_blank" title="Open Web Terminal">
+                            Terminal
+                          </a>
                         </td>
                         <td class="action-cell">
-                          <% if (agent.webTerminalUrl) { %>
-                            <% const sessionLogUrl = agent.webTerminalUrl.replace(':7681/', ':7791/'); %>
-                            <a href="<%= sessionLogUrl %>" class="table-btn session-log-btn" target="_blank" title="View Session Logs">
-                              Session Log
-                            </a>
-                          <% } %>
+                          <% const sessionLogUrl = helpers.getWebTerminalUrl(thopter, process.env.APP_NAME, 7791); %>
+                          <a href="<%= sessionLogUrl %>" class="table-btn session-log-btn" target="_blank" title="View Session Logs">
+                            Session Log
+                          </a>
                         </td>
                         <td class="action-cell">
-                          <% if (agent.state === 'killing') { %>
-                            <button class="table-btn kill-btn disabled" disabled title="Agent is being killed">
+                          <% if (thopter.hub.killRequested) { %>
+                            <button class="table-btn kill-btn disabled" disabled title="Thopter is being killed">
                               Killing...
                             </button>
                           <% } else { %>
-                            <form action="/agent/<%= agent.id %>/kill" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to kill this agent? This action cannot be undone.');">
-                              <button type="submit" class="table-btn kill-btn" title="Kill Agent">
+                            <form action="/agent/<%= thopter.fly.id %>/kill" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to kill this thopter? This action cannot be undone.');">
+                              <button type="submit" class="table-btn kill-btn" title="Kill Thopter">
                                 Kill
                               </button>
                             </form>
@@ -217,8 +203,202 @@
               </div>
             </div>
           <% }); %>
-        <% } %>
-      </section>
+        </section>
+      <% } %>
+
+      <!-- Orphaned Thopters Section -->
+      <% if (orphanedGroups.length > 0) { %>
+        <section class="thopters-section orphaned-section">
+          <h2>Orphaned Thopters</h2>
+          
+          <% orphanedGroups.forEach(group => { %>
+            <div class="user-group">
+              <h3 class="user-group-header">
+                👤 <%= group.user %> (<%= group.thopters.length %> orphaned)
+              </h3>
+              <div class="table-container">
+                <table class="thopters-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Machine State</th>
+                      <th>Orphan Reason</th>
+                      <th>Last Seen</th>
+                      <th>Age</th>
+                      <th>Task</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% group.thopters.forEach(thopter => { %>
+                      <% const orphanStatus = helpers.getOrphanStatus(thopter); %>
+                      <tr class="thopter-row orphaned">
+                        <td class="thopter-id-cell">
+                          <a href="/agent/<%= thopter.fly.id %>" class="thopter-id-link">
+                            <%= thopter.fly.id %>
+                          </a>
+                          <span class="orphaned-indicator" title="Orphaned: <%= orphanStatus.reason %>">⚠️</span>
+                        </td>
+                        <td class="status-cell">
+                          <span class="machine-state <%= formatters.stateClass(thopter.fly.machineState) %>">
+                            <%= thopter.fly.machineState %>
+                          </span>
+                        </td>
+                        <td class="orphan-reason-cell">
+                          <span class="orphan-reason"><%= orphanStatus.reason %></span>
+                          <% if (orphanStatus.secondsSinceLastUpdate) { %>
+                            <span class="stale-duration">(<%= orphanStatus.secondsSinceLastUpdate %>s ago)</span>
+                          <% } %>
+                        </td>
+                        <td class="activity-cell">
+                          <% if (orphanStatus.lastSeen) { %>
+                            <span title="<%= formatters.absoluteTime(orphanStatus.lastSeen) %>">
+                              <%= formatters.relativeTime(orphanStatus.lastSeen) %>
+                            </span>
+                          <% } else { %>
+                            <span class="no-data">—</span>
+                          <% } %>
+                        </td>
+                        <td class="age-cell">
+                          <span title="<%= formatters.absoluteTime(thopter.fly.createdAt) %>">
+                            <%= formatters.relativeTime(thopter.fly.createdAt) %>
+                          </span>
+                        </td>
+                        <td class="repo-issue-cell">
+                          <div class="repo-issue-content">
+                            <% if (helpers.getRepository(thopter)) { %>
+                              <div class="repo-line">
+                                <a href="<%= formatters.gitHubUrl(helpers.getRepository(thopter)) %>" target="_blank">
+                                  <%= helpers.getRepository(thopter) %>
+                                </a>
+                              </div>
+                            <% } else { %>
+                              <div class="repo-line no-data">—</div>
+                            <% } %>
+                            <% if (thopter.github && thopter.github.issueNumber) { %>
+                              <div class="issue-line">
+                                <a href="<%= formatters.gitHubUrl(thopter.github.repository, thopter.github.issueNumber) %>" target="_blank">
+                                  #<%= thopter.github.issueNumber %>: <%= formatters.truncateText(thopter.github.issueTitle, 50) %>
+                                </a>
+                              </div>
+                            <% } %>
+                            <% const workBranch = helpers.getWorkBranch(thopter); %>
+                            <% if (workBranch && thopter.github && thopter.github.repository) { %>
+                              <div class="branch-line">
+                                <a href="<%= formatters.gitHubTreeUrl(thopter.github.repository, workBranch) %>" target="_blank" class="branch-name">
+                                  <%= workBranch %>
+                                </a>
+                              </div>
+                            <% } %>
+                          </div>
+                        </td>
+                        <td class="action-cell">
+                          <% if (thopter.fly.machineState === 'started') { %>
+                            <form action="/agent/<%= thopter.fly.id %>/kill" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to kill this orphaned thopter?');">
+                              <button type="submit" class="table-btn kill-btn" title="Kill Orphaned Thopter">
+                                Kill
+                              </button>
+                            </form>
+                          <% } else { %>
+                            <span class="no-data">—</span>
+                          <% } %>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <% }); %>
+        </section>
+      <% } %>
+
+      <!-- Stopped Thopters Section -->
+      <% if (stoppedGroups.length > 0) { %>
+        <section class="thopters-section stopped-section">
+          <h2>Stopped Thopters</h2>
+          
+          <% stoppedGroups.forEach(group => { %>
+            <div class="user-group">
+              <h3 class="user-group-header">
+                👤 <%= group.user %> (<%= group.thopters.length %> stopped)
+              </h3>
+              <div class="table-container">
+                <table class="thopters-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Machine State</th>
+                      <th>Age</th>
+                      <th>Task</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% group.thopters.forEach(thopter => { %>
+                      <tr class="thopter-row stopped">
+                        <td class="thopter-id-cell">
+                          <span class="thopter-id">
+                            <%= thopter.fly.id %>
+                          </span>
+                        </td>
+                        <td class="status-cell">
+                          <span class="machine-state <%= formatters.stateClass(thopter.fly.machineState) %>">
+                            <%= thopter.fly.machineState %>
+                          </span>
+                        </td>
+                        <td class="age-cell">
+                          <span title="<%= formatters.absoluteTime(thopter.fly.createdAt) %>">
+                            <%= formatters.relativeTime(thopter.fly.createdAt) %>
+                          </span>
+                        </td>
+                        <td class="repo-issue-cell">
+                          <div class="repo-issue-content">
+                            <% if (helpers.getRepository(thopter)) { %>
+                              <div class="repo-line">
+                                <a href="<%= formatters.gitHubUrl(helpers.getRepository(thopter)) %>" target="_blank">
+                                  <%= helpers.getRepository(thopter) %>
+                                </a>
+                              </div>
+                            <% } else { %>
+                              <div class="repo-line no-data">—</div>
+                            <% } %>
+                            <% if (thopter.github && thopter.github.issueNumber) { %>
+                              <div class="issue-line">
+                                <a href="<%= formatters.gitHubUrl(thopter.github.repository, thopter.github.issueNumber) %>" target="_blank">
+                                  #<%= thopter.github.issueNumber %>: <%= formatters.truncateText(thopter.github.issueTitle, 50) %>
+                                </a>
+                              </div>
+                            <% } %>
+                            <% const workBranch = helpers.getWorkBranch(thopter); %>
+                            <% if (workBranch && thopter.github && thopter.github.repository) { %>
+                              <div class="branch-line">
+                                <a href="<%= formatters.gitHubTreeUrl(thopter.github.repository, workBranch) %>" target="_blank" class="branch-name">
+                                  <%= workBranch %>
+                                </a>
+                              </div>
+                            <% } %>
+                          </div>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <% }); %>
+        </section>
+      <% } %>
+
+      <!-- Empty State for No Thopters -->
+      <% if (healthyGroups.length === 0 && orphanedGroups.length === 0 && stoppedGroups.length === 0) { %>
+        <section class="thopters-section">
+          <h2>Thopters (0)</h2>
+          <div class="empty-state">
+            <p>No thopters found.</p>
+            <p>Thopters will appear here when they are spawned and running.</p>
+          </div>
+        </section>
+      <% } %>
 
       <!-- Provision Requests Section -->
       <section class="requests-section">
@@ -237,7 +417,7 @@
                   <th>Repository / Issue</th>
                   <th>Status</th>
                   <th>Created</th>
-                  <th>Agent</th>
+                  <th>Thopter</th>
                 </tr>
               </thead>
               <tbody>
@@ -268,10 +448,10 @@
                         <%= formatters.relativeTime(request.createdAt) %>
                       </span>
                     </td>
-                    <td class="agent-cell">
-                      <% if (request.agentId) { %>
-                        <a href="/agent/<%= request.agentId %>" class="agent-id-link">
-                          <%= request.agentId.substring(0, 8) %>...
+                    <td class="thopter-cell">
+                      <% if (request.thopterId) { %>
+                        <a href="/agent/<%= request.thopterId %>" class="thopter-id-link">
+                          <%= request.thopterId.substring(0, 8) %>...
                         </a>
                       <% } else { %>
                         <span class="no-data">—</span>
@@ -299,7 +479,7 @@
               <thead>
                 <tr>
                   <th>Request ID</th>
-                  <th>Agent</th>
+                  <th>Thopter</th>
                   <th>Source</th>
                   <th>Reason</th>
                   <th>Status</th>
@@ -312,10 +492,10 @@
                     <td class="request-id-cell">
                       <span class="request-id"><%= request.requestId.substring(0, 12) %>...</span>
                     </td>
-                    <td class="agent-cell">
-                      <% if (request.agentId) { %>
-                        <a href="/agent/<%= request.agentId %>" class="agent-id-link">
-                          <%= request.agentId.substring(0, 8) %>...
+                    <td class="thopter-cell">
+                      <% if (request.thopterId) { %>
+                        <a href="/agent/<%= request.thopterId %>" class="thopter-id-link">
+                          <%= request.thopterId.substring(0, 8) %>...
                         </a>
                       <% } else { %>
                         <span class="no-data">—</span>

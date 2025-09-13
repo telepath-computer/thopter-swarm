@@ -4,6 +4,7 @@ import { stateManager } from '../lib/state-manager';
 import { logger } from '../lib/logger';
 import { AgentManager } from '../lib/agent-manager';
 import * as utils from '../lib/utils';
+import { categorizeThopters, groupThoptersByUser, getOrphanStatus, getWorkBranch, getWebTerminalUrl, getRepository } from '../lib/thopter-utils';
 
 // Create dashboard router
 const router = Router();
@@ -32,30 +33,33 @@ export function setupDashboard(app: express.Application, manager?: AgentManager)
  */
 router.get('/', (req: Request, res: Response) => {
   try {
-    const agents = stateManager.getAllAgents();
+    const thopters = stateManager.getAllThopters();
     const goldenClaudes = stateManager.getAllGoldenClaudes();
     const provisionRequests = stateManager.getRecentProvisionRequests(5);
     const destroyRequests = stateManager.getRecentDestroyRequests(5);
     const logs = stateManager.getRecentLogs(50);
     const operatingMode = stateManager.getOperatingMode();
     
-    // Group agents by mentionAuthor (the user who created them)
-    const agentsByUser = new Map<string, typeof agents>();
-    for (const agent of agents) {
-      const mentionAuthor = agent.github?.mentionAuthor || 'unknown';
-      if (!agentsByUser.has(mentionAuthor)) {
-        agentsByUser.set(mentionAuthor, []);
-      }
-      agentsByUser.get(mentionAuthor)!.push(agent);
-    }
+    // Categorize thopters by status (healthy, orphaned, stopped)
+    const categorizedThopters = categorizeThopters(thopters);
     
-    // Convert to array of groups, sorted by username
-    const agentGroups = Array.from(agentsByUser.entries())
+    // Group thopters by mentionAuthor (the user who created them)
+    const healthyThoptersByUser = groupThoptersByUser(categorizedThopters.healthyThopters);
+    const orphanedThoptersByUser = groupThoptersByUser(categorizedThopters.orphanedThopters);
+    const stoppedThoptersByUser = groupThoptersByUser(categorizedThopters.stoppedThopters);
+    
+    // Create grouped data for template
+    const healthyGroups = Array.from(healthyThoptersByUser.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([user, userAgents]) => ({
-        user,
-        agents: userAgents
-      }));
+      .map(([user, thopters]) => ({ user, thopters }));
+    
+    const orphanedGroups = Array.from(orphanedThoptersByUser.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([user, thopters]) => ({ user, thopters }));
+      
+    const stoppedGroups = Array.from(stoppedThoptersByUser.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([user, thopters]) => ({ user, thopters }));
     
     // Sort requests by creation date (newest first)
     provisionRequests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -70,8 +74,10 @@ router.get('/', (req: Request, res: Response) => {
     const testIssueNumber = Math.floor(Math.random() * 1000) + 1;
     
     res.render('dashboard', {
-      agents,
-      agentGroups,
+      thopters,
+      healthyGroups,
+      orphanedGroups, 
+      stoppedGroups,
       goldenClaudes,
       provisionRequests,
       destroyRequests,
@@ -91,6 +97,12 @@ router.get('/', (req: Request, res: Response) => {
         truncateText: utils.truncateText,
         gitHubUrl: utils.getGitHubUrl,
         gitHubTreeUrl: utils.getGitHubTreeUrl
+      },
+      helpers: {
+        getOrphanStatus,
+        getWorkBranch,
+        getWebTerminalUrl,
+        getRepository
       }
     });
     
@@ -104,23 +116,24 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 /**
- * Agent detail page
+ * Thopter detail page
  */
 router.get('/agent/:id', (req: Request, res: Response) => {
   try {
-    const agentId = req.params.id;
-    const agent = stateManager.getAgent(agentId);
+    const thopterId = req.params.id;
+    const thopter = stateManager.getThopter(thopterId);
     
-    if (!agent) {
+    if (!thopter) {
       res.status(404).render('error', {
-        error: 'Agent not found',
-        details: `Agent with ID ${agentId} was not found`
+        error: 'Thopter not found',
+        details: `Thopter with ID ${thopterId} was not found`
       });
       return;
     }
     
     res.render('agent-detail', {
-      agent,
+      agent: thopter, // Keep 'agent' name for template compatibility
+      thopter,
       formatters: {
         relativeTime: utils.formatRelativeTime,
         absoluteTime: utils.formatAbsoluteTime,
@@ -129,32 +142,38 @@ router.get('/agent/:id', (req: Request, res: Response) => {
         truncateText: utils.truncateText,
         gitHubUrl: utils.getGitHubUrl,
         gitHubTreeUrl: utils.getGitHubTreeUrl,
-        terminalUrl: (agentId: string) => `http://${agentId}.vm.${process.env.APP_NAME}.internal:${process.env.WEB_TERMINAL_PORT || '7681'}/`,
-        sessionLogUrl: (agentId: string) => `http://${agentId}.vm.${process.env.APP_NAME}.internal:7791/`
+        terminalUrl: (thopterId: string) => `http://${thopterId}.vm.${process.env.APP_NAME}.internal:${process.env.WEB_TERMINAL_PORT || '7681'}/`,
+        sessionLogUrl: (thopterId: string) => `http://${thopterId}.vm.${process.env.APP_NAME}.internal:7791/`
+      },
+      helpers: {
+        getOrphanStatus,
+        getWorkBranch,
+        getWebTerminalUrl,
+        getRepository
       }
     });
     
   } catch (error) {
-    logger.error(`Agent detail render error: ${error instanceof Error ? error.message : String(error)}`, req.params.id, 'dashboard');
+    logger.error(`Thopter detail render error: ${error instanceof Error ? error.message : String(error)}`, req.params.id, 'dashboard');
     res.status(500).render('error', {
-      error: 'Failed to load agent details',
+      error: 'Failed to load thopter details',
       details: error instanceof Error ? error.message : String(error)
     });
   }
 });
 
 /**
- * Kill agent endpoint
+ * Kill thopter endpoint
  */
 router.post('/agent/:id/kill', (req: Request, res: Response) => {
   try {
-    const agentId = req.params.id;
-    const agent = stateManager.getAgent(agentId);
+    const thopterId = req.params.id;
+    const thopter = stateManager.getThopter(thopterId);
     
-    if (!agent) {
+    if (!thopter) {
       res.status(404).render('error', {
-        error: 'Agent not found',
-        details: `Agent with ID ${agentId} was not found`
+        error: 'Thopter not found',
+        details: `Thopter with ID ${thopterId} was not found`
       });
       return;
     }
@@ -168,17 +187,20 @@ router.post('/agent/:id/kill', (req: Request, res: Response) => {
       return;
     }
     
+    // Set kill requested flag
+    stateManager.setKillRequested(thopterId, true);
+    
     // Create destroy request via agent manager (this now prevents duplicates)
-    const requestId = agentManager.createDestroyRequest(agentId, 'dashboard', 'Manual kill request from dashboard');
+    const requestId = agentManager.createDestroyRequest(thopterId, 'dashboard', 'Manual kill request from dashboard');
     
     if (!requestId) {
       // Agent manager refused the request (already killing or duplicate request)
-      logger.warn(`Kill request refused for agent ${agentId} - may already be killing`, agentId, 'dashboard');
-      res.redirect('/?warning=agent-already-killing');
+      logger.warn(`Kill request refused for thopter ${thopterId} - may already be killing`, thopterId, 'dashboard');
+      res.redirect('/?warning=thopter-already-killing');
       return;
     }
     
-    logger.info(`Kill request created for agent ${agentId}: ${requestId}`, agentId, 'dashboard');
+    logger.info(`Kill request created for thopter ${thopterId}: ${requestId}`, thopterId, 'dashboard');
     
     // Redirect back to dashboard
     res.redirect('/');
@@ -194,7 +216,7 @@ router.post('/agent/:id/kill', (req: Request, res: Response) => {
 
 
 /**
- * Pause agent processing
+ * Pause thopter processing
  */
 router.post('/control/pause', (req: Request, res: Response) => {
   try {
@@ -202,7 +224,7 @@ router.post('/control/pause', (req: Request, res: Response) => {
     
     if (currentMode === 'running') {
       stateManager.setOperatingMode('paused');
-      logger.info('Agent processing paused via dashboard', undefined, 'dashboard');
+      logger.info('Thopter processing paused via dashboard', undefined, 'dashboard');
     } else {
       logger.warn(`Cannot pause from ${currentMode} mode`, undefined, 'dashboard');
     }
@@ -219,7 +241,7 @@ router.post('/control/pause', (req: Request, res: Response) => {
 });
 
 /**
- * Resume agent processing  
+ * Resume thopter processing  
  */
 router.post('/control/resume', (req: Request, res: Response) => {
   try {
@@ -227,7 +249,7 @@ router.post('/control/resume', (req: Request, res: Response) => {
     
     if (currentMode === 'paused') {
       stateManager.setOperatingMode('running');
-      logger.info('Agent processing resumed via dashboard', undefined, 'dashboard');
+      logger.info('Thopter processing resumed via dashboard', undefined, 'dashboard');
     } else {
       logger.warn(`Cannot resume from ${currentMode} mode`, undefined, 'dashboard');
     }

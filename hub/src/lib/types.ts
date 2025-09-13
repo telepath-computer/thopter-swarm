@@ -8,8 +8,9 @@ export interface GitHubComment {
   url: string;
 }
 
-// GitHub context - grouped together
+// GitHub context - grouped together with repository field required
 export interface GitHubContext {
+  repository: string;       // e.g. "owner/repo" - REQUIRED
   issueNumber: string;
   issueTitle: string;
   issueBody: string;
@@ -23,12 +24,10 @@ export interface GitHubContext {
   comments?: GitHubComment[]; // Full conversation thread
 }
 
-// Future: Slack context later
-
 // Status updates from observers (authoritative source)
 export interface ThopterStatusUpdate {
   // Core status
-  agent_id: string;
+  thopter_id: string;
   state: 'running' | 'idle';
   screen_dump: string;
   last_activity: string;
@@ -44,45 +43,62 @@ export interface ThopterStatusUpdate {
   github?: GitHubContext;
 }
 
-// Internal agent state
-export interface AgentState {
-  id: string;
-  machineId: string;
-  state: 'provisioning' | 'running' | 'idle' | 'failed' | 'orphaned' | 'killing';
+// New fly-first state structure
+export interface ThopterState {
+  // === FLY INFRASTRUCTURE (authoritative, always present) ===
+  fly: {
+    id: string;              // machine.id
+    name: string;            // machine.name (e.g. "thopter-abc123")
+    machineState: 'started' | 'stopped' | 'suspended' | 'destroyed';
+    region: string;          // machine.region
+    image: string;           // machine.image_ref.tag
+    createdAt: Date;         // machine.created_at (actual spawn time)
+  };
   
-  // Core fields
-  repository?: string;
-  workBranch?: string;
-  spawnedAt?: Date;
-  lastActivity?: Date;
-  idle_since?: Date;
-  screenDump?: string;
-  webTerminalUrl?: string;
-  hasObserver: boolean;  // False = orphaned
+  // === HUB MANAGEMENT (ephemeral) ===
+  hub: {
+    killRequested: boolean;  // true when user requests kill, cleared on fail/timeout
+  };
   
-  // Source tracking
-  source?: 'github';  // Optional for orphaned machines
-  github?: GitHubContext;  // Optional for orphaned machines
+  // === THOPTER SESSION (nullable, best-effort from observer) ===
+  session?: {
+    claudeState: 'running' | 'idle';
+    lastActivity: Date;
+    idleSince?: Date;
+    screenDump: string;
+  };
+  
+  // === GITHUB CONTEXT (nullable, from provisioning) ===
+  github?: GitHubContext;
 }
+
+// Orphan status (computed dynamically, never stored)
+export interface OrphanStatus {
+  isOrphan: boolean;
+  reason?: 'machine_stopped' | 'no_observer' | 'stale_session';
+  lastSeen?: Date;
+  secondsSinceLastUpdate?: number;
+}
+
 
 // Golden Claude state tracking
 export interface GoldenClaudeState {
-  id: string;
-  name: string;  // e.g. "default", "josh", "xyz"
   machineId: string;
+  name: string;  // e.g. "default", "josh", "xyz"
   state: 'running' | 'stopped';
   webTerminalUrl?: string;
 }
 
 // Separate request types for provisioning and destroying
 export interface ProvisionRequest {
+  // TODO this could be cleaned up a bit, e.g. github payload already includes repo, workBranch should be derived, etc.
   requestId: string;
   source: 'github';  // Only source for now
   createdAt: Date;
   completedAt?: Date;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
-  agentId?: string;  // Set after agent is created
+  thopterId?: string;  // Set after thopter is created
   
   // Required for provisioning
   repository: string;
@@ -102,8 +118,8 @@ export interface DestroyRequest {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
   
-  // Target agent
-  agentId: string;
+  // Target thopter
+  thopterId: string;
   reason?: string;  // Why destroying (idle, user request, etc)
 }
 
@@ -112,7 +128,7 @@ export interface LogEvent {
   timestamp: Date;
   level: 'info' | 'warn' | 'error' | 'debug';
   message: string;
-  agentId?: string;
+  thopterId?: string;
   source?: string;
   context?: any;
 }

@@ -5,15 +5,15 @@ import { logger } from '../lib/logger';
 
 /**
  * Handle POST /status requests from thopter observers
- * This is the main entry point for status updates from agents
+ * This is the main entry point for status updates from thopters
  */
 export function handleStatusUpdate(req: Request, res: Response): void {
   try {
     const statusUpdate: ThopterStatusUpdate = req.body;
     
     // Validate required fields
-    if (!statusUpdate.agent_id) {
-      res.status(400).json({ error: 'Missing required field: agent_id' });
+    if (!statusUpdate.thopter_id) {
+      res.status(400).json({ error: 'Missing required field: thopter_id' });
       return;
     }
     
@@ -27,33 +27,34 @@ export function handleStatusUpdate(req: Request, res: Response): void {
       return;
     }
     
-    // Log the status update (silenced for debugging)
-    // logger.debug(
-    //   `Status update received: ${statusUpdate.state}`,
-    //   statusUpdate.agent_id,
-    //   'collector',
-    //   { 
-    //     hasGithubContext: !!statusUpdate.github,
-    //     repository: statusUpdate.repository,
-    //     screenLength: statusUpdate.screen_dump?.length || 0
-    //   }
-    // );
+    // Log the status update for debugging
+    logger.info(
+      `Status update received: ${statusUpdate.state}`,
+      statusUpdate.thopter_id,
+      'collector',
+      { 
+        hasGithubContext: !!statusUpdate.github,
+        repository: statusUpdate.repository,
+        githubRepository: statusUpdate.github?.repository,
+        screenLength: statusUpdate.screen_dump?.length || 0
+      }
+    );
     
     // Update state manager with the status
-    stateManager.updateAgentFromStatus(statusUpdate);
+    stateManager.updateThopterFromStatus(statusUpdate);
     
     // Respond with success
     res.json({ 
       received: true, 
       timestamp: new Date().toISOString(),
-      agent_id: statusUpdate.agent_id,
+      thopter_id: statusUpdate.thopter_id,
       state: statusUpdate.state
     });
     
   } catch (error) {
     logger.error(
       `Status update processing failed: ${error instanceof Error ? error.message : String(error)}`,
-      req.body?.agent_id,
+      req.body?.thopter_id,
       'collector'
     );
     
