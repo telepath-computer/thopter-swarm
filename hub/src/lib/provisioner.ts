@@ -533,17 +533,7 @@ ${request.github.issueBody}
       source: 'github',
       repository: request.repository,
       workBranch: branchName,
-      github: {
-        issueNumber: request.github.issueNumber,
-        issueTitle: request.github.issueTitle,
-        issueBody: request.github.issueBody,
-        issueUrl: request.github.issueUrl,
-        issueAuthor: request.github.issueAuthor,
-        mentionAuthor: request.github.mentionAuthor,
-        mentionLocation: request.github.mentionLocation,
-        mentionCommentId: request.github.mentionCommentId,
-        comments: request.github.comments || []
-      }
+      github: request.github  // Use the complete GitHubContext object directly
     };
     
     return JSON.stringify(issueContext, null, 2);
