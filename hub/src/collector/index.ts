@@ -28,17 +28,17 @@ export function handleStatusUpdate(req: Request, res: Response): void {
     }
     
     // Log the status update for debugging
-    logger.info(
-      `Status update received: ${statusUpdate.state}`,
-      statusUpdate.thopter_id,
-      'collector',
-      { 
-        hasGithubContext: !!statusUpdate.github,
-        repository: statusUpdate.repository,
-        githubRepository: statusUpdate.github?.repository,
-        screenLength: statusUpdate.screen_dump?.length || 0
-      }
-    );
+    // logger.info(
+    //   `Status update received: ${statusUpdate.state}`,
+    //   statusUpdate.thopter_id,
+    //   'collector',
+    //   { 
+    //     hasGithubContext: !!statusUpdate.github,
+    //     repository: statusUpdate.repository,
+    //     githubRepository: statusUpdate.github?.repository,
+    //     screenLength: statusUpdate.screen_dump?.length || 0
+    //   }
+    // );
     
     // Update state manager with the status
     stateManager.updateThopterFromStatus(statusUpdate);
