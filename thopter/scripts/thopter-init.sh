@@ -58,6 +58,10 @@ thopter_log "rm -rf /data/*"
 # agent).
 # TODO: i have seen this hang forever, stuck on cleaning up uv cache
 # directories. i have no idea how that is possible or what to do about it.
+# i am considering not using a volume pool and just creating a new volume for
+# every thopter, then regularly destroying unattached thopter volumes, because
+# this is a fatal provisioning problem that has no apparent explanation or
+# proper fix right now.
 rm -rf /data/*
 
 thopter_log "useradd thopter"

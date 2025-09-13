@@ -14,7 +14,7 @@ Monitors GitHub issues for `/thopter` commands and automatically provisions Fly 
 
 This is v0.1 for internal testing with many constraints:
 
-- **Unstable provisioning**: expect thopters to fail to launch or to get stuck sometimes. Be ready to look at hub machine logs (`fly logs --machine NNN`). Use `fly/status.sh` and the fly.io admin console's machines page for help.
+- **Unstable provisioning**: expect thopters to fail to launch or to get stuck sometimes. Be ready to look at hub and thopter machine logs (`fly logs --machine NNN`). Use `fly/status.sh` and the fly.io admin console's machines page for help.(*)
 - **Weird DNS names**: the dashboard lives at 1.hub.kv._metadata.{appname}.internal (but at least it's persistent across hub server redeployment)
 - **Manual lifecycle**: Agents must be killed manually; idle agents block new ones at MAX_AGENTS
 - **No PR workflow**: Agents push to `thopter/*` branches but don't create PRs yet
@@ -24,6 +24,8 @@ This is v0.1 for internal testing with many constraints:
 - **Guides/docs needed**: Lots of details warrant further documentation and explanation.
 - **Immature workflow for daily use**: e.g. thopters can't report completion status to GitHub ("idle" state on the dashboard is the signal for completion), can't comment on issues, can't read/write PRs yet, etc.
 - Expect bugs and broken edge cases. PRs welcome :)
+
+(*) For example I have seen thopters fail to finish initialization due to the initial `rm -rf /data/*` command that cleans up state from prior thopters on the volume hanging forever once in a while. So maybe I shouldn't be using a shared volume pool. Lots of kinks like this are getting worked out.
 
 ## Quick start of a new swarm setup
 
