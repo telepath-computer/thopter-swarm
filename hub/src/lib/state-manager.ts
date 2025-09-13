@@ -21,6 +21,7 @@ const createFlyWrapper = (appName: string) => {
 class StateManager {
   private thopters: Map<string, ThopterState> = new Map();
   private goldenClaudes: Map<string, GoldenClaudeState> = new Map();
+  private expectedThopters: Map<string, GitHubContext> = new Map(); // Pre-register GitHub context
   private provisionRequests: ProvisionRequest[] = [];
   private destroyRequests: DestroyRequest[] = [];
   private operatingMode: OperatingMode = 'initializing';
@@ -86,6 +87,14 @@ class StateManager {
   }
   
   /**
+   * Trigger immediate reconciliation (e.g., after provisioning)
+   */
+  async triggerReconciliation(): Promise<void> {
+    logger.debug('Triggering immediate reconciliation', undefined, 'state-manager');
+    await this.reconcileWithFly();
+  }
+
+  /**
    * Reconcile thopter state with fly machines (fly machines are authoritative)
    */
   private async reconcileWithFly(): Promise<void> {
@@ -124,11 +133,17 @@ class StateManager {
           // === SESSION STATE (preserve existing) ===
           session: existing?.session,
           
-          // === GITHUB CONTEXT (preserve existing) ===
-          github: existing?.github
+          // === GITHUB CONTEXT (preserve existing or use expected) ===
+          github: existing?.github || this.expectedThopters.get(machine.id)
         };
         
         newThopters.set(machine.id, thopterState);
+        
+        // Clean up expected entry if it was used
+        if (this.expectedThopters.has(machine.id)) {
+          this.expectedThopters.delete(machine.id);
+          logger.debug(`Consumed expected GitHub context for thopter: ${machine.id}`, machine.id, 'state-manager');
+        }
       }
       
       // Log changes and update
@@ -291,6 +306,14 @@ class StateManager {
     return this.destroyRequests.filter(r => r.status === 'pending').slice(0, limit);
   }
   
+  /**
+   * Pre-register a thopter with GitHub context before it's discovered by reconciliation
+   */
+  expectThopter(machineId: string, github: GitHubContext): void {
+    this.expectedThopters.set(machineId, github);
+    logger.info(`Pre-registered thopter with GitHub context: ${github.repository}#${github.issueNumber}`, machineId, 'state-manager');
+  }
+
   /**
    * Add a new thopter to state (used when provisioner creates thopter)
    */

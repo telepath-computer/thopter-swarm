@@ -126,6 +126,11 @@ export class AgentManager {
       // Call provisioner with rich ProvisionRequest (no capacity check needed)
       const result = await this.provisioner.provision(request);
       
+      // Pre-register GitHub context for any machine that was created (success or partial)
+      if (result.machineId && request.github) {
+        stateManager.expectThopter(result.machineId, request.github);
+      }
+      
       if (result.success && result.thopterId && result.machineId && result.region && result.image) {
         // Update request to completed
         stateManager.updateProvisionRequest(requestId, {
@@ -145,6 +150,11 @@ export class AgentManager {
         );
         
         logger.info(`Provision request completed: ${requestId} → thopter ${result.thopterId}`, result.thopterId, 'agent-manager');
+        
+        // Trigger immediate reconciliation to discover the new thopter
+        stateManager.triggerReconciliation().catch(error => {
+          logger.warn(`Failed to trigger reconciliation after provisioning: ${error.message}`, result.thopterId, 'agent-manager');
+        });
         
       } else {
         // Update request to failed
