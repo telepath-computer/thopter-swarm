@@ -59,21 +59,22 @@
                 <% goldenClaudes.forEach(gc => { %>
                   <tr class="gc-row">
                     <td class="gc-name-cell">
-                      <span class="gc-name">gc-<%= gc.name %></span>
+                      <span class="gc-name">gc-<%= gc.goldenClaudeName %></span>
                     </td>
                     <td class="status-cell">
                       <div class="status-multiline">
                         <div class="status-line">
-                          machine: <span class="machine-state <%= gc.state === 'running' ? 'state-running' : 'state-stopped' %>">
-                            <%= gc.state %>
+                          machine: <span class="machine-state-<%= gc.fly.machineState %>">
+                            <%= gc.fly.machineState %>
                           </span>
+                          (age: <%= formatters.relativeTime(gc.fly.createdAt) %>)
                           <% if (gc.session?.lastActivity) { %>
                             (last ping: <%= formatters.relativeTime(gc.session.lastActivity) %>)
                           <% } %>
                         </div>
                         <% if (gc.session) { %>
                           <div class="status-line">
-                            tmux: <span class="tmux-state <%= formatters.stateClass(gc.session.tmuxState) %>">
+                            tmux: <span class="tmux-state-<%= gc.session.tmuxState %>">
                               <%= gc.session.tmuxState %>
                             </span>
                             <% if (gc.session.idleSince) { %>
@@ -81,7 +82,7 @@
                             <% } %>
                           </div>
                           <div class="status-line">
-                            claude process: <span class="claude-process <%= gc.session.claudeProcess === 'notFound' ? 'process-good' : 'process-warning' %>">
+                            claude process: <span class="claude-process-<%= gc.session.claudeProcess === 'notFound' ? 'good' : 'warning' %>">
                               <%= gc.session.claudeProcess === 'running' ? 'running' : 'not found' %>
                               <% if (gc.session.claudeProcess === 'running') { %>
                                 <span class="warning-icon" title="Warning: Claude should be stopped in golden claudes for filesystem stability">⚠️</span>
@@ -95,13 +96,14 @@
                       </div>
                     </td>
                     <td class="gc-id-cell">
-                      <span class="machine-id" title="<%= gc.machineId %>">
-                        <%= gc.machineId %>
+                      <span class="machine-id" title="<%= gc.fly.id %>">
+                        <%= gc.fly.id %>
                       </span>
                     </td>
                     <td class="terminal-cell">
-                      <% if (gc.webTerminalUrl) { %>
-                        <a href="<%= gc.webTerminalUrl %>" target="_blank" class="table-btn terminal-btn">
+                      <% if (gc.fly.machineState === 'started') { %>
+                        <% const webTerminalUrl = `http://${gc.fly.id}.vm.${process.env.APP_NAME}.internal:${process.env.WEB_TERMINAL_PORT || '7681'}/`; %>
+                        <a href="<%= webTerminalUrl %>" target="_blank" class="table-btn terminal-btn">
                           Terminal
                         </a>
                       <% } else { %>
@@ -149,7 +151,7 @@
                         <td class="status-cell">
                           <div class="status-multiline">
                             <div class="status-line">
-                              machine: <span class="machine-state <%= formatters.stateClass(thopter.fly.machineState) %>">
+                              machine: <span class="machine-state-<%= thopter.fly.machineState %>">
                                 <%= thopter.fly.machineState %>
                               </span>
                               (age: <%= formatters.relativeTime(thopter.fly.createdAt) %>)
@@ -159,7 +161,7 @@
                             </div>
                             <% if (thopter.session) { %>
                               <div class="status-line">
-                                tmux: <span class="tmux-state <%= formatters.stateClass(thopter.session.tmuxState) %>">
+                                tmux: <span class="tmux-state-<%= thopter.session.tmuxState %>">
                                   <%= thopter.session.tmuxState %>
                                 </span>
                                 <% if (thopter.session.idleSince) { %>
@@ -167,7 +169,7 @@
                                 <% } %>
                               </div>
                               <div class="status-line">
-                                claude process: <span class="claude-process <%= thopter.session.claudeProcess === 'running' ? 'process-running' : 'process-not-found' %>">
+                                claude process: <span class="claude-process-<%= thopter.session.claudeProcess %>">
                                   <%= thopter.session.claudeProcess === 'running' ? 'running' : 'not found' %>
                                 </span>
                               </div>
@@ -274,7 +276,7 @@
                           <span class="orphaned-indicator" title="Orphaned: <%= orphanStatus.reason %>">⚠️</span>
                         </td>
                         <td class="status-cell">
-                          <span class="machine-state <%= formatters.stateClass(thopter.fly.machineState) %>">
+                          <span class="machine-state-<%= thopter.fly.machineState %>">
                             <%= thopter.fly.machineState %>
                           </span>
                         </td>
@@ -376,7 +378,7 @@
                           </span>
                         </td>
                         <td class="status-cell">
-                          <span class="machine-state <%= formatters.stateClass(thopter.fly.machineState) %>">
+                          <span class="machine-state-<%= thopter.fly.machineState %>">
                             <%= thopter.fly.machineState %>
                           </span>
                         </td>
@@ -473,7 +475,7 @@
                       </div>
                     </td>
                     <td class="status-cell">
-                      <span class="request-status <%= formatters.requestStatusClass(request.status) %>">
+                      <span class="provision-request-status-<%= request.status %>">
                         <%= request.status %>
                       </span>
                     </td>
@@ -542,7 +544,7 @@
                       <%= request.reason ? formatters.truncateText(request.reason, 40) : '—' %>
                     </td>
                     <td class="status-cell">
-                      <span class="request-status <%= formatters.requestStatusClass(request.status) %>">
+                      <span class="destroy-request-status-<%= request.status %>">
                         <%= request.status %>
                       </span>
                     </td>

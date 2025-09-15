@@ -83,14 +83,24 @@ export interface OrphanStatus {
 }
 
 
-// Golden Claude state tracking
+// Golden Claude state tracking - now using ThopterState structure
 export interface GoldenClaudeState {
-  machineId: string;
-  name: string;  // e.g. "default", "josh", "xyz"
-  state: 'running' | 'stopped';
-  webTerminalUrl?: string;
+  // === FLY INFRASTRUCTURE (authoritative, always present) ===
+  fly: {
+    id: string;              // machine.id
+    name: string;            // machine.name (e.g. "gc-default")
+    machineState: 'started' | 'stopped' | 'suspended' | 'destroyed';
+    region: string;          // machine.region
+    image: string;           // machine.image_ref.tag
+    createdAt: Date;         // machine.created_at (actual spawn time)
+  };
   
-  // Session data from observer (same structure as ThopterState.session)
+  // === HUB MANAGEMENT (ephemeral) ===
+  hub: {
+    killRequested: boolean;  // true when user requests kill, cleared on fail/timeout
+  };
+  
+  // === THOPTER SESSION (nullable, best-effort from observer) ===
   session?: {
     tmuxState: 'active' | 'idle';
     claudeProcess: 'running' | 'notFound';
@@ -98,6 +108,13 @@ export interface GoldenClaudeState {
     idleSince?: Date;
     screenDump: string;
   };
+  
+  // === GITHUB CONTEXT (nullable, not used for golden claudes) ===
+  // github field omitted - golden claudes don't have GitHub context
+  
+  // === GOLDEN CLAUDE SPECIFIC FIELDS ===
+  goldenClaudeName: string;  // e.g. "default", "josh", "xyz" (extracted from fly.name)
+  // webTerminalUrl is derived - computed from fly.machineState and fly.id
 }
 
 // Separate request types for provisioning and destroying
