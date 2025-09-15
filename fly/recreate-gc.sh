@@ -56,6 +56,7 @@ REQUIRED_VARS=(
     "APP_NAME"
     "REGION"
     "WEB_TERMINAL_PORT"
+    "HUB_STATUS_PORT"
 )
 
 for var in "${REQUIRED_VARS[@]}"; do
@@ -192,6 +193,8 @@ fly machine run $THOPTER_IMAGE \
     --volume $GC_VOLUME_NAME:/data \
     --region $REGION \
     --env METADATA_SERVICE_HOST="$METADATA_SERVICE_HOST" \
+    --env APP_NAME="$APP_NAME" \
+    --env HUB_STATUS_PORT="$HUB_STATUS_PORT" \
     --env WEB_TERMINAL_PORT="$WEB_TERMINAL_PORT" \
     --env GITHUB_REPOS="$GITHUB_REPOS" \
     --env GIT_USER_NAME="$GIT_USER_NAME" \
