@@ -188,21 +188,29 @@ class StateManager {
    * Update thopter from observer status report (best-effort metadata)
    */
   updateThopterFromStatus(status: ThopterStatusUpdate): void {
-    let thopter = this.thopters.get(status.thopter_id);
+    let thopter = this.thopters.get(status.thopterId);  // UPDATED field name
     
     if (!thopter) {
-      logger.warn(`Received status for unknown thopter: ${status.thopter_id}`, status.thopter_id, 'state-manager');
+      // NEW: Check if this is a golden claude reporting
+      const goldenClaude = this.goldenClaudes.get(status.thopterId);
+      if (goldenClaude) {
+        this.updateGoldenClaudeFromStatus(goldenClaude, status);
+        return;
+      }
+      
+      logger.warn(`Received status for unknown thopter: ${status.thopterId}`, status.thopterId, 'state-manager');
       // Don't auto-create - fly reconciliation will discover it if it exists
       // This prevents phantom thopters from bad status updates
       return;
     }
     
-    // Update session state (best-effort metadata)
+    // Update session state (best-effort metadata) - ALL camelCase
     thopter.session = {
-      claudeState: status.state,
-      lastActivity: new Date(status.last_activity),
-      idleSince: status.idle_since ? new Date(status.idle_since) : undefined,
-      screenDump: status.screen_dump
+      tmuxState: status.tmuxState,
+      claudeProcess: status.claudeProcess,
+      lastActivity: new Date(status.lastActivity),
+      idleSince: status.idleSince ? new Date(status.idleSince) : undefined,
+      screenDump: status.screenDump
     };
     
     // Update GitHub context if provided (best-effort metadata)
@@ -212,7 +220,22 @@ class StateManager {
     }
     
     // Log successful status update
-    logger.debug(`Updated thopter session state: ${status.thopter_id}`, status.thopter_id, 'state-manager');
+    logger.debug(`Updated thopter session state: ${status.thopterId}`, status.thopterId, 'state-manager');
+  }
+
+  /**
+   * Handle golden claude status updates (NEW METHOD)
+   */
+  updateGoldenClaudeFromStatus(goldenClaude: GoldenClaudeState, status: ThopterStatusUpdate): void {
+    goldenClaude.session = {
+      tmuxState: status.tmuxState,
+      claudeProcess: status.claudeProcess,
+      lastActivity: new Date(status.lastActivity),
+      idleSince: status.idleSince ? new Date(status.idleSince) : undefined,
+      screenDump: status.screenDump
+    };
+    
+    logger.debug(`Updated golden claude session state: ${status.thopterId}`, status.thopterId, 'state-manager');
   }
   
   /**
@@ -475,30 +498,47 @@ class StateManager {
         // Extract name from machine name (gc-default -> default)
         const name = machine.name.replace(/^gc-/, '');
         
+        // PRESERVE existing session data if it exists
+        const existing = this.goldenClaudes.get(machine.id);
+        
         const gcState: GoldenClaudeState = {
-          machineId: machine.id,
-          name: name,
-          state: machine.state === 'started' ? 'running' : 'stopped',
-          webTerminalUrl: machine.state === 'started' 
-            ? `http://${machine.id}.vm.${this.appName}.internal:${this.webTerminalPort}/`
-            : undefined
+          // === FLY INFRASTRUCTURE (authoritative) ===
+          fly: {
+            id: machine.id,
+            name: machine.name,
+            machineState: machine.state,  // Use actual Fly states
+            region: machine.region || existing?.fly?.region || 'unknown',
+            image: machine.image_ref?.tag || existing?.fly?.image || 'unknown',
+            createdAt: new Date(machine.created_at)
+          },
+          
+          // === HUB MANAGEMENT (preserve existing) ===
+          hub: {
+            killRequested: existing?.hub?.killRequested || false
+          },
+          
+          // === SESSION STATE (preserve existing) ===
+          session: existing?.session,
+          
+          // === GOLDEN CLAUDE SPECIFIC FIELDS ===
+          goldenClaudeName: name  // e.g. "default" from "gc-default"
+          // webTerminalUrl is derived - computed in templates/utils
         };
         
         newGoldenClaudes.set(machine.id, gcState);
         
         // Log changes
-        const existing = this.goldenClaudes.get(machine.id);
         if (!existing) {
-          logger.info(`Added Golden Claude: ${name} (${machine.id}) - ${gcState.state}`, undefined, 'state-manager');
-        } else if (existing.state !== gcState.state) {
-          logger.info(`Golden Claude ${name} state changed: ${existing.state} → ${gcState.state}`, undefined, 'state-manager');
+          logger.info(`Added Golden Claude: ${name} (${machine.id}) - ${gcState.fly.machineState}`, undefined, 'state-manager');
+        } else if (existing.fly?.machineState !== gcState.fly.machineState) {
+          logger.info(`Golden Claude ${name} state changed: ${existing.fly?.machineState} → ${gcState.fly.machineState}`, undefined, 'state-manager');
         }
       }
       
       // Log removed GCs
       for (const [machineId, existing] of this.goldenClaudes) {
         if (!newGoldenClaudes.has(machineId)) {
-          logger.info(`Removed Golden Claude: ${existing.name} (${machineId}) - no longer exists`, undefined, 'state-manager');
+          logger.info(`Removed Golden Claude: ${existing.goldenClaudeName} (${machineId}) - no longer exists`, undefined, 'state-manager');
         }
       }
       
@@ -546,8 +586,8 @@ class StateManager {
    * Get Golden Claude by name
    */
   getGoldenClaude(name: string): GoldenClaudeState | undefined {
-    // Find by name, not machine ID
-    return Array.from(this.goldenClaudes.values()).find(gc => gc.name === name);
+    // Find by golden claude name, not machine ID
+    return Array.from(this.goldenClaudes.values()).find(gc => gc.goldenClaudeName === name);
   }
   
   /**

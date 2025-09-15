@@ -26,18 +26,19 @@ export interface GitHubContext {
 
 // Status updates from observers (authoritative source)
 export interface ThopterStatusUpdate {
-  // Core status
-  thopter_id: string;
-  state: 'running' | 'idle';
-  screen_dump: string;
-  last_activity: string;
+  // Core status - ALL camelCase for consistency
+  thopterId: string;
+  tmuxState: 'active' | 'idle';
+  claudeProcess: 'running' | 'notFound';
+  screenDump: string;
+  lastActivity: string;
   timestamp: string;
-  idle_since?: string | null;
+  idleSince?: string | null;
+  spawnedAt?: string;
   
   // Source-agnostic metadata
   repository?: string;
   workBranch?: string;
-  spawned_at?: string;
   
   // Source-specific contexts
   github?: GitHubContext;
@@ -62,7 +63,8 @@ export interface ThopterState {
   
   // === THOPTER SESSION (nullable, best-effort from observer) ===
   session?: {
-    claudeState: 'running' | 'idle';
+    tmuxState: 'active' | 'idle';
+    claudeProcess: 'running' | 'notFound';
     lastActivity: Date;
     idleSince?: Date;
     screenDump: string;
@@ -81,12 +83,38 @@ export interface OrphanStatus {
 }
 
 
-// Golden Claude state tracking
+// Golden Claude state tracking - now using ThopterState structure
 export interface GoldenClaudeState {
-  machineId: string;
-  name: string;  // e.g. "default", "josh", "xyz"
-  state: 'running' | 'stopped';
-  webTerminalUrl?: string;
+  // === FLY INFRASTRUCTURE (authoritative, always present) ===
+  fly: {
+    id: string;              // machine.id
+    name: string;            // machine.name (e.g. "gc-default")
+    machineState: 'started' | 'stopped' | 'suspended' | 'destroyed';
+    region: string;          // machine.region
+    image: string;           // machine.image_ref.tag
+    createdAt: Date;         // machine.created_at (actual spawn time)
+  };
+  
+  // === HUB MANAGEMENT (ephemeral) ===
+  hub: {
+    killRequested: boolean;  // true when user requests kill, cleared on fail/timeout
+  };
+  
+  // === THOPTER SESSION (nullable, best-effort from observer) ===
+  session?: {
+    tmuxState: 'active' | 'idle';
+    claudeProcess: 'running' | 'notFound';
+    lastActivity: Date;
+    idleSince?: Date;
+    screenDump: string;
+  };
+  
+  // === GITHUB CONTEXT (nullable, not used for golden claudes) ===
+  // github field omitted - golden claudes don't have GitHub context
+  
+  // === GOLDEN CLAUDE SPECIFIC FIELDS ===
+  goldenClaudeName: string;  // e.g. "default", "josh", "xyz" (extracted from fly.name)
+  // webTerminalUrl is derived - computed from fly.machineState and fly.id
 }
 
 // Separate request types for provisioning and destroying

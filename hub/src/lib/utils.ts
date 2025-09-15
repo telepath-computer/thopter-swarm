@@ -47,28 +47,6 @@ export function formatAbsoluteTime(timestamp: string | Date): string {
   }
 }
 
-/**
- * Get CSS class for thopter state
- */
-export function getStateClass(state: string): string {
-  switch (state?.toLowerCase()) {
-    case 'running':
-      return 'state-running';
-    case 'idle':
-      return 'state-idle';
-    case 'provisioning':
-      return 'state-provisioning';
-    case 'orphaned':
-      return 'state-orphaned';
-    case 'killing':
-      return 'state-killing';
-    case 'failed':
-    case 'error':
-      return 'state-failed';
-    default:
-      return 'state-unknown';
-  }
-}
 
 /**
  * Get CSS class for operating mode
@@ -88,23 +66,6 @@ export function getModeClass(mode: string): string {
   }
 }
 
-/**
- * Get CSS class for request status
- */
-export function getRequestStatusClass(status: string): string {
-  switch (status?.toLowerCase()) {
-    case 'pending':
-      return 'status-pending';
-    case 'processing':
-      return 'status-processing';
-    case 'completed':
-      return 'status-completed';
-    case 'failed':
-      return 'status-failed';
-    default:
-      return 'status-unknown';
-  }
-}
 
 /**
  * Get CSS class for log level

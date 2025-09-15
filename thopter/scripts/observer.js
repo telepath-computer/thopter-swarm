@@ -150,19 +150,35 @@ class SessionObserver {
     });
   }
 
-  async updateHubState(state, screenDump) {
+  async checkClaudeProcess() {
+    try {
+      // Check if exact 'claude' process is running (not claude-log-generator, etc.)
+      // Using pgrep -x for exact match
+      execSync('pgrep -x claude', { encoding: 'utf8', timeout: 5000 });
+      return 'running';
+    } catch (error) {
+      // pgrep returns non-zero exit code if no processes found
+      return 'notFound';
+    }
+  }
+
+  async updateHubState(tmuxState, screenDump) {
     try {
       // Reload issue context every time to avoid race conditions
       await this.loadIssueContext();
 
+      // Check Claude process status
+      const claudeProcess = await this.checkClaudeProcess();
+
       const now = new Date().toISOString();
       const payload = {
-        thopter_id: this.thopterId,
-        state: state,
-        screen_dump: screenDump,
-        last_activity: now,
+        thopterId: this.thopterId,        // RENAMED from thopter_id
+        tmuxState: tmuxState,             // RENAMED from state
+        claudeProcess: claudeProcess,     // NEW
+        screenDump: screenDump,           // RENAMED from screen_dump
+        lastActivity: now,                // RENAMED from last_activity
         timestamp: now,
-        spawned_at: this.spawnedAt
+        spawnedAt: this.spawnedAt         // RENAMED from spawned_at
       };
 
       // Include issue context metadata if available
@@ -173,28 +189,28 @@ class SessionObserver {
       }
 
       // Track idle duration
-      if (state === 'idle' && this.lastState !== 'idle') {
+      if (tmuxState === 'idle' && this.lastState !== 'idle') {
         // Just transitioned to idle - record when it went idle
         this.idle_since = new Date(this.lastChangeTime).toISOString();
-        payload.idle_since = this.idle_since;
-      } else if (state === 'running' && this.lastState === 'idle') {
-        // Just transitioned to running - clear idle timestamp
+        payload.idleSince = this.idle_since;
+      } else if (tmuxState === 'active' && this.lastState === 'idle') {
+        // Just transitioned to active - clear idle timestamp
         this.idle_since = null;
-        payload.idle_since = null;
-      } else if (state === 'idle' && this.idle_since) {
+        payload.idleSince = null;
+      } else if (tmuxState === 'idle' && this.idle_since) {
         // Still idle - include the original idle timestamp
-        payload.idle_since = this.idle_since;
+        payload.idleSince = this.idle_since;
       }
 
       const response = await this.postToHub(payload);
 
       // Log successful communication
-      console.log(`[SessionObserver] Status sent to hub: ${state} (${response.status})`);
+      console.log(`[SessionObserver] Status sent to hub: ${tmuxState} (${response.status})`);
 
       // Log state transitions
-      if (this.lastState !== state) {
-        console.log(`[SessionObserver] State transition: ${this.lastState || 'initial'} → ${state}`);
-        this.lastState = state;
+      if (this.lastState !== tmuxState) {
+        console.log(`[SessionObserver] State transition: ${this.lastState || 'initial'} → ${tmuxState}`);
+        this.lastState = tmuxState;
       }
 
     } catch (error) {
@@ -221,23 +237,23 @@ class SessionObserver {
       const now = Date.now();
 
       // 2. Compare with previous screen and determine state
-      let state;
+      let tmuxState;
       if (currentScreen !== this.lastScreen) {
         // Screen changed - agent is active
-        state = 'running';
+        tmuxState = 'active';
         this.lastChangeTime = now;
         this.lastScreen = currentScreen;
       } else {
         // Screen unchanged - check if idle long enough
         if (now - this.lastChangeTime > this.IDLE_THRESHOLD) {
-          state = 'idle';
+          tmuxState = 'idle';
         } else {
-          state = 'running';
+          tmuxState = 'active';
         }
       }
 
       // 3. Always update hub with current screen and state
-      await this.updateHubState(state, currentScreen);
+      await this.updateHubState(tmuxState, currentScreen);
 
     } catch (tmuxError) {
       console.error('[SessionObserver] Tmux capture failed:', tmuxError.message);

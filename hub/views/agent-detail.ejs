@@ -40,7 +40,7 @@
               <div class="detail-row">
                 <div class="detail-label">Machine State:</div>
                 <div class="detail-value">
-                  <span class="machine-state <%= formatters.stateClass(thopter.fly.machineState) %>">
+                  <span class="machine-state-<%= thopter.fly.machineState %>">
                     <%= thopter.fly.machineState %>
                   </span>
                 </div>
@@ -85,10 +85,19 @@
                 <h3>Session Status</h3>
                 
                 <div class="detail-row">
-                  <div class="detail-label">Claude State:</div>
+                  <div class="detail-label">Tmux State:</div>
                   <div class="detail-value">
-                    <span class="claude-state <%= formatters.stateClass(thopter.session.claudeState) %>">
-                      <%= thopter.session.claudeState %>
+                    <span class="tmux-state-<%= thopter.session.tmuxState %>">
+                      <%= thopter.session.tmuxState %>
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="detail-row">
+                  <div class="detail-label">Claude Process:</div>
+                  <div class="detail-value">
+                    <span class="claude-process-<%= thopter.session.claudeProcess %>">
+                      <%= thopter.session.claudeProcess === 'running' ? 'running' : 'not found' %>
                     </span>
                   </div>
                 </div>
