@@ -225,8 +225,8 @@ echo ""
 ALL_VOLUMES=$(fly volumes list --json 2>/dev/null || echo "[]")
 TOTAL_VOLUMES=$(echo "$ALL_VOLUMES" | jq '. | length' 2>/dev/null || echo "0")
 METADATA_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name=="metadata_redis")] | length' 2>/dev/null || echo "0")
-HUB_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name=="hub_volume")] | length' 2>/dev/null || echo "0")
-GC_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name=="golden_claude")] | length' 2>/dev/null || echo "0")
+HUB_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name=="hub_data")] | length' 2>/dev/null || echo "0")
+GC_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name | startswith("gc_volume_"))] | length' 2>/dev/null || echo "0")
 THOPTER_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name=="thopter_data")] | length' 2>/dev/null || echo "0")
 
 
@@ -295,7 +295,7 @@ if [ "$TOTAL_VOLUMES" -gt 0 ]; then
                     echo -e "  ${WARNING} $VOLUME_NAME ($VOLUME_ID) ${VOLUME_SIZE}GB in $VOLUME_REGION - unattached"
                 fi
             fi
-        done < <(echo "$ALL_VOLUMES" | jq -r '.[] | select(.name != "metadata_redis" and .name != "hub_volume" and .name != "golden_claude" and .name != "thopter_data") | "\(.id)|\(.name)|\(.size_gb)|\(.region)|\(.attached_machine_id // "null")"' 2>/dev/null || true)
+        done < <(echo "$ALL_VOLUMES" | jq -r '.[] | select(.name != "metadata_redis" and .name != "hub_data" and (.name | startswith("gc_volume_") | not) and .name != "thopter_data") | "\(.id)|\(.name)|\(.size_gb)|\(.region)|\(.attached_machine_id // "null")"' 2>/dev/null || true)
     fi
 else
     echo -e "${YELLOW}No volumes found${NC}"
