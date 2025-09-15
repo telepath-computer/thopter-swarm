@@ -217,34 +217,51 @@ else
     echo -e "${CHECK} Hub volume created: $HUB_VOLUME_NAME"
 fi
 
+# Check for .env.thopters file before launching hub machine
+echo "5. Checking for .env.thopters file..."
+ENV_THOPTERS_ARG=""
+if [ -f ".env.thopters" ]; then
+    echo -e "${INFO} Found .env.thopters file, will include in machine creation"
+    ENV_THOPTERS_ARG="--file-local /data/thopter-env/.env.thopters=.env.thopters"
+else
+    echo -e "${INFO} No .env.thopters file found (optional)"
+fi
+
+echo ""
+
 # Launch hub machine
-echo "5. Launching hub machine..."
+echo "6. Launching hub machine..."
 echo -e "${ROCKET} Starting hub with image: $HUB_IMAGE"
 
 METADATA_SERVICE_HOST=1.redis.kv._metadata.${APP_NAME}.internal
 
-fly machine run $HUB_IMAGE \
-    --name $HUB_MACHINE_NAME \
-    --vm-size=$HUB_VM_SIZE \
-    --autostop=off \
-    --region $REGION \
-    --volume $HUB_VOLUME_NAME:/data \
-    --env APP_NAME="$APP_NAME" \
-    --env REGION="$REGION" \
-    --env MAX_THOPTERS="$MAX_THOPTERS" \
-    --env THOPTER_VM_SIZE="$THOPTER_VM_SIZE" \
-    --env THOPTER_VOLUME_SIZE="$THOPTER_VOLUME_SIZE" \
-    --env HUB_VM_SIZE="$HUB_VM_SIZE" \
-    --env DANGEROUSLY_SKIP_FIREWALL="$DANGEROUSLY_SKIP_FIREWALL" \
-    --env ALLOWED_DOMAINS="$ALLOWED_DOMAINS" \
-    --env WEB_TERMINAL_PORT="$WEB_TERMINAL_PORT" \
-    --env HUB_PORT="$HUB_PORT" \
-    --env HUB_STATUS_PORT="$HUB_STATUS_PORT" \
-    --env GITHUB_INTEGRATION_JSON="$GITHUB_INTEGRATION_JSON" \
-    --env GITHUB_ISSUES_POLLING_INTERVAL="$GITHUB_ISSUES_POLLING_INTERVAL" \
-    --env FLY_DEPLOY_KEY="$FLY_DEPLOY_KEY" \
-    --env METADATA_SERVICE_HOST="$METADATA_SERVICE_HOST" \
-    --metadata hub=1
+# Build the fly machine run command with optional --file-local flag
+FLY_CMD="fly machine run $HUB_IMAGE \\
+    --name $HUB_MACHINE_NAME \\
+    --vm-size=$HUB_VM_SIZE \\
+    --autostop=off \\
+    --region $REGION \\
+    --volume $HUB_VOLUME_NAME:/data \\
+    --env APP_NAME=\"$APP_NAME\" \\
+    --env REGION=\"$REGION\" \\
+    --env MAX_THOPTERS=\"$MAX_THOPTERS\" \\
+    --env THOPTER_VM_SIZE=\"$THOPTER_VM_SIZE\" \\
+    --env THOPTER_VOLUME_SIZE=\"$THOPTER_VOLUME_SIZE\" \\
+    --env HUB_VM_SIZE=\"$HUB_VM_SIZE\" \\
+    --env DANGEROUSLY_SKIP_FIREWALL=\"$DANGEROUSLY_SKIP_FIREWALL\" \\
+    --env ALLOWED_DOMAINS=\"$ALLOWED_DOMAINS\" \\
+    --env WEB_TERMINAL_PORT=\"$WEB_TERMINAL_PORT\" \\
+    --env HUB_PORT=\"$HUB_PORT\" \\
+    --env HUB_STATUS_PORT=\"$HUB_STATUS_PORT\" \\
+    --env GITHUB_INTEGRATION_JSON=\"$GITHUB_INTEGRATION_JSON\" \\
+    --env GITHUB_ISSUES_POLLING_INTERVAL=\"$GITHUB_ISSUES_POLLING_INTERVAL\" \\
+    --env FLY_DEPLOY_KEY=\"$FLY_DEPLOY_KEY\" \\
+    --env METADATA_SERVICE_HOST=\"$METADATA_SERVICE_HOST\" \\
+    $ENV_THOPTERS_ARG \\
+    --metadata hub=1"
+
+# Execute the command
+eval $FLY_CMD
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}${CROSS} Failed to launch hub machine${NC}"
@@ -269,7 +286,7 @@ fi
 echo ""
 
 # Wait for hub to be ready
-echo "6. Waiting for hub to start..."
+echo "7. Waiting for hub to start..."
 echo -e "${INFO} Checking if hub process is running..."
 
 # Check if hub is running internally (this doesn't require wireguard)
@@ -289,7 +306,7 @@ if [ "$HEALTH_CHECK_PASSED" = false ]; then
 fi
 
 echo ""
-echo "7. Waiting for hub service discovery..."
+echo "8. Waiting for hub service discovery..."
 echo -e "${INFO} Testing hub service discovery via 1.hub.kv._metadata.${APP_NAME}.internal:${HUB_PORT}"
 HUB_DNS_READY=false
 for i in {1..24}; do
@@ -309,7 +326,7 @@ if [ "$HUB_DNS_READY" = false ]; then
 fi
 
 echo ""
-echo "8. Testing Wireguard connectivity..."
+echo "9. Testing Wireguard connectivity..."
 HUB_URL="http://$HUB_ID.vm.$APP_NAME.internal:$HUB_PORT/health"
 
 if curl -s --connect-timeout 3 "$HUB_URL" | grep -q '"status":"ok"' 2>/dev/null; then
@@ -322,17 +339,7 @@ else
     echo "  - Network connectivity issues"
 fi
 
-echo ""
-echo "9. Checking for .env.thopters file..."
-if [ -f ".env.thopters" ]; then
-    echo -e "${INFO} Found .env.thopters file, uploading to hub..."
-    ./fly/upload-env-thopters.sh
-    if [ $? -ne 0 ]; then
-        echo -e "${WARNING} Failed to upload .env.thopters (continuing anyway)"
-    fi
-else
-    echo -e "${INFO} No .env.thopters file found (optional)"
-fi
+# Note: .env.thopters file was included during machine creation via --file-local flag
 
 echo ""
 echo "========================================"
