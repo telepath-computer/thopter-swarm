@@ -62,9 +62,37 @@
                       <span class="gc-name">gc-<%= gc.name %></span>
                     </td>
                     <td class="status-cell">
-                      <span class="gc-state <%= gc.state === 'running' ? 'state-running' : 'state-stopped' %>">
-                        <%= gc.state %>
-                      </span>
+                      <div class="status-multiline">
+                        <div class="status-line">
+                          machine: <span class="machine-state <%= gc.state === 'running' ? 'state-running' : 'state-stopped' %>">
+                            <%= gc.state %>
+                          </span>
+                          <% if (gc.session?.lastActivity) { %>
+                            (last ping: <%= formatters.relativeTime(gc.session.lastActivity) %>)
+                          <% } %>
+                        </div>
+                        <% if (gc.session) { %>
+                          <div class="status-line">
+                            tmux: <span class="tmux-state <%= formatters.stateClass(gc.session.tmuxState) %>">
+                              <%= gc.session.tmuxState %>
+                            </span>
+                            <% if (gc.session.idleSince) { %>
+                              (idle since: <%= formatters.relativeTime(gc.session.idleSince) %>)
+                            <% } %>
+                          </div>
+                          <div class="status-line">
+                            claude process: <span class="claude-process <%= gc.session.claudeProcess === 'notFound' ? 'process-good' : 'process-warning' %>">
+                              <%= gc.session.claudeProcess === 'running' ? 'running' : 'not found' %>
+                              <% if (gc.session.claudeProcess === 'running') { %>
+                                <span class="warning-icon" title="Warning: Claude should be stopped in golden claudes for filesystem stability">⚠️</span>
+                              <% } %>
+                            </span>
+                          </div>
+                        <% } else { %>
+                          <div class="status-line no-session">tmux: no data</div>
+                          <div class="status-line no-session">claude process: no data</div>
+                        <% } %>
+                      </div>
                     </td>
                     <td class="gc-id-cell">
                       <span class="machine-id" title="<%= gc.machineId %>">
@@ -104,8 +132,6 @@
                     <tr>
                       <th>ID</th>
                       <th>Status</th>
-                      <th>Age</th>
-                      <th>Last Ping</th>
                       <th>Task</th>
                       <th></th>
                       <th></th>
@@ -121,27 +147,35 @@
                           </a>
                         </td>
                         <td class="status-cell">
-                          <span class="thopter-state <%= formatters.stateClass(thopter.session?.claudeState || 'idle') %>">
-                            <%= thopter.session?.claudeState || 'idle' %>
-                          </span>
-                          <% const idleDuration = formatters.idleDuration(thopter.session?.idleSince, thopter.session?.claudeState || 'idle'); %>
-                          <% if (idleDuration) { %>
-                            <span class="idle-duration">(<%= idleDuration %>)</span>
-                          <% } %>
-                        </td>
-                        <td class="age-cell">
-                          <span title="<%= formatters.absoluteTime(thopter.fly.createdAt) %>">
-                            <%= formatters.relativeTime(thopter.fly.createdAt) %>
-                          </span>
-                        </td>
-                        <td class="activity-cell">
-                          <% if (thopter.session?.lastActivity) { %>
-                            <span title="<%= formatters.absoluteTime(thopter.session.lastActivity) %>">
-                              <%= formatters.relativeTime(thopter.session.lastActivity) %>
-                            </span>
-                          <% } else { %>
-                            <span class="no-data">—</span>
-                          <% } %>
+                          <div class="status-multiline">
+                            <div class="status-line">
+                              machine: <span class="machine-state <%= formatters.stateClass(thopter.fly.machineState) %>">
+                                <%= thopter.fly.machineState %>
+                              </span>
+                              (age: <%= formatters.relativeTime(thopter.fly.createdAt) %>)
+                              <% if (thopter.session?.lastActivity) { %>
+                                (last ping: <%= formatters.relativeTime(thopter.session.lastActivity) %>)
+                              <% } %>
+                            </div>
+                            <% if (thopter.session) { %>
+                              <div class="status-line">
+                                tmux: <span class="tmux-state <%= formatters.stateClass(thopter.session.tmuxState) %>">
+                                  <%= thopter.session.tmuxState %>
+                                </span>
+                                <% if (thopter.session.idleSince) { %>
+                                  (idle since: <%= formatters.relativeTime(thopter.session.idleSince) %>)
+                                <% } %>
+                              </div>
+                              <div class="status-line">
+                                claude process: <span class="claude-process <%= thopter.session.claudeProcess === 'running' ? 'process-running' : 'process-not-found' %>">
+                                  <%= thopter.session.claudeProcess === 'running' ? 'running' : 'not found' %>
+                                </span>
+                              </div>
+                            <% } else { %>
+                              <div class="status-line no-session">tmux: no data</div>
+                              <div class="status-line no-session">claude process: no data</div>
+                            <% } %>
+                          </div>
                         </td>
                         <td class="repo-issue-cell">
                           <div class="repo-issue-content">

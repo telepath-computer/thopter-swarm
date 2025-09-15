@@ -11,19 +11,29 @@ export function handleStatusUpdate(req: Request, res: Response): void {
   try {
     const statusUpdate: ThopterStatusUpdate = req.body;
     
-    // Validate required fields
-    if (!statusUpdate.thopter_id) {
-      res.status(400).json({ error: 'Missing required field: thopter_id' });
+    // Validate required fields - ALL camelCase
+    if (!statusUpdate.thopterId) {
+      res.status(400).json({ error: 'Missing required field: thopterId' });
       return;
     }
     
-    if (!statusUpdate.state) {
-      res.status(400).json({ error: 'Missing required field: state' });
+    if (!statusUpdate.tmuxState) {
+      res.status(400).json({ error: 'Missing required field: tmuxState' });
       return;
     }
     
-    if (!['running', 'idle'].includes(statusUpdate.state)) {
-      res.status(400).json({ error: 'Invalid state. Must be "running" or "idle"' });
+    if (!['active', 'idle'].includes(statusUpdate.tmuxState)) {
+      res.status(400).json({ error: 'Invalid tmuxState. Must be "active" or "idle"' });
+      return;
+    }
+    
+    if (!statusUpdate.claudeProcess) {
+      res.status(400).json({ error: 'Missing required field: claudeProcess' });
+      return;
+    }
+    
+    if (!['running', 'notFound'].includes(statusUpdate.claudeProcess)) {
+      res.status(400).json({ error: 'Invalid claudeProcess. Must be "running" or "notFound"' });
       return;
     }
     
@@ -47,8 +57,9 @@ export function handleStatusUpdate(req: Request, res: Response): void {
     res.json({ 
       received: true, 
       timestamp: new Date().toISOString(),
-      thopter_id: statusUpdate.thopter_id,
-      state: statusUpdate.state
+      thopterId: statusUpdate.thopterId,
+      tmuxState: statusUpdate.tmuxState,
+      claudeProcess: statusUpdate.claudeProcess
     });
     
   } catch (error) {
