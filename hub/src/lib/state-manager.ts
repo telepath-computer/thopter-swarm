@@ -188,21 +188,29 @@ class StateManager {
    * Update thopter from observer status report (best-effort metadata)
    */
   updateThopterFromStatus(status: ThopterStatusUpdate): void {
-    let thopter = this.thopters.get(status.thopter_id);
+    let thopter = this.thopters.get(status.thopterId);  // UPDATED field name
     
     if (!thopter) {
-      logger.warn(`Received status for unknown thopter: ${status.thopter_id}`, status.thopter_id, 'state-manager');
+      // NEW: Check if this is a golden claude reporting
+      const goldenClaude = this.goldenClaudes.get(status.thopterId);
+      if (goldenClaude) {
+        this.updateGoldenClaudeFromStatus(goldenClaude, status);
+        return;
+      }
+      
+      logger.warn(`Received status for unknown thopter: ${status.thopterId}`, status.thopterId, 'state-manager');
       // Don't auto-create - fly reconciliation will discover it if it exists
       // This prevents phantom thopters from bad status updates
       return;
     }
     
-    // Update session state (best-effort metadata)
+    // Update session state (best-effort metadata) - ALL camelCase
     thopter.session = {
-      claudeState: status.state,
-      lastActivity: new Date(status.last_activity),
-      idleSince: status.idle_since ? new Date(status.idle_since) : undefined,
-      screenDump: status.screen_dump
+      tmuxState: status.tmuxState,
+      claudeProcess: status.claudeProcess,
+      lastActivity: new Date(status.lastActivity),
+      idleSince: status.idleSince ? new Date(status.idleSince) : undefined,
+      screenDump: status.screenDump
     };
     
     // Update GitHub context if provided (best-effort metadata)
@@ -212,7 +220,22 @@ class StateManager {
     }
     
     // Log successful status update
-    logger.debug(`Updated thopter session state: ${status.thopter_id}`, status.thopter_id, 'state-manager');
+    logger.debug(`Updated thopter session state: ${status.thopterId}`, status.thopterId, 'state-manager');
+  }
+
+  /**
+   * Handle golden claude status updates (NEW METHOD)
+   */
+  updateGoldenClaudeFromStatus(goldenClaude: GoldenClaudeState, status: ThopterStatusUpdate): void {
+    goldenClaude.session = {
+      tmuxState: status.tmuxState,
+      claudeProcess: status.claudeProcess,
+      lastActivity: new Date(status.lastActivity),
+      idleSince: status.idleSince ? new Date(status.idleSince) : undefined,
+      screenDump: status.screenDump
+    };
+    
+    logger.debug(`Updated golden claude session state: ${status.thopterId}`, status.thopterId, 'state-manager');
   }
   
   /**
@@ -475,19 +498,23 @@ class StateManager {
         // Extract name from machine name (gc-default -> default)
         const name = machine.name.replace(/^gc-/, '');
         
+        // PRESERVE existing session data if it exists
+        const existing = this.goldenClaudes.get(machine.id);
+        
         const gcState: GoldenClaudeState = {
           machineId: machine.id,
           name: name,
           state: machine.state === 'started' ? 'running' : 'stopped',
           webTerminalUrl: machine.state === 'started' 
             ? `http://${machine.id}.vm.${this.appName}.internal:${this.webTerminalPort}/`
-            : undefined
+            : undefined,
+          // PRESERVE session data from observer updates
+          session: existing?.session
         };
         
         newGoldenClaudes.set(machine.id, gcState);
         
         // Log changes
-        const existing = this.goldenClaudes.get(machine.id);
         if (!existing) {
           logger.info(`Added Golden Claude: ${name} (${machine.id}) - ${gcState.state}`, undefined, 'state-manager');
         } else if (existing.state !== gcState.state) {

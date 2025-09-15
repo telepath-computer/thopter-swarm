@@ -26,18 +26,19 @@ export interface GitHubContext {
 
 // Status updates from observers (authoritative source)
 export interface ThopterStatusUpdate {
-  // Core status
-  thopter_id: string;
-  state: 'running' | 'idle';
-  screen_dump: string;
-  last_activity: string;
+  // Core status - ALL camelCase for consistency
+  thopterId: string;
+  tmuxState: 'active' | 'idle';
+  claudeProcess: 'running' | 'notFound';
+  screenDump: string;
+  lastActivity: string;
   timestamp: string;
-  idle_since?: string | null;
+  idleSince?: string | null;
+  spawnedAt?: string;
   
   // Source-agnostic metadata
   repository?: string;
   workBranch?: string;
-  spawned_at?: string;
   
   // Source-specific contexts
   github?: GitHubContext;
@@ -62,7 +63,8 @@ export interface ThopterState {
   
   // === THOPTER SESSION (nullable, best-effort from observer) ===
   session?: {
-    claudeState: 'running' | 'idle';
+    tmuxState: 'active' | 'idle';
+    claudeProcess: 'running' | 'notFound';
     lastActivity: Date;
     idleSince?: Date;
     screenDump: string;
@@ -87,6 +89,15 @@ export interface GoldenClaudeState {
   name: string;  // e.g. "default", "josh", "xyz"
   state: 'running' | 'stopped';
   webTerminalUrl?: string;
+  
+  // Session data from observer (same structure as ThopterState.session)
+  session?: {
+    tmuxState: 'active' | 'idle';
+    claudeProcess: 'running' | 'notFound';
+    lastActivity: Date;
+    idleSince?: Date;
+    screenDump: string;
+  };
 }
 
 // Separate request types for provisioning and destroying
