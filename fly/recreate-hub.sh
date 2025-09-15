@@ -147,8 +147,9 @@ fi
 echo ""
 
 # Generate unique tag and machine name for this deployment
+GIT_SHA=$(git rev-parse --short=8 HEAD)
 EPOCH_SECONDS=$(date +%s)
-HUB_TAG="hub-$(date +%Y%m%d-%H%M%S)"
+HUB_TAG="hub-${GIT_SHA}-${EPOCH_SECONDS}"
 HUB_MACHINE_NAME="hub-$EPOCH_SECONDS"
 HUB_IMAGE="registry.fly.io/$APP_NAME:$HUB_TAG"
 

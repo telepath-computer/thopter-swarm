@@ -66,7 +66,9 @@ fi
 echo ""
 
 # Generate unique tag for this deployment
-THOPTER_TAG="thopter-$(date +%Y%m%d-%H%M%S)"
+GIT_SHA=$(git rev-parse --short=8 HEAD)
+EPOCH_SECONDS=$(date +%s)
+THOPTER_TAG="thopter-${GIT_SHA}-${EPOCH_SECONDS}"
 THOPTER_IMAGE="registry.fly.io/$APP_NAME:$THOPTER_TAG"
 
 echo "2. Building thopter image..."
