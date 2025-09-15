@@ -468,41 +468,62 @@ main {
   white-space: nowrap;
 }
 
-/* State colors */
-.state-running {
+/* Machine state colors (Fly.io states) */
+.machine-state-started {
   background: #2ecc71;
   color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
 }
 
-.state-idle {
-  background: #f39c12;
-  color: white;
-}
-
-.state-provisioning {
-  background: #3498db;
-  color: white;
-}
-
-.state-orphaned {
-  background: #9b59b6;
-  color: white;
-}
-
-.state-killing {
-  background: #e67e22;
-  color: white;
-}
-
-.state-failed {
-  background: #e74c3c;
-  color: white;
-}
-
-.state-unknown {
+.machine-state-stopped {
   background: #95a5a6;
   color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
 }
+
+.machine-state-suspended {
+  background: #f39c12;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.machine-state-destroyed {
+  background: #e74c3c;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+/* Tmux state colors */
+.tmux-state-active {
+  background: #2ecc71;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.tmux-state-idle {
+  background: #f39c12;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
 
 .idle-duration {
   color: #7f8c8d;
@@ -1248,16 +1269,9 @@ main {
   white-space: nowrap;
 }
 
-/* Tmux state styling (similar to existing state styles) */
-.tmux-state {
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 0.85em;
-  font-weight: 500;
-}
 
-/* For regular thopters - Claude running is good */
-.claude-process.process-running {
+/* Claude process state colors - specific naming */
+.claude-process-running {
   color: #28a745;
   background-color: #d4edda;
   padding: 2px 6px;
@@ -1266,7 +1280,7 @@ main {
   font-weight: 500;
 }
 
-.claude-process.process-not-found {
+.claude-process-notFound {
   color: #dc3545;
   background-color: #f8d7da;
   padding: 2px 6px;
@@ -1275,8 +1289,8 @@ main {
   font-weight: 500;
 }
 
-/* For golden claudes - Claude NOT running is good */
-.claude-process.process-good {
+/* For golden claudes - inverted logic */
+.claude-process-good {
   color: #28a745;
   background-color: #d4edda;
   padding: 2px 6px;
@@ -1285,9 +1299,83 @@ main {
   font-weight: 500;
 }
 
-.claude-process.process-warning {
+.claude-process-warning {
   color: #856404;
   background-color: #fff3cd;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+/* Request status colors - provision requests */
+.provision-request-status-pending {
+  background: #6c757d;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.provision-request-status-processing {
+  background: #3498db;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.provision-request-status-completed {
+  background: #2ecc71;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.provision-request-status-failed {
+  background: #e74c3c;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+/* Request status colors - destroy requests */
+.destroy-request-status-pending {
+  background: #6c757d;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.destroy-request-status-processing {
+  background: #e67e22;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.destroy-request-status-completed {
+  background: #2ecc71;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.destroy-request-status-failed {
+  background: #e74c3c;
+  color: white;
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 0.85em;

@@ -89,9 +89,7 @@ router.get('/', (req: Request, res: Response) => {
       formatters: {
         relativeTime: utils.formatRelativeTime,
         absoluteTime: utils.formatAbsoluteTime,
-        stateClass: utils.getStateClass,
         modeClass: utils.getModeClass,
-        requestStatusClass: utils.getRequestStatusClass,
         logLevelClass: utils.getLogLevelClass,
         idleDuration: utils.formatIdleDuration,
         truncateText: utils.truncateText,
@@ -137,7 +135,6 @@ router.get('/agent/:id', (req: Request, res: Response) => {
       formatters: {
         relativeTime: utils.formatRelativeTime,
         absoluteTime: utils.formatAbsoluteTime,
-        stateClass: utils.getStateClass,
         idleDuration: utils.formatIdleDuration,
         truncateText: utils.truncateText,
         gitHubUrl: utils.getGitHubUrl,

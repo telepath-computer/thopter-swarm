@@ -502,30 +502,43 @@ class StateManager {
         const existing = this.goldenClaudes.get(machine.id);
         
         const gcState: GoldenClaudeState = {
-          machineId: machine.id,
-          name: name,
-          state: machine.state === 'started' ? 'running' : 'stopped',
-          webTerminalUrl: machine.state === 'started' 
-            ? `http://${machine.id}.vm.${this.appName}.internal:${this.webTerminalPort}/`
-            : undefined,
-          // PRESERVE session data from observer updates
-          session: existing?.session
+          // === FLY INFRASTRUCTURE (authoritative) ===
+          fly: {
+            id: machine.id,
+            name: machine.name,
+            machineState: machine.state,  // Use actual Fly states
+            region: machine.region || existing?.fly?.region || 'unknown',
+            image: machine.image_ref?.tag || existing?.fly?.image || 'unknown',
+            createdAt: new Date(machine.created_at)
+          },
+          
+          // === HUB MANAGEMENT (preserve existing) ===
+          hub: {
+            killRequested: existing?.hub?.killRequested || false
+          },
+          
+          // === SESSION STATE (preserve existing) ===
+          session: existing?.session,
+          
+          // === GOLDEN CLAUDE SPECIFIC FIELDS ===
+          goldenClaudeName: name  // e.g. "default" from "gc-default"
+          // webTerminalUrl is derived - computed in templates/utils
         };
         
         newGoldenClaudes.set(machine.id, gcState);
         
         // Log changes
         if (!existing) {
-          logger.info(`Added Golden Claude: ${name} (${machine.id}) - ${gcState.state}`, undefined, 'state-manager');
-        } else if (existing.state !== gcState.state) {
-          logger.info(`Golden Claude ${name} state changed: ${existing.state} → ${gcState.state}`, undefined, 'state-manager');
+          logger.info(`Added Golden Claude: ${name} (${machine.id}) - ${gcState.fly.machineState}`, undefined, 'state-manager');
+        } else if (existing.fly?.machineState !== gcState.fly.machineState) {
+          logger.info(`Golden Claude ${name} state changed: ${existing.fly?.machineState} → ${gcState.fly.machineState}`, undefined, 'state-manager');
         }
       }
       
       // Log removed GCs
       for (const [machineId, existing] of this.goldenClaudes) {
         if (!newGoldenClaudes.has(machineId)) {
-          logger.info(`Removed Golden Claude: ${existing.name} (${machineId}) - no longer exists`, undefined, 'state-manager');
+          logger.info(`Removed Golden Claude: ${existing.goldenClaudeName} (${machineId}) - no longer exists`, undefined, 'state-manager');
         }
       }
       
@@ -573,8 +586,8 @@ class StateManager {
    * Get Golden Claude by name
    */
   getGoldenClaude(name: string): GoldenClaudeState | undefined {
-    // Find by name, not machine ID
-    return Array.from(this.goldenClaudes.values()).find(gc => gc.name === name);
+    // Find by golden claude name, not machine ID
+    return Array.from(this.goldenClaudes.values()).find(gc => gc.goldenClaudeName === name);
   }
   
   /**
