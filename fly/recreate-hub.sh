@@ -235,33 +235,29 @@ echo -e "${ROCKET} Starting hub with image: $HUB_IMAGE"
 
 METADATA_SERVICE_HOST=1.redis.kv._metadata.${APP_NAME}.internal
 
-# Build the fly machine run command with optional --file-local flag
-FLY_CMD="fly machine run $HUB_IMAGE \\
-    --name $HUB_MACHINE_NAME \\
-    --vm-size=$HUB_VM_SIZE \\
-    --autostop=off \\
-    --region $REGION \\
-    --volume $HUB_VOLUME_NAME:/data \\
-    --env APP_NAME=\"$APP_NAME\" \\
-    --env REGION=\"$REGION\" \\
-    --env MAX_THOPTERS=\"$MAX_THOPTERS\" \\
-    --env THOPTER_VM_SIZE=\"$THOPTER_VM_SIZE\" \\
-    --env THOPTER_VOLUME_SIZE=\"$THOPTER_VOLUME_SIZE\" \\
-    --env HUB_VM_SIZE=\"$HUB_VM_SIZE\" \\
-    --env DANGEROUSLY_SKIP_FIREWALL=\"$DANGEROUSLY_SKIP_FIREWALL\" \\
-    --env ALLOWED_DOMAINS=\"$ALLOWED_DOMAINS\" \\
-    --env WEB_TERMINAL_PORT=\"$WEB_TERMINAL_PORT\" \\
-    --env HUB_PORT=\"$HUB_PORT\" \\
-    --env HUB_STATUS_PORT=\"$HUB_STATUS_PORT\" \\
-    --env GITHUB_INTEGRATION_JSON=\"$GITHUB_INTEGRATION_JSON\" \\
-    --env GITHUB_ISSUES_POLLING_INTERVAL=\"$GITHUB_ISSUES_POLLING_INTERVAL\" \\
-    --env FLY_DEPLOY_KEY=\"$FLY_DEPLOY_KEY\" \\
-    --env METADATA_SERVICE_HOST=\"$METADATA_SERVICE_HOST\" \\
-    $ENV_THOPTERS_ARG \\
-    --metadata hub=1"
-
-# Execute the command
-eval $FLY_CMD
+fly machine run $HUB_IMAGE \
+    --name $HUB_MACHINE_NAME \
+    --vm-size=$HUB_VM_SIZE \
+    --autostop=off \
+    --region $REGION \
+    --volume $HUB_VOLUME_NAME:/data \
+    --env APP_NAME="$APP_NAME" \
+    --env REGION="$REGION" \
+    --env MAX_THOPTERS="$MAX_THOPTERS" \
+    --env THOPTER_VM_SIZE="$THOPTER_VM_SIZE" \
+    --env THOPTER_VOLUME_SIZE="$THOPTER_VOLUME_SIZE" \
+    --env HUB_VM_SIZE="$HUB_VM_SIZE" \
+    --env DANGEROUSLY_SKIP_FIREWALL="$DANGEROUSLY_SKIP_FIREWALL" \
+    --env ALLOWED_DOMAINS="$ALLOWED_DOMAINS" \
+    --env WEB_TERMINAL_PORT="$WEB_TERMINAL_PORT" \
+    --env HUB_PORT="$HUB_PORT" \
+    --env HUB_STATUS_PORT="$HUB_STATUS_PORT" \
+    --env GITHUB_INTEGRATION_JSON="$GITHUB_INTEGRATION_JSON" \
+    --env GITHUB_ISSUES_POLLING_INTERVAL="$GITHUB_ISSUES_POLLING_INTERVAL" \
+    --env FLY_DEPLOY_KEY="$FLY_DEPLOY_KEY" \
+    --env METADATA_SERVICE_HOST="$METADATA_SERVICE_HOST" \
+    $ENV_THOPTERS_ARG \
+    --metadata hub=1
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}${CROSS} Failed to launch hub machine${NC}"
