@@ -260,8 +260,8 @@ echo "✅ Post-checkout setup completed!"
 ```
 
 **Important notes:**
-- Script runs as the thopter user in the repository directory as working directory
-- Script is located at `../post-checkout.sh` relative to the repo (in `/data/thopter/`)
+- Script runs as the thopter user with the repository directory as working directory
+- Script is stored at `/data/thopter/post-checkout.sh` and accessed as `../post-checkout.sh` from repo
 - This allows commands like `npm install` to work naturally in the script
 - Output is captured to `/thopter/log` for debugging
 - Script failure does not prevent Claude from launching
