@@ -185,6 +185,10 @@ echo -e "${CHECK} Thopter will connect to hub via metadata service"
 echo "5. Launching golden claude machine..."
 echo -e "${ROCKET} Starting golden claude with image: $THOPTER_IMAGE"
 
+# Golden Claudes bypass the firewall to allow Claude Code to self-update
+# and potentially access other needed services
+GOLDEN_CLAUDE_SKIP_FIREWALL="I_UNDERSTAND"
+
 # Restricted environment variables for thopters (no sensitive hub secrets)
 fly machine run $THOPTER_IMAGE \
     --name $GC_MACHINE_NAME \
@@ -200,7 +204,7 @@ fly machine run $THOPTER_IMAGE \
     --env GIT_USER_NAME="$GIT_USER_NAME" \
     --env GIT_USER_EMAIL="$GIT_USER_EMAIL" \
     --env ALLOWED_DOMAINS="$ALLOWED_DOMAINS" \
-    --env DANGEROUSLY_SKIP_FIREWALL="$DANGEROUSLY_SKIP_FIREWALL" \
+    --env DANGEROUSLY_SKIP_FIREWALL="$GOLDEN_CLAUDE_SKIP_FIREWALL" \
     --env GITHUB_AGENT_CODER_PAT="$GITHUB_AGENT_CODER_PAT"
 
 if [ $? -ne 0 ]; then
