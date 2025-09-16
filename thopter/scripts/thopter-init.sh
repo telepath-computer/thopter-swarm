@@ -136,6 +136,14 @@ if [ -f "/tmp/.env.thopters" ]; then
     chown thopter:thopter /data/thopter/.bashrc
 fi
 
+# Move post-checkout.sh from /tmp if it exists (provided during machine creation)
+if [ -f "/tmp/post-checkout.sh" ]; then
+    thopter_log "Moving post-checkout.sh from /tmp to thopter home directory..."
+    mv /tmp/post-checkout.sh /data/thopter/post-checkout.sh
+    chown thopter:thopter /data/thopter/post-checkout.sh
+    chmod +x /data/thopter/post-checkout.sh
+fi
+
 thopter_log "add uv env setup to bashrc"
 echo "" >> /data/thopter/.bashrc
 echo "# make uv available" >> /data/thopter/.bashrc

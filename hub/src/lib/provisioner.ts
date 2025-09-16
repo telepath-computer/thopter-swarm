@@ -326,7 +326,7 @@ export class ThopterProvisioner {
     const postCheckoutScriptPath = '/data/thopter-env/post-checkout.sh';
     if (require('fs').existsSync(postCheckoutScriptPath)) {
       console.log(`  ✅ Found post-checkout.sh script, including in machine creation`);
-      machineRunArgs.push('--file-local', `/data/thopter/post-checkout.sh=${postCheckoutScriptPath}`);
+      machineRunArgs.push('--file-local', `/tmp/post-checkout.sh=${postCheckoutScriptPath}`);
     }
 
     console.log(`Executing async: fly ${machineRunArgs.join(' ')}`);
