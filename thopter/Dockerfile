@@ -90,6 +90,27 @@ RUN npm install -g ioredis
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/uv sh
 # to use it, you have to `source /uv/env` -- which we do setup in bashrc in init
 
+# create the thopter user now, because we need to install claude-code-log via uv
+# an uv only allows installation for the user under which it runs.
+RUN useradd -m -d /data/thopter -s /bin/bash -U thopter
+# install everything OUTSIDE the /data/thopter dir, because that whole tree is
+# going to get replaced by the volume mount. the binary will be:
+# /opt/uv/tools/claude-code-log/bin/claude-code-log
+# note these same vars are also added to bashrc in the thopter-init.sh script
+RUN mkdir -p /opt/uv/tools /opt/uv/cache /opt/uv/pys /opt/uv/bin \
+ && chown -R thopter:thopter /opt/uv \
+ && chmod -R 755 /opt/uv
+USER thopter
+WORKDIR /data/thopter
+ENV UV_BIN_DIR="/opt/uv/bin"
+ENV UV_CACHE_DIR="/opt/uv/cache"
+ENV UV_PYTHON_INSTALL_DIR="/opt/uv/pys"
+ENV UV_TOOL_DIR="/opt/uv/tools"
+RUN . /uv/env && uv tool install git+https://github.com/daaain/claude-code-log.git
+# back to root
+USER root
+WORKDIR /root
+
 # Copy session observer components
 COPY scripts/observer.js /usr/local/bin/observer.js
 COPY scripts/claude-log-generator.js /usr/local/bin/claude-log-generator.js

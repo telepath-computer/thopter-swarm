@@ -17,6 +17,11 @@ thopter_log "Starting Thopter agent container as PID 1..."
 # in the golden claude, and if you do, you need to exclude them in the
 # provisioner's snapshot logic.
 
+# note the thopter user is created in the Dockerfile, and homedir is set to
+# /data/thopter - and files might end up in there in that workflow (like uv's
+# .local binary references) but they're going to be replaced by the mounted
+# volume on machine creation.
+
 # Wait for /data mount point to be fully ready before proceeding
 thopter_log "Checking data mount point readiness..."
 DATA_MOUNT_READY=false
@@ -63,9 +68,6 @@ thopter_log "rm -rf /data/*"
 # this is a fatal provisioning problem that has no apparent explanation or
 # proper fix right now.
 rm -rf /data/*
-
-thopter_log "useradd thopter"
-useradd -m -d /data/thopter -s /bin/bash -U thopter
 
 thopter_log "create workspace dir"
 mkdir -p /data/thopter/workspace
@@ -138,6 +140,10 @@ thopter_log "add uv env setup to bashrc"
 echo "" >> /data/thopter/.bashrc
 echo "# make uv available" >> /data/thopter/.bashrc
 echo "source /uv/env" >> /data/thopter/.bashrc
+echo 'export UV_BIN_DIR="/opt/uv/bin"' >> /data/thopter/.bashrc
+echo 'export UV_CACHE_DIR="/opt/uv/cache"' >> /data/thopter/.bashrc
+echo 'export UV_PYTHON_INSTALL_DIR="/opt/uv/pys"' >> /data/thopter/.bashrc
+echo 'export UV_TOOL_DIR="/opt/uv/tools"' >> /data/thopter/.bashrc
 
 # Ensure logs directory exists with proper ownership for pm2 service logging
 thopter_log "create and chmod /data/thopter/logs (for pm2)"
