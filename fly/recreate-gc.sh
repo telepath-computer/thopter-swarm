@@ -200,8 +200,7 @@ fly machine run $THOPTER_IMAGE \
     --env GIT_USER_NAME="$GIT_USER_NAME" \
     --env GIT_USER_EMAIL="$GIT_USER_EMAIL" \
     --env ALLOWED_DOMAINS="$ALLOWED_DOMAINS" \
-    --env DANGEROUSLY_SKIP_FIREWALL="$DANGEROUSLY_SKIP_FIREWALL" \
-    --env GITHUB_AGENT_CODER_PAT="$GITHUB_AGENT_CODER_PAT"
+    --env DANGEROUSLY_SKIP_FIREWALL="$DANGEROUSLY_SKIP_FIREWALL"
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}${CROSS} Failed to launch golden claude machine${NC}"

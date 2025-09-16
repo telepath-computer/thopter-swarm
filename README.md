@@ -176,10 +176,10 @@ The webserver for them is available at `http://{machine-id}.vm.{app-name}.intern
 
 ### GitHub
 
-You need two PATs for security isolation:
+For each repo (or possibly shared among multiple repos), you need two PATs for security isolation:
 
-- **`GITHUB_ISSUES_PAT`**: For the hub's issue monitoring (read/write issues)
-- **`GITHUB_AGENT_CODER_PAT`**: Thopter agent repository access (read repo, write optional)
+- **Issues PAT**: For the hub's GitHub issue polling and updates (read/write issues)
+- **Agent PAT**: For the thopter machines' autonomous repository access (read repo, write optional)
 
 Sorry but we need to dive into GitHub integration and access control patterns for a bit here. Bear with me and follow along. This guide is also based on my experience doing this in a GitHub org account, not in personal repos. It may change depending on that context. Let's work together and get this right. I'm still figuring out what the best authentication and constraints system is for GitHub here. Help/advice needed! Maybe GitHub apps is the right way?
 
