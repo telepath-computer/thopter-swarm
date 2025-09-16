@@ -138,6 +138,7 @@ You can create multiple thopters by issuing multiple comments with /thopter comm
 ```
 ├── .env                 # Thopter swarm configuration (fly app and tokens, github details and tokens)
 ├── .env.thopters        # Custom env vars to have in your thopter environment
+├── post-checkout.sh     # Custom script to run after repository checkout
 ├── fly/                 # Deployment scripts
 ├── hub/                 # Central server (TypeScript)
 │   └── templates/
@@ -229,6 +230,41 @@ NODE_ENV=development
 - Only use KEY=value format (no commands)
 - The file is automatically uploaded to hub during `./fly/recreate-hub.sh`
 - Manually update existing hub after edits with `./fly/upload-env-thopters.sh`
+- Changes apply only to new thopters and only after uploading to the hub
+
+#### Post-Checkout Custom Script (post-checkout.sh)
+You can provide a custom script that will be automatically executed after 
+repository checkout but before Claude is launched by creating a `post-checkout.sh` 
+file in your project root. This is useful for setup tasks like installing 
+dependencies.
+
+Example `post-checkout.sh`:
+```bash
+#!/bin/bash
+# This script runs after git checkout in thopters
+echo 'Running post-checkout setup...'
+
+# Install Node.js dependencies if package.json exists
+if [ -f "package.json" ]; then
+    echo "📦 Installing Node.js dependencies..."
+    npm install
+fi
+
+# Install Python dependencies if requirements.txt exists
+if [ -f "requirements.txt" ]; then
+    echo "🐍 Installing Python dependencies..."
+    pip install -r requirements.txt
+fi
+
+echo "✅ Post-checkout setup completed!"
+```
+
+**Important notes:**
+- Script runs as the thopter user in the workspace directory
+- Output is captured to `/thopter/log` for debugging
+- Script failure does not prevent Claude from launching
+- The file is automatically uploaded to hub during `./fly/recreate-hub.sh`
+- Manually update existing hub after edits with `./fly/upload-post-checkout-script.sh`
 - Changes apply only to new thopters and only after uploading to the hub
 
 #### Alternative: Golden Claude Files

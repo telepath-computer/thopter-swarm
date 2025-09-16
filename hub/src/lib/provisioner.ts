@@ -322,6 +322,13 @@ export class ThopterProvisioner {
       machineRunArgs.push('--file-local', `/tmp/.env.thopters=${envFilePath}`);
     }
 
+    // Add post-checkout.sh script if it exists on hub
+    const postCheckoutScriptPath = '/data/thopter-scripts/post-checkout.sh';
+    if (require('fs').existsSync(postCheckoutScriptPath)) {
+      console.log(`  ✅ Found post-checkout.sh script, including in machine creation`);
+      machineRunArgs.push('--file-local', `/tmp/post-checkout.sh=${postCheckoutScriptPath}`);
+    }
+
     console.log(`Executing async: fly ${machineRunArgs.join(' ')}`);
     
     let output: string;
@@ -828,18 +835,21 @@ ${request.github.issueBody}
       //   console.warn(`  ⚠️ Failed to navigate to workspace: ${error instanceof Error ? error.message : String(error)}`);
       // }
 
-      // Step 2: Launch Claude with prompt
-      console.log(`  2️⃣ Launching Claude with instructions...`);
+      // Step 2: Execute post-checkout script if available, then launch Claude with prompt
+      console.log(`  2️⃣ Running post-checkout script (if available) and launching Claude...`);
       try {
+        // Execute post-checkout.sh if it exists, capture output to log, continue on failure
+        const claudeCommand = `cd /data/thopter/workspace && if [ -f /tmp/post-checkout.sh ]; then chmod +x /tmp/post-checkout.sh && echo "Running post-checkout.sh..." && /tmp/post-checkout.sh 2>&1 | tee -a /thopter/log || true; fi && claude --dangerously-skip-permissions \\"read /data/thopter/prompt.md for your instructions\\"`;
+        
         await execAsync(
-          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"claude --dangerously-skip-permissions \\\\\\\"read /data/thopter/prompt.md for your instructions\\\\\\\"\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"${claudeCommand}\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
           { 
             cwd: process.cwd()
           }
         );
-        console.log(`  ✅ Claude launched successfully`);
+        console.log(`  ✅ Post-checkout script executed and Claude launched successfully`);
       } catch (error) {
-        console.warn(`  ⚠️ Failed to launch Claude: ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(`  ⚠️ Failed to execute post-checkout script and launch Claude: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

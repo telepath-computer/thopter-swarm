@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Example post-checkout script for Thopter Swarm
+# This script runs after the repository is cloned but before Claude is launched
+
+echo "🔧 Running post-checkout setup..."
+
+# Example: Install dependencies if package.json exists
+if [ -f "package.json" ]; then
+    echo "📦 Installing Node.js dependencies..."
+    npm install
+fi
+
+# Example: Install Python dependencies if requirements.txt exists
+if [ -f "requirements.txt" ]; then
+    echo "🐍 Installing Python dependencies..."
+    pip install -r requirements.txt
+fi
+
+# Example: Run any build or setup commands
+# npm run build
+# composer install
+# bundle install
+
+echo "✅ Post-checkout setup completed!"
