@@ -2,8 +2,9 @@
 
 # Example post-checkout script for Thopter Swarm
 # This script runs after the repository is cloned but before Claude is launched
+# Working directory is the repository root, script is at ../post-checkout.sh
 
-echo "🔧 Running post-checkout setup..."
+echo "🔧 Running post-checkout setup in $(pwd)..."
 
 # Example: Install dependencies if package.json exists
 if [ -f "package.json" ]; then
@@ -17,9 +18,13 @@ if [ -f "requirements.txt" ]; then
     pip install -r requirements.txt
 fi
 
-# Example: Run any build or setup commands
-# npm run build
-# composer install
-# bundle install
+# Example: Install other dependencies
+# if [ -f "composer.json" ]; then composer install; fi
+# if [ -f "Gemfile" ]; then bundle install; fi
+# if [ -f "go.mod" ]; then go mod download; fi
 
-echo "✅ Post-checkout setup completed!"
+# Example: Run build commands
+# npm run build
+# make build
+
+echo "✅ Post-checkout setup completed in $(pwd)!"

@@ -93,13 +93,13 @@ echo ""
 echo "3. Uploading post-checkout.sh to hub..."
 
 # Create directory on hub if it doesn't exist
-fly ssh console --machine $HUB_MACHINE -C "mkdir -p /data/thopter-scripts" 2>/dev/null || true
+fly ssh console --machine $HUB_MACHINE -C "mkdir -p /data/thopter-env" 2>/dev/null || true
 
 # Delete existing file first (sftp won't replace files)
-fly ssh console --machine $HUB_MACHINE -C "rm -f /data/thopter-scripts/post-checkout.sh" 2>/dev/null || true
+fly ssh console --machine $HUB_MACHINE -C "rm -f /data/thopter-env/post-checkout.sh" 2>/dev/null || true
 
 # Upload the file using sftp
-echo "put post-checkout.sh /data/thopter-scripts/post-checkout.sh" | fly ssh sftp shell --machine $HUB_MACHINE
+echo "put post-checkout.sh /data/thopter-env/post-checkout.sh" | fly ssh sftp shell --machine $HUB_MACHINE
 
 if [ $? -eq 0 ]; then
     echo -e "${CHECK} post-checkout.sh uploaded successfully"
@@ -111,13 +111,13 @@ fi
 # Set permissions
 echo ""
 echo "4. Setting file permissions..."
-fly ssh console --machine $HUB_MACHINE -C "chmod 755 /data/thopter-scripts/post-checkout.sh"
+fly ssh console --machine $HUB_MACHINE -C "chmod 755 /data/thopter-env/post-checkout.sh"
 echo -e "${CHECK} Permissions set"
 
 # Verify the file
 echo ""
 echo "5. Verifying upload..."
-FILE_SIZE=$(fly ssh console --machine $HUB_MACHINE -C "stat -c%s /data/thopter-scripts/post-checkout.sh" 2>/dev/null)
+FILE_SIZE=$(fly ssh console --machine $HUB_MACHINE -C "stat -c%s /data/thopter-env/post-checkout.sh" 2>/dev/null)
 LOCAL_SIZE=$(stat -f%z post-checkout.sh 2>/dev/null || stat -c%s post-checkout.sh 2>/dev/null)
 
 if [ "$FILE_SIZE" = "$LOCAL_SIZE" ]; then

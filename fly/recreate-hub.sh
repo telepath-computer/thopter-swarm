@@ -233,7 +233,7 @@ echo "  Checking for post-checkout.sh script..."
 POST_CHECKOUT_ARG=""
 if [ -f "post-checkout.sh" ]; then
     echo -e "${INFO} Found post-checkout.sh script, will include in machine creation"
-    POST_CHECKOUT_ARG="--file-local /data/thopter-scripts/post-checkout.sh=post-checkout.sh"
+    POST_CHECKOUT_ARG="--file-local /data/thopter-env/post-checkout.sh=post-checkout.sh"
 else
     echo -e "${INFO} No post-checkout.sh script found (optional)"
 fi

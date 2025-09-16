@@ -195,7 +195,7 @@ export class ThopterProvisioner {
       // Launch Claude in tmux session (final step)
       console.log(`🚀 [${requestId}] Launching Claude in tmux session...`);
       await this.logToThopterAsync(machineId, "Launching Claude in tmux session");
-      await this.launchClaudeInTmux(machineId, requestId);
+      await this.launchClaudeInTmux(machineId, request, requestId);
       await this.logToThopterAsync(machineId, `Provisioning completed successfully. Thopter ${machineId} is ready to work on issue ${request.github.issueNumber}`);
 
       console.log(`✅ [${requestId}] Thopter ${machineId} provisioned successfully`);
@@ -323,10 +323,10 @@ export class ThopterProvisioner {
     }
 
     // Add post-checkout.sh script if it exists on hub
-    const postCheckoutScriptPath = '/data/thopter-scripts/post-checkout.sh';
+    const postCheckoutScriptPath = '/data/thopter-env/post-checkout.sh';
     if (require('fs').existsSync(postCheckoutScriptPath)) {
       console.log(`  ✅ Found post-checkout.sh script, including in machine creation`);
-      machineRunArgs.push('--file-local', `/tmp/post-checkout.sh=${postCheckoutScriptPath}`);
+      machineRunArgs.push('--file-local', `/data/thopter/post-checkout.sh=${postCheckoutScriptPath}`);
     }
 
     console.log(`Executing async: fly ${machineRunArgs.join(' ')}`);
@@ -814,7 +814,7 @@ ${request.github.issueBody}
   /**
    * Launch Claude in the thopter's tmux session
    */
-  private async launchClaudeInTmux(machineId: string, requestId: string): Promise<void> {
+  private async launchClaudeInTmux(machineId: string, request: ProvisionRequest, requestId: string): Promise<void> {
     const startTime = Date.now();
     
     try {
@@ -838,11 +838,17 @@ ${request.github.issueBody}
       // Step 2: Execute post-checkout script if available, then launch Claude with prompt
       console.log(`  2️⃣ Running post-checkout script (if available) and launching Claude...`);
       try {
-        // Execute post-checkout.sh if it exists, capture output to log, continue on failure
-        const claudeCommand = `cd /data/thopter/workspace && if [ -f /tmp/post-checkout.sh ]; then chmod +x /tmp/post-checkout.sh && echo "Running post-checkout.sh..." && /tmp/post-checkout.sh 2>&1 | tee -a /thopter/log || true; fi && claude --dangerously-skip-permissions \\"read /data/thopter/prompt.md for your instructions\\"`;
+        // Get repository name for directory path
+        const repoName = request.repository.split('/')[1];
+        
+        // Create bash script that runs from repo directory with post-checkout.sh in parent
+        const bashScript = `cd /data/thopter/workspace/${repoName} && if [ -f ../post-checkout.sh ]; then chmod +x ../post-checkout.sh && echo "Running post-checkout.sh..." && ../post-checkout.sh 2>&1 | tee -a /thopter/log || true; fi && claude --dangerously-skip-permissions "read /data/thopter/prompt.md for your instructions"`;
+        
+        // Encode to base64 to avoid quoting issues
+        const encodedScript = Buffer.from(bashScript).toString('base64');
         
         await execAsync(
-          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"${claudeCommand}\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"echo ${encodedScript} | base64 -d | bash\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
           { 
             cwd: process.cwd()
           }
