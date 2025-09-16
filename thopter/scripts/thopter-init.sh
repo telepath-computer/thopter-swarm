@@ -105,32 +105,32 @@ if [ -d "/data/thopter/.claude" ]; then
 fi
 
 # If issue context was injected, fix ownership  
-if [ -f "/data/thopter/issue.md" ]; then
+if [ -f "/data/thopter/workspace/issue.md" ]; then
     thopter_log "Fixing issue context ownership for thopter user..."
-    chown thopter:thopter /data/thopter/issue.md
+    chown thopter:thopter /data/thopter/workspace/issue.md
 fi
 
-if [ -f "/data/thopter/issue.json" ]; then
+if [ -f "/data/thopter/workspace/issue.json" ]; then
     thopter_log "Fixing issue.json ownership for thopter user..."
-    chown thopter:thopter /data/thopter/issue.json
+    chown thopter:thopter /data/thopter/workspace/issue.json
 fi
 
-if [ -f "/data/thopter/prompt.md" ]; then
+if [ -f "/data/thopter/workspace/prompt.md" ]; then
     thopter_log "Fixing prompt.md ownership for thopter user..."
-    chown thopter:thopter /data/thopter/prompt.md
+    chown thopter:thopter /data/thopter/workspace/prompt.md
 fi
 
 # Move .env.thopters from /tmp if it exists (provided during machine creation)
 if [ -f "/tmp/.env.thopters" ]; then
-    thopter_log "Moving .env.thopters from /tmp to thopter home directory..."
-    mv /tmp/.env.thopters /data/thopter/.env.thopters
-    chown thopter:thopter /data/thopter/.env.thopters
+    thopter_log "Moving .env.thopters from /tmp to workspace directory..."
+    mv /tmp/.env.thopters /data/thopter/workspace/.env.thopters
+    chown thopter:thopter /data/thopter/workspace/.env.thopters
     thopter_log "Sourcing .env.thopters in .bashrc..."
     echo "" >> /data/thopter/.bashrc
     echo "# Load developer environment variables" >> /data/thopter/.bashrc
-    echo "if [ -f ~/.env.thopters ]; then" >> /data/thopter/.bashrc
+    echo "if [ -f ~/workspace/.env.thopters ]; then" >> /data/thopter/.bashrc
     echo "    set -a  # Mark all new variables for export" >> /data/thopter/.bashrc
-    echo "    source ~/.env.thopters" >> /data/thopter/.bashrc
+    echo "    source ~/workspace/.env.thopters" >> /data/thopter/.bashrc
     echo "    set +a  # Turn off auto-export" >> /data/thopter/.bashrc
     echo "fi" >> /data/thopter/.bashrc
     chown thopter:thopter /data/thopter/.bashrc
@@ -138,10 +138,10 @@ fi
 
 # Move post-checkout.sh from /tmp if it exists (provided during machine creation)
 if [ -f "/tmp/post-checkout.sh" ]; then
-    thopter_log "Moving post-checkout.sh from /tmp to thopter home directory..."
-    mv /tmp/post-checkout.sh /data/thopter/post-checkout.sh
-    chown thopter:thopter /data/thopter/post-checkout.sh
-    chmod +x /data/thopter/post-checkout.sh
+    thopter_log "Moving post-checkout.sh from /tmp to workspace directory..."
+    mv /tmp/post-checkout.sh /data/thopter/workspace/post-checkout.sh
+    chown thopter:thopter /data/thopter/workspace/post-checkout.sh
+    chmod +x /data/thopter/workspace/post-checkout.sh
 fi
 
 thopter_log "add uv env setup to bashrc"

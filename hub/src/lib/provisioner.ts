@@ -402,17 +402,17 @@ export class ThopterProvisioner {
       // Copy files to machine using fly ssh sftp shell
       const execAsync = promisify(exec);
       
-      await execAsync(`echo "put ${issueFile} /data/thopter/issue.md" | fly ssh sftp shell --machine ${machineId} -a ${this.appName} -t "${this.flyToken}"`, {
+      await execAsync(`echo "put ${issueFile} /data/thopter/workspace/issue.md" | fly ssh sftp shell --machine ${machineId} -a ${this.appName} -t "${this.flyToken}"`, {
         cwd: process.cwd(),
         shell: '/bin/bash'
       });
 
-      await execAsync(`echo "put ${promptFile} /data/thopter/prompt.md" | fly ssh sftp shell --machine ${machineId} -a ${this.appName} -t "${this.flyToken}"`, {
+      await execAsync(`echo "put ${promptFile} /data/thopter/workspace/prompt.md" | fly ssh sftp shell --machine ${machineId} -a ${this.appName} -t "${this.flyToken}"`, {
         cwd: process.cwd(),
         shell: '/bin/bash'
       });
 
-      await execAsync(`echo "put ${issueJsonFile} /data/thopter/issue.json" | fly ssh sftp shell --machine ${machineId} -a ${this.appName} -t "${this.flyToken}"`, {
+      await execAsync(`echo "put ${issueJsonFile} /data/thopter/workspace/issue.json" | fly ssh sftp shell --machine ${machineId} -a ${this.appName} -t "${this.flyToken}"`, {
         cwd: process.cwd(),
         shell: '/bin/bash'
       });
@@ -841,8 +841,8 @@ ${request.github.issueBody}
         // Get repository name for directory path
         const repoName = request.repository.split('/')[1];
         
-        // Create bash script that runs from repo directory with post-checkout.sh two levels up
-        const bashScript = `cd /data/thopter/workspace/${repoName} && if [ -f ../../post-checkout.sh ]; then chmod +x ../../post-checkout.sh && echo "Running post-checkout.sh..." && ../../post-checkout.sh 2>&1 | tee -a /thopter/log || true; fi && claude --dangerously-skip-permissions "read /data/thopter/prompt.md for your instructions"`;
+        // Create bash script that runs from repo directory with post-checkout.sh in parent workspace
+        const bashScript = `cd /data/thopter/workspace/${repoName} && if [ -f ../post-checkout.sh ]; then chmod +x ../post-checkout.sh && echo "Running post-checkout.sh..." && ../post-checkout.sh 2>&1 | tee -a /thopter/log || true; fi && claude --dangerously-skip-permissions "read ../prompt.md for your instructions"`;
         
         // Encode to base64 to avoid quoting issues
         const encodedScript = Buffer.from(bashScript).toString('base64');

@@ -151,11 +151,12 @@ Inside a thopter, you have:
 ```
 ├── /data/thopter        # thopter user homedir
 │   ├── .claude/         # copied from golden claude, session log html is here too
-│   ├── .env.thopters    # copied in and sourced in .bashrc for thopter user
-│   └── workspace/
-│       ├── issue.json   # generated from github issue details
-│       ├── prompt.md    # copied in and given to claude as initial task
-│       └── {repodir}/   # the git repo
+│   └── workspace/       # task-specific workspace
+│       ├── .env.thopters    # developer environment variables, sourced in .bashrc
+│       ├── post-checkout.sh # custom setup script, runs after repo clone
+│       ├── issue.json       # generated from github issue details
+│       ├── prompt.md        # copied in and given to claude as initial task
+│       └── {repodir}/       # the git repo (claude launches from here)
 └── /thopter/log         # initialization and provisioning log for debugging
 
 processes:
@@ -261,7 +262,7 @@ echo "✅ Post-checkout setup completed!"
 
 **Important notes:**
 - Script runs as the thopter user with the repository directory as working directory
-- Script is stored at `/data/thopter/post-checkout.sh` and accessed as `../../post-checkout.sh` from repo
+- Script is stored at `/data/thopter/workspace/post-checkout.sh` and accessed as `../post-checkout.sh` from repo
 - This allows commands like `npm install` to work naturally in the script
 - Output is captured to `/thopter/log` for debugging
 - Script failure does not prevent Claude from launching
