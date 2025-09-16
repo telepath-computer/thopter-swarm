@@ -2,7 +2,7 @@
 
 # Example post-checkout script for Thopter Swarm
 # This script runs after the repository is cloned but before Claude is launched
-# Working directory is the repository root, script is at ../post-checkout.sh
+# Working directory is the repository root, script is at ../../post-checkout.sh
 
 echo "🔧 Running post-checkout setup in $(pwd)..."
 
