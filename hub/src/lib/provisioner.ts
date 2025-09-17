@@ -698,6 +698,12 @@ ${request.github.issueBody}
         throw new Error(`No GitHub configuration found for repository: ${request.repository}`);
       }
       
+      // IMPORTANT: Git operations are now handled by thopter-init.sh via the git proxy system
+      // The following git setup code has been replaced:
+      // - Git configuration is handled by thopter-init.sh
+      // - Repository cloning is done through a root-owned bare repo
+      // - Work branch creation happens in thopter-init.sh using ISSUE_NUMBER and FLY_MACHINE_ID
+      
       const gitUserName = repoConfig.userName;
       const gitUserEmail = repoConfig.userEmail;
       const githubToken = repoConfig.agentCoderPAT;
@@ -708,57 +714,63 @@ ${request.github.issueBody}
       let repositoryCloned = false;
       let branchCreated = false;
       
-      // Step 1: Configure Git user identity
-      console.log(`  1️⃣ Configuring Git user identity...`);
-      try {
-        await execAsync(
-          `fly ssh console -C "su - thopter -c \\"git config --global user.name '${gitUserName}' && git config --global user.email '${gitUserEmail}'\\"" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
-          { 
-            cwd: process.cwd()
-          }
-        );
-        console.log(`  ✅ Configured Git user identity: ${gitUserName} <${gitUserEmail}>`);
-        gitConfigured = true;
-      } catch (error) {
-        console.warn(`  ⚠️ Git configuration failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
+      // COMMENTED OUT - Git setup now happens in thopter-init.sh
+      // // Step 1: Configure Git user identity
+      // console.log(`  1️⃣ Configuring Git user identity...`);
+      // try {
+      //   await execAsync(
+      //     `fly ssh console -C "su - thopter -c \\"git config --global user.name '${gitUserName}' && git config --global user.email '${gitUserEmail}'\\"" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+      //     { 
+      //       cwd: process.cwd()
+      //     }
+      //   );
+      //   console.log(`  ✅ Configured Git user identity: ${gitUserName} <${gitUserEmail}>`);
+      //   gitConfigured = true;
+      // } catch (error) {
+      //   console.warn(`  ⚠️ Git configuration failed: ${error instanceof Error ? error.message : String(error)}`);
+      // }
 
-      // Step 2: Create workspace directory
-      // TODO this has already been created in the docker image but -p makes it safe
-      console.log(`  2️⃣ Preparing workspace directory...`);
-      try {
-        await execAsync(
-          `fly ssh console -C "su - thopter -c \\"mkdir -p /data/thopter/workspace\\"" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
-          { 
-            cwd: process.cwd()
-          }
-        );
-        console.log(`  ✅ Workspace directory ready`);
-        workspaceCreated = true;
-      } catch (error) {
-        console.warn(`  ⚠️ Workspace creation failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
+      // // Step 2: Create workspace directory
+      // // TODO this has already been created in the docker image but -p makes it safe
+      // console.log(`  2️⃣ Preparing workspace directory...`);
+      // try {
+      //   await execAsync(
+      //     `fly ssh console -C "su - thopter -c \\"mkdir -p /data/thopter/workspace\\"" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+      //     { 
+      //       cwd: process.cwd()
+      //     }
+      //   );
+      //   console.log(`  ✅ Workspace directory ready`);
+      //   workspaceCreated = true;
+      // } catch (error) {
+      //   console.warn(`  ⚠️ Workspace creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      // }
 
-      // Step 3: Clone repository with PAT authentication (only if workspace was created)
-      if (workspaceCreated) {
-        console.log(`  3️⃣ Cloning repository ${request.repository}...`);
-        try {
-          const repositoryUrl = `https://${githubToken}@github.com/${request.repository}.git`;
-          
-          await execAsync(
-            `fly ssh console -C "su - thopter -c \\"cd /data/thopter/workspace && git clone '${repositoryUrl}' \\"" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
-            { 
-              cwd: process.cwd()
-            }
-          );
-          console.log(`  ✅ Repository cloned successfully`);
-          repositoryCloned = true;
-        } catch (error) {
-          console.warn(`  ⚠️ Repository clone failed: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      } else {
-        console.log(`  ⏭️ Skipping repository clone (workspace creation failed)`);
-      }
+      // // Step 3: Clone repository with PAT authentication (only if workspace was created)
+      // if (workspaceCreated) {
+      //   console.log(`  3️⃣ Cloning repository ${request.repository}...`);
+      //   try {
+      //     const repositoryUrl = `https://${githubToken}@github.com/${request.repository}.git`;
+      //     
+      //     await execAsync(
+      //       `fly ssh console -C "su - thopter -c \\"cd /data/thopter/workspace && git clone '${repositoryUrl}' \\"" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+      //       { 
+      //         cwd: process.cwd()
+      //       }
+      //     );
+      //     console.log(`  ✅ Repository cloned successfully`);
+      //     repositoryCloned = true;
+      //   } catch (error) {
+      //     console.warn(`  ⚠️ Repository clone failed: ${error instanceof Error ? error.message : String(error)}`);
+      //   }
+      // } else {
+      //   console.log(`  ⏭️ Skipping repository clone (workspace creation failed)`);
+      // }
+      
+      console.log(`  ℹ️ Git setup is now handled by thopter-init.sh via the git proxy system`);
+      console.log(`    - Repository: ${request.repository}`);
+      console.log(`    - Work branch will be: thopter/${request.github.issueNumber}--<machine-id>`);
+      console.log(`    - Git operations proxied through root-owned MCP server`)
 
       // commenting out - prompt has instructions to claude to create branch more dynamically.
       // // Step 4: Create and checkout feature branch (only if repository was cloned)

@@ -52,5 +52,23 @@ module.exports = {
     error_file: '/data/thopter/logs/webserver.err.log',
     combine_logs: true,
     merge_logs: true
+  }, {
+    name: 'git-proxy-mcp',
+    script: '/usr/local/bin/git-proxy-mcp.js',
+    cwd: '/root',
+    user: 'root',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '100M',
+    env: {
+      NODE_ENV: 'production',
+      WORK_BRANCH: process.env.WORK_BRANCH
+    },
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    out_file: '/data/thopter/logs/git-proxy.out.log',
+    error_file: '/data/thopter/logs/git-proxy.err.log',
+    combine_logs: true,
+    merge_logs: true
   }]
 };

@@ -10,6 +10,15 @@ thopter_log() {
 
 thopter_log "Starting Thopter agent container as PID 1..."
 
+# Construct WORK_BRANCH from ISSUE_NUMBER and FLY_MACHINE_ID
+# ISSUE_NUMBER is set by provisioner, FLY_MACHINE_ID is set by Fly.io
+if [ -n "$ISSUE_NUMBER" ] && [ -n "$FLY_MACHINE_ID" ]; then
+    export WORK_BRANCH="thopter/${ISSUE_NUMBER}--${FLY_MACHINE_ID}"
+    thopter_log "Constructed WORK_BRANCH: $WORK_BRANCH"
+else
+    thopter_log "Warning: ISSUE_NUMBER or FLY_MACHINE_ID not set, WORK_BRANCH cannot be constructed"
+fi
+
 # important: the golden claude copy logic will *bulldoze* files in the homedir,
 # with unpredictable timing relative to this script. for example, .bashrc --
 # which i have explicitly excluded from the tarball snapshot in the copy script
@@ -94,6 +103,46 @@ thopter_log "Setting up network firewall..."
     echo "$(date '+%Y-%m-%d %H:%M:%S') [FIREWALL] $line" | tee -a /thopter/log
 done
 
+# Phase 5: Set up git repositories (NEW - git proxy system)
+# Only set up if we have the required environment variables
+if [ -n "$REPOSITORY" ] && [ -n "$GITHUB_REPO_PAT" ]; then
+    thopter_log "Setting up root-owned bare repository..."
+    # Clone bare repo as root with PAT
+    rm -rf /root/thopter-repo
+    git clone --bare "https://${GITHUB_REPO_PAT}@github.com/${REPOSITORY}" /root/thopter-repo 2>&1 | while IFS= read -r line; do
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [GIT-SETUP] $line" | tee -a /thopter/log
+    done
+    
+    if [ -d "/root/thopter-repo" ]; then
+        thopter_log "Bare repository created successfully at /root/thopter-repo"
+        
+        # Clone from bare repo for thopter user
+        REPO_NAME=$(echo $REPOSITORY | cut -d'/' -f2)
+        thopter_log "Cloning from bare repo to /data/thopter/workspace/$REPO_NAME..."
+        git clone /root/thopter-repo "/data/thopter/workspace/$REPO_NAME" 2>&1 | while IFS= read -r line; do
+            echo "$(date '+%Y-%m-%d %H:%M:%S') [GIT-SETUP] $line" | tee -a /thopter/log
+        done
+        
+        if [ -d "/data/thopter/workspace/$REPO_NAME" ]; then
+            thopter_log "Working repository created successfully at /data/thopter/workspace/$REPO_NAME"
+            # Set ownership for the working repo
+            chown -R thopter:thopter "/data/thopter/workspace/$REPO_NAME"
+        else
+            thopter_log "ERROR: Failed to clone from bare repository"
+        fi
+    else
+        thopter_log "ERROR: Failed to create bare repository"
+    fi
+else
+    thopter_log "Git repository setup skipped - REPOSITORY or GITHUB_REPO_PAT not provided"
+fi
+
+# Export WORK_BRANCH for thopter user
+if [ -n "$WORK_BRANCH" ]; then
+    echo "export WORK_BRANCH='$WORK_BRANCH'" >> /data/thopter/.bashrc
+    thopter_log "WORK_BRANCH exported to thopter user environment"
+fi
+
 # If credentials were injected during container setup, fix ownership
 if [ -d "/data/thopter/.claude" ]; then
     thopter_log "Fixing Claude credentials ownership for thopter user..."
@@ -155,11 +204,21 @@ mkdir -p /data/thopter/logs
 thopter_log "chmod .claude dir"
 mkdir -p /data/thopter/.claude/projects
 
-# Start session observer with PM2 (as root, but observer runs as thopter user)
-thopter_log "Starting session observer..."
-/usr/local/bin/start-observer.sh 2>&1 | while IFS= read -r line; do
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [OBSERVER] $line" | tee -a /thopter/log
+# Start services with PM2 (as root, but most services run as thopter user)
+thopter_log "Starting services..."
+# Export WORK_BRANCH so PM2 can access it
+export WORK_BRANCH
+/usr/local/bin/start-services.sh 2>&1 | while IFS= read -r line; do
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [SERVICES] $line" | tee -a /thopter/log
 done
+
+# Configure Claude's MCP settings (as thopter user)
+if [ -d "/root/thopter-repo" ]; then
+    thopter_log "Configuring Claude's MCP settings for git-proxy..."
+    runuser -u thopter -- claude mcp add --transport http git-proxy http://localhost:8777 2>&1 | while IFS= read -r line; do
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [MCP-CONFIG] $line" | tee -a /thopter/log
+    done
+fi
 
 # fix all ownership
 thopter_log "chown -R thopter:thopter /data"

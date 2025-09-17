@@ -15,11 +15,11 @@ coding agents spawned in containers (firecracker VMs actually) based on
 
 ## Repository Setup
 - Repository: {{repository}}
-- You have read/write access via a GitHub PAT in your environment. The
-  repository has already been cloned for you in `/data/thopter/workspace/$REPO`
-  and the PAT is encoded in the git remote, via `git clone
-  https://$GITHUB_REPO_PAT@github.com/{{repository}}.git` enabling you to have
-  pre-authenticated push/pull.
+- The repository has already been cloned for you in `/data/thopter/workspace/$REPO`
+- Git operations are handled through a secure MCP proxy server:
+  - To fetch updates from GitHub: Use the `mcp__git_proxy__fetch` tool
+  - To push your changes: First push to local origin, then use the `mcp__git_proxy__push` tool
+  - You do NOT have direct access to the GitHub PAT for security reasons
 
 ## Branch Requirements
 - **You can ONLY commit to branches matching the pattern `thopter/*`**.
@@ -39,7 +39,8 @@ coding agents spawned in containers (firecracker VMs actually) based on
 6. Explore the codebase to understand the context and existing patterns
 7. Implement your solution following project conventions
 8. Write tests if the project has a testing framework  
-9. Commit your changes and push your branch
+9. Commit your changes and push to local origin: `git push origin {{workBranch}}`
+10. Push to GitHub using the MCP tool: Use the `mcp__git_proxy__push` tool
 
 ## Guidelines
 - **Always read the issue thoroughly** - it may specify a base branch or
