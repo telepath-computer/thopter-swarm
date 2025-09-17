@@ -48,6 +48,9 @@ RUN npm run build
 # Remove dev dependencies to keep image smaller
 RUN npm ci --only=production && npm cache clean --force
 
+# Create directory for .env.thopters and post-checkout.sh files
+RUN mkdir -p /tmp/thopter
+
 ARG HUB_PORT=8080
 ARG HUB_STATUS_PORT=8081
 

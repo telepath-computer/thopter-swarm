@@ -316,14 +316,14 @@ export class ThopterProvisioner {
     ];
 
     // Add .env.thopters file if it exists on hub
-    const envFilePath = '/data/thopter-env/.env.thopters';
+    const envFilePath = '/tmp/thopter/.env.thopters';
     if (require('fs').existsSync(envFilePath)) {
       console.log(`  ✅ Found .env.thopters file, including in machine creation`);
       machineRunArgs.push('--file-local', `/tmp/.env.thopters=${envFilePath}`);
     }
 
     // Add post-checkout.sh script if it exists on hub
-    const postCheckoutScriptPath = '/data/thopter-env/post-checkout.sh';
+    const postCheckoutScriptPath = '/tmp/thopter/post-checkout.sh';
     if (require('fs').existsSync(postCheckoutScriptPath)) {
       console.log(`  ✅ Found post-checkout.sh script, including in machine creation`);
       machineRunArgs.push('--file-local', `/tmp/post-checkout.sh=${postCheckoutScriptPath}`);
