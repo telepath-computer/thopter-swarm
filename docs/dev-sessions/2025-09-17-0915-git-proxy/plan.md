@@ -148,7 +148,7 @@ Develop the core MCP server that will handle git proxy operations. This server w
 ## Phase 2: Update Docker and PM2 Configuration
 
 ### Summary
-Integrate the MCP server into the thopter container build and process management system.
+Integrate the MCP server into the thopter container build and process management system. Update all logging paths to use centralized `/data/logs` directory.
 
 ### Phase Relationships
 - **Dependencies**: Phase 1 (MCP server implementation)
@@ -157,21 +157,27 @@ Integrate the MCP server into the thopter container build and process management
 ### Success Criteria
 - Dockerfile includes MCP SDK dependencies
 - PM2 config includes git-proxy-mcp server entry
+- All PM2 log paths updated to `/data/logs/`
 - Server script is copied to correct location during build
 - Build completes without errors
 
 ### Keep in Mind
 - MCP SDK needs to be installed globally or in a location accessible to root
 - PM2 config must specify user as root for the MCP server
-- Log files should go to appropriate location for debugging
+- **CRITICAL**: All log files must go to `/data/logs/` for performance
+- The `/data/logs` directory will be created by init script, not Dockerfile
+- PM2 logs must be accessible to both root and thopter users
 
 ### Steps
 
-1. **Update Dockerfile to include MCP SDK**
+1. **Update Dockerfile to include MCP SDK and remove old log setup**
    - **File to modify**: `/thopter/Dockerfile`
    - Add after line 83 (after Claude CLI installation):
      `RUN npm install -g @modelcontextprotocol/sdk`
    - This makes the SDK available globally for the root user
+   - **Remove old log file creation** (around line 147):
+     - Remove: `touch /thopter/log && chmod 666 /thopter/log`
+     - No longer needed as logs go to `/data/logs/init.log`
    - Verify the package name and installation works during Docker build
 
 2. **Copy MCP server script in Dockerfile**
@@ -181,12 +187,16 @@ Integrate the MCP server into the thopter container build and process management
    - Add after line 128:
      `RUN chmod +x /usr/local/bin/git-proxy-mcp.js`
 
-3. **Update pm2.config.js**
+3. **Update pm2.config.js with centralized logging**
    - **File to modify**: `/thopter/scripts/pm2.config.js`
    - Add new app entry to the apps array for 'git-proxy-mcp'
    - Set user to 'root' (critical!)
-   - Configure log files to `/data/thopter/logs/git-proxy.*.log`
-   - Set working directory to `/root`
+   - **Update ALL log paths to use `/data/logs/`**:
+     - `session-observer`: `/data/logs/observer.*.log`
+     - `claude-log-generator`: `/data/logs/claude-log.*.log`
+     - `claude-log-webserver`: `/data/logs/webserver.*.log`
+     - `git-proxy-mcp`: `/data/logs/git-proxy.*.log`
+   - Set working directory to `/root` for git-proxy-mcp
    - Pass through WORK_BRANCH environment variable
 
 4. **Rename start-observer.sh to start-services.sh**
@@ -206,13 +216,15 @@ Integrate the MCP server into the thopter container build and process management
 ## Phase 3: Modify Initialization Process
 
 ### Summary
-Update the thopter initialization script to set up the dual-repository system and configure Claude's MCP settings.
+Update the thopter initialization script to set up the dual-repository system, configure Claude's MCP settings, and implement centralized logging.
 
 ### Phase Relationships
 - **Dependencies**: Phase 1 (MCP server) and Phase 2 (Docker/PM2 setup)
 - **Enables**: Phase 4 (full system testing)
 
 ### Success Criteria
+- Centralized logging directory `/data/logs` created early with proper permissions
+- All logs write to `/data/logs/` instead of scattered locations
 - Root-owned bare repository is created and configured
 - Claude's repository uses bare repo as origin
 - MCP server starts successfully via PM2
@@ -232,22 +244,48 @@ Update the thopter initialization script to set up the dual-repository system an
 
 ### Steps
 
-1. **Update provisioner to pass ISSUE_NUMBER and IS_GOLDEN_CLAUDE environment variables**
+1. **Set up centralized logging directory (VERY EARLY in init)**
+   - **File to modify**: `/thopter/scripts/thopter-init.sh`
+   - Add at the very beginning of the script (before line 5):
+     ```bash
+     # Create centralized logging directory on fast filesystem
+     mkdir -p /data/logs
+     chmod 755 /data/logs
+     chown thopter:thopter /data/logs
+     
+     # Update logging function to use new location
+     LOG_FILE="/data/logs/init.log"
+     thopter_log() {
+         local message="$(date '+%Y-%m-%d %H:%M:%S') [THOPTER-INIT] $*"
+         echo "$message" | tee -a "$LOG_FILE"
+     }
+     ```
+   - This ensures ALL initialization output goes to the fast filesystem
+   - Directory is writable by both root (during init) and thopter (later operations)
+
+2. **Update provisioner to use new log location and set IS_GOLDEN_CLAUDE**
    - **File to modify**: `/hub/src/lib/provisioner.ts`
-   - For golden claude instances:
-     ```typescript
-     '--env', `IS_GOLDEN_CLAUDE=true`,
-     ```
-   - For regular thopters:
-     ```typescript
-     '--env', `ISSUE_NUMBER=${issueNumber}`,
-     '--env', `IS_GOLDEN_CLAUDE=false`,  // Or omit since false is default
-     ```
+   - **Critical log path changes**:
+     - Update ALL references from `/thopter/log` to `/data/logs/init.log`
+     - Search for all occurrences of `/thopter/log` in the file
+     - Update log tailing commands (e.g., `tail -f /thopter/log` → `tail -f /data/logs/init.log`)
+     - Update log extraction commands
+     - Update any log monitoring or status checking
+   - **Environment variable handling**:
+     - For golden claude instances:
+       ```typescript
+       '--env', `IS_GOLDEN_CLAUDE=true`,
+       ```
+     - For regular thopters:
+       ```typescript
+       '--env', `ISSUE_NUMBER=${issueNumber}`,
+       '--env', `IS_GOLDEN_CLAUDE=false`,  // Or omit since false is default
+       ```
    - Comment out or remove git clone operations around lines 320-380
    - Keep PAT passing but rename to be clear it's for root only
    - Note: WORK_BRANCH will be constructed by init script using ISSUE_NUMBER + FLY_MACHINE_ID
 
-2. **Check for golden claude mode and conditionally set up git**
+3. **Check for golden claude mode and conditionally set up git**
    - **File to modify**: `/thopter/scripts/thopter-init.sh`
    - Add early in script (after line 10) to check golden claude mode:
      ```bash
@@ -272,7 +310,7 @@ Update the thopter initialization script to set up the dual-repository system an
      fi
      ```
 
-3. **Create secure root enclave and set up bare repository (skip for golden claude)**
+4. **Create secure root enclave and set up bare repository (skip for golden claude)**
    - **File to modify**: `/thopter/scripts/thopter-init.sh`
    - Add after line 95 (after firewall setup), as root:
      ```bash
@@ -300,12 +338,12 @@ Update the thopter initialization script to set up the dual-repository system an
    - The PAT will be embedded in the remote URL in the git config
    - Using `/data/root` ensures high-performance I/O operations
 
-4. **Start MCP server via PM2**
+5. **Start MCP server via PM2**
    - **File to modify**: `/thopter/scripts/start-services.sh` (renamed from start-observer.sh)
    - The PM2 config already updated in Phase 2 will start the MCP server
    - Ensure WORK_BRANCH is exported before PM2 starts
 
-5. **Replace thopter repository setup entirely**
+6. **Replace thopter repository setup entirely**
    - **File to modify**: `/thopter/scripts/thopter-init.sh`
    - Add after setting up bare repo (still as root):
      ```bash
@@ -315,7 +353,7 @@ Update the thopter initialization script to set up the dual-repository system an
      chown -R thopter:thopter /data/thopter/workspace/$REPO_NAME
      ```
 
-6. **Configure Claude's MCP settings**
+7. **Configure Claude's MCP settings**
    - **File to modify**: `/thopter/scripts/thopter-init.sh`
    - Add BEFORE the blanket chown but after services start:
      ```bash
@@ -324,21 +362,26 @@ Update the thopter initialization script to set up the dual-repository system an
      ```
    - This adds the MCP server to Claude's user configuration
 
-7. **Fix permissions while preserving root enclave**
+8. **Fix permissions while preserving root enclave and logs**
    - **File to modify**: `/thopter/scripts/thopter-init.sh`
    - Replace the blanket chown at line 165 with:
      ```bash
-     # Fix all ownership but preserve root enclave
+     # Fix all ownership but preserve root enclave and shared logs
      thopter_log "chown -R thopter:thopter /data"
      chown -R thopter:thopter /data
      
      # Restore root ownership of the secure enclave
-     chown -R root:root /data/root
-     chmod 700 /data/root
+     if [ -d "/data/root" ]; then
+         chown -R root:root /data/root
+         chmod 700 /data/root
+     fi
+     
+     # Keep logs directory accessible to both root and thopter
+     chmod 755 /data/logs
      ```
-   - This ensures the root enclave remains secure after the blanket permission fix
+   - This ensures the root enclave remains secure and logs remain accessible
 
-8. **Update prompts to use MCP tools**
+9. **Update prompts to use MCP tools**
    - **File to modify**: `/hub/templates/prompts/default.md`
    - Replace direct git push instructions with:
      ```markdown
@@ -379,7 +422,12 @@ This section describes the complete flow of how a thopter is initialized with th
 ### 3. Container Startup (thopter-init.sh as root)
 The init script runs as root (PID 1) and performs these steps in order:
 
-#### Early Setup (lines 1-95)
+#### Very Early Setup (lines 1-10)
+- **Create `/data/logs` directory** (755 permissions, thopter:thopter ownership)
+- **Update logging function** to write to `/data/logs/init.log` instead of `/thopter/log`
+- All subsequent logging goes to fast filesystem
+
+#### Early Setup (lines 11-95)
 - Mount point readiness check
 - Workspace directory creation
 - Firewall setup
@@ -446,6 +494,7 @@ fi
 #### Final Setup (lines 166-175)
 - Ownership fixed: `chown -R thopter:thopter /data`
 - **Root enclave restored**: `chown -R root:root /data/root && chmod 700 /data/root`
+- **Logs directory kept accessible**: `chmod 755 /data/logs`
 - Switch to thopter user
 - Launch tmux and gotty web terminal
 

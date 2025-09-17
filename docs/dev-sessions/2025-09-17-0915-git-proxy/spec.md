@@ -129,12 +129,36 @@ This design ensures golden claudes remain clean templates without git state, whi
 /data/                      # High-performance Fly.io volume
 ├── root/                   # Root-owned enclave (700 permissions)
 │   └── thopter-repo/      # Bare repository with PAT
+├── logs/                   # Centralized logging directory (755, thopter:thopter)
+│   ├── init.log           # Initialization log (was /thopter/log)
+│   ├── observer.out.log   # PM2 session observer stdout
+│   ├── observer.err.log   # PM2 session observer stderr
+│   ├── claude-log.out.log # PM2 claude log generator stdout
+│   ├── claude-log.err.log # PM2 claude log generator stderr
+│   ├── webserver.out.log  # PM2 webserver stdout
+│   ├── webserver.err.log  # PM2 webserver stderr
+│   ├── git-proxy.out.log  # PM2 git proxy stdout
+│   └── git-proxy.err.log  # PM2 git proxy stderr
 └── thopter/               # Thopter user space
     ├── workspace/
     │   └── {repoName}/    # Working repository
-    ├── logs/
     └── .claude/
 ```
+
+### Logging Architecture
+
+All logs are centralized in `/data/logs/` for several critical reasons:
+
+1. **Performance**: The `/data` volume is a high-performance Fly.io volume, while `/thopter` and other locations use slower VM filesystem
+2. **Persistence**: Logs remain available across container restarts when using the volume
+3. **Permissions**: `/data/logs` is owned by thopter:thopter with 755 permissions, allowing both root and thopter processes to write
+4. **Early Access**: The directory is created very early in initialization (before mount checks) to capture all initialization output
+5. **Unified Access**: All logs in one location simplifies debugging and monitoring
+
+Key logging changes:
+- `/thopter/log` → `/data/logs/init.log` - Initialization and provisioning logs
+- PM2 logs previously in `/data/thopter/logs/` → `/data/logs/` - All PM2 service logs
+- Log directory must be created and chowned before any logging begins in thopter-init.sh
 
 ### Security Model
 - Claude has no access to the GitHub PAT
@@ -148,7 +172,11 @@ This design ensures golden claudes remain clean templates without git state, whi
 
 ## Modifications Required
 
-### 1. thopter-init.sh (Complete Replacement of Git Setup)
+### 1. thopter-init.sh (Complete Replacement of Git Setup and Logging)
+- **Very early in script (before mount checks)**:
+  - Create `/data/logs` directory with 755 permissions
+  - Set ownership to thopter:thopter for `/data/logs`
+  - Update logging function to write to `/data/logs/init.log` instead of `/thopter/log`
 - Check `IS_GOLDEN_CLAUDE` environment variable early in script
 - If golden claude mode:
   - Skip all git-related operations
@@ -169,6 +197,11 @@ This design ensures golden claudes remain clean templates without git state, whi
 
 ### 2. pm2.config.js
 - Add git-proxy-mcp server configuration running as root
+- Update all log file paths from `/data/thopter/logs/` to `/data/logs/`:
+  - observer.*.log → `/data/logs/observer.*.log`
+  - claude-log.*.log → `/data/logs/claude-log.*.log`
+  - webserver.*.log → `/data/logs/webserver.*.log`
+  - git-proxy.*.log → `/data/logs/git-proxy.*.log`
 
 ### 3. New/Modified Files
 - `/usr/local/bin/git-proxy-mcp.js` - The MCP server implementation (new)
@@ -177,6 +210,13 @@ This design ensures golden claudes remain clean templates without git state, whi
 ### 4. Dockerfile
 - Install MCP SDK globally for root user: `npm install -g @modelcontextprotocol/sdk`
 - This is the only new npm dependency needed for the git proxy system
+- Remove creation of `/thopter/log` file (no longer needed)
+- Note: `/data/logs` will be created dynamically by init script
+
+### 5. Provisioner (hub/src/lib/provisioner.ts)
+- Update all references to `/thopter/log` to `/data/logs/init.log`
+- Update log tailing commands to use new location
+- Ensure log monitoring works with new centralized logging structure
 
 ## Testing Requirements
 
