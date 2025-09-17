@@ -32,8 +32,10 @@ This design ensures golden claudes remain clean templates without git state, whi
 
 2. **Claude's working repository** (`/data/thopter/workspace/{repoName}`)
    - Regular git repository owned by thopter user
-   - Has the root-owned bare repo as its origin
+   - **LOCAL-ONLY**: No remote origin configured (removed after initial clone)
+   - **CRITICAL**: Thopter user cannot write to root-owned bare repo due to Linux permissions
    - No direct access to GitHub or the PAT
+   - All GitHub operations must go through MCP proxy
 
 3. **MCP Server** (TypeScript/Node.js)
    - Runs as root via pm2
@@ -47,19 +49,25 @@ This design ensures golden claudes remain clean templates without git state, whi
    - Root clones from GitHub into bare repo using PAT
    - Configure bare repo with GitHub as origin and PAT for auth
    - Thopter user clones from bare repo into working directory
+   - **CRITICAL**: Remove origin remote from thopter repo (make local-only)
    - Work branch name available via environment variable
 
 2. **Fetch Operation**
    - Claude requests fetch via MCP tool
-   - MCP server executes `git fetch` in bare repo
-   - Returns git command output
-   - Claude then pulls from bare repo locally
+   - **Step 1**: MCP server (as root) executes `git fetch` in bare repo from GitHub
+   - **Step 2**: MCP server syncs changes from bare repo to thopter repo
+   - **Method**: `git fetch /data/root/thopter-repo branch:branch` (root can read bare repo)
+   - Returns git command output to Claude
+   - **Note**: Claude cannot run `git pull/fetch` directly (no remote configured)
 
 3. **Push Operation**
-   - Claude commits and pushes to bare repo locally
-   - Claude requests push via MCP tool
-   - MCP server executes `git push origin ${WORK_BRANCH}` in bare repo
-   - Returns git command output
+   - Claude commits changes locally (only local git operations work)
+   - Claude requests push via MCP tool  
+   - **Step 1**: MCP server syncs thopter commits to bare repo
+   - **Method**: `git fetch /data/thopter/workspace/{repo} ${WORK_BRANCH}:${WORK_BRANCH}` (root can read thopter files)
+   - **Step 2**: MCP server executes `git push origin ${WORK_BRANCH}` in bare repo to GitHub
+   - Returns git command output to Claude
+   - **Note**: Claude cannot push directly (no remote + permission denied on bare repo)
 
 ## Implementation Details
 
@@ -163,7 +171,10 @@ Key logging changes:
 ### Security Model
 - Claude has no access to the GitHub PAT
 - Claude cannot access `/data/root` directory (700 permissions, root ownership)
+- **Permission Isolation**: Thopter user cannot write to root-owned bare repository
+- **Local-Only Repository**: Claude's repo has no remote origin, preventing direct GitHub access
 - Claude can only trigger push to one predefined branch
+- **Sync Security**: MCP server leverages root privileges to read between user boundaries
 - All git operations are logged via pm2 (complete stdout/stderr capture)
 - Every git command execution is logged with full output for audit trail
 - Root process validates branch name from environment variable

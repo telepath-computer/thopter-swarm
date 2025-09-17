@@ -42,6 +42,19 @@ This division of labor ensures clean code delivery while acknowledging the execu
 - Manual testing only, no automated tests required
 - We can break anything - there are no existing users to worry about
 
+### CRITICAL Implementation Constraint
+**Linux Permission Issue**: Thopter user cannot write to root-owned bare repository.
+
+**Problem**: The original design assumed thopter could push to `/data/root/thopter-repo`, but Linux filesystem permissions prevent this (thopter user cannot write to root:root 700-permission directory).
+
+**Solution**: 
+1. **Thopter repository is LOCAL-ONLY** (no remote origin after initial clone)
+2. **MCP server handles bidirectional sync**: 
+   - **Push**: MCP server syncs thopter commits to bare repo, then pushes to GitHub
+   - **Fetch**: MCP server fetches from GitHub to bare repo, then syncs to thopter repo
+3. **Root privilege leverage**: MCP server (running as root) can read thopter-owned files and write to root-owned bare repo
+4. **Command used**: `git fetch /path/to/source/repo branch:branch` for local sync operations
+
 ---
 
 ## Phase 1: Create MCP Server Implementation
@@ -462,6 +475,12 @@ else
         # Clone from bare repo for thopter user
         REPO_NAME=$(echo $REPOSITORY | cut -d'/' -f2)
         git clone /data/root/thopter-repo /data/thopter/workspace/$REPO_NAME
+        
+        # CRITICAL: Remove origin remote to make repository local-only
+        # This prevents permission denied errors when thopter tries to push to root-owned bare repo
+        cd /data/thopter/workspace/$REPO_NAME
+        git remote remove origin
+        cd /
 
         # Export WORK_BRANCH for thopter user
         echo "export WORK_BRANCH='$WORK_BRANCH'" >> /data/thopter/.bashrc
