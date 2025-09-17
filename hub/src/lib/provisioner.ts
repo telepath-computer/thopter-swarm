@@ -841,15 +841,13 @@ ${request.github.issueBody}
         // Get repository name for directory path
         const repoName = request.repository.split('/')[1];
         
-        // Create bash script that runs from repo directory with post-checkout.sh in parent workspace
-        const bashScript = `cd /data/thopter/workspace/${repoName} && if [ -f ../post-checkout.sh ]; then chmod +x ../post-checkout.sh && echo "Running post-checkout.sh..." && ../post-checkout.sh 2>&1 | tee -a /thopter/log || true; fi && claude --dangerously-skip-permissions "read ../prompt.md for your instructions"`;
-        
-        // Encode to base64 to avoid quoting issues
-        const encodedScript = Buffer.from(bashScript).toString('base64');
-        
+        // Use base64 for complex post-checkout script, then append simple claude command
+        const postCheckoutScript = `cd /data/thopter/workspace/${repoName} && if [ -f ../post-checkout.sh ]; then chmod +x ../post-checkout.sh && echo "Running post-checkout.sh..." && ../post-checkout.sh 2>&1 | tee -a /thopter/log || true; fi`;
+        const encodedScript = Buffer.from(postCheckoutScript).toString('base64');
+
         await execAsync(
-          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"echo ${encodedScript} | base64 -d | bash\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
-          { 
+          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"echo ${encodedScript} | base64 -d | bash && claude --dangerously-skip-permissions \\\\\\\"read ../prompt.md for your instructions\\\\\\\"\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+          {
             cwd: process.cwd()
           }
         );
