@@ -185,6 +185,10 @@ echo -e "${CHECK} Thopter will connect to hub via metadata service"
 echo "5. Launching golden claude machine..."
 echo -e "${ROCKET} Starting golden claude with image: $THOPTER_IMAGE"
 
+# Golden Claudes bypass the firewall to allow Claude Code to self-update
+# and potentially access other needed services
+DANGEROUSLY_SKIP_FIREWALL="I_UNDERSTAND"
+
 # Restricted environment variables for thopters (no sensitive hub secrets)
 fly machine run $THOPTER_IMAGE \
     --name $GC_MACHINE_NAME \

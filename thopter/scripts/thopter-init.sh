@@ -71,7 +71,6 @@ rm -rf /data/*
 
 thopter_log "create workspace dir"
 mkdir -p /data/thopter/workspace
-chown thopter:thopter /data/thopter/workspace
 
 thopter_log "create yolo-claude alias"
 # Create useful aliases for thopter user
@@ -80,8 +79,6 @@ cat > /data/thopter/.bash_aliases << 'EOF'
 alias yolo-claude='claude --dangerously-skip-permissions'
 EOF
 
-chown thopter:thopter /data/thopter/.bash_aliases
-
 # Ensure .bashrc sources .bash_aliases
 if ! grep -q "source.*\.bash_aliases" /data/thopter/.bashrc 2>/dev/null; then
     echo "" >> /data/thopter/.bashrc
@@ -89,7 +86,6 @@ if ! grep -q "source.*\.bash_aliases" /data/thopter/.bashrc 2>/dev/null; then
     echo "if [ -f ~/.bash_aliases ]; then" >> /data/thopter/.bashrc
     echo "    source ~/.bash_aliases" >> /data/thopter/.bashrc
     echo "fi" >> /data/thopter/.bashrc
-    chown thopter:thopter /data/thopter/.bashrc
 fi
 
 # Phase 4: Setup network firewall (as root before switching to thopter user)
@@ -101,39 +97,42 @@ done
 # If credentials were injected during container setup, fix ownership
 if [ -d "/data/thopter/.claude" ]; then
     thopter_log "Fixing Claude credentials ownership for thopter user..."
-    chown -R thopter:thopter /data/thopter/.claude
 fi
 
 # If issue context was injected, fix ownership  
-if [ -f "/data/thopter/issue.md" ]; then
+if [ -f "/data/thopter/workspace/issue.md" ]; then
     thopter_log "Fixing issue context ownership for thopter user..."
-    chown thopter:thopter /data/thopter/issue.md
 fi
 
-if [ -f "/data/thopter/issue.json" ]; then
+if [ -f "/data/thopter/workspace/issue.json" ]; then
     thopter_log "Fixing issue.json ownership for thopter user..."
-    chown thopter:thopter /data/thopter/issue.json
 fi
 
-if [ -f "/data/thopter/prompt.md" ]; then
+if [ -f "/data/thopter/workspace/prompt.md" ]; then
     thopter_log "Fixing prompt.md ownership for thopter user..."
-    chown thopter:thopter /data/thopter/prompt.md
 fi
 
 # Move .env.thopters from /tmp if it exists (provided during machine creation)
 if [ -f "/tmp/.env.thopters" ]; then
-    thopter_log "Moving .env.thopters from /tmp to thopter home directory..."
-    mv /tmp/.env.thopters /data/thopter/.env.thopters
-    chown thopter:thopter /data/thopter/.env.thopters
+    thopter_log "Moving .env.thopters from /tmp to workspace directory..."
+    mv /tmp/.env.thopters /data/thopter/workspace/.env.thopters
+    chown thopter:thopter /data/thopter/workspace/.env.thopters
     thopter_log "Sourcing .env.thopters in .bashrc..."
     echo "" >> /data/thopter/.bashrc
     echo "# Load developer environment variables" >> /data/thopter/.bashrc
-    echo "if [ -f ~/.env.thopters ]; then" >> /data/thopter/.bashrc
+    echo "if [ -f ~/workspace/.env.thopters ]; then" >> /data/thopter/.bashrc
     echo "    set -a  # Mark all new variables for export" >> /data/thopter/.bashrc
-    echo "    source ~/.env.thopters" >> /data/thopter/.bashrc
+    echo "    source ~/workspace/.env.thopters" >> /data/thopter/.bashrc
     echo "    set +a  # Turn off auto-export" >> /data/thopter/.bashrc
     echo "fi" >> /data/thopter/.bashrc
-    chown thopter:thopter /data/thopter/.bashrc
+fi
+
+# Move post-checkout.sh from /tmp if it exists (provided during machine creation)
+if [ -f "/tmp/post-checkout.sh" ]; then
+    thopter_log "Moving post-checkout.sh from /tmp to workspace directory..."
+    mv /tmp/post-checkout.sh /data/thopter/workspace/post-checkout.sh
+    chown thopter:thopter /data/thopter/workspace/post-checkout.sh
+    chmod +x /data/thopter/workspace/post-checkout.sh
 fi
 
 thopter_log "add uv env setup to bashrc"
@@ -145,21 +144,26 @@ echo 'export UV_CACHE_DIR="/opt/uv/cache"' >> /data/thopter/.bashrc
 echo 'export UV_PYTHON_INSTALL_DIR="/opt/uv/pys"' >> /data/thopter/.bashrc
 echo 'export UV_TOOL_DIR="/opt/uv/tools"' >> /data/thopter/.bashrc
 
+# ensure bashrc is loaded on login shells
+echo 'source ~/.bashrc' >> /data/thopter/.bash_profile
+
 # Ensure logs directory exists with proper ownership for pm2 service logging
 thopter_log "create and chmod /data/thopter/logs (for pm2)"
 mkdir -p /data/thopter/logs
-chown thopter:thopter /data/thopter/logs
 
 # Create directory for claude-code-log HTML output (webserver working directory)
 thopter_log "chmod .claude dir"
 mkdir -p /data/thopter/.claude/projects
-chown -R thopter:thopter /data/thopter/.claude
 
 # Start session observer with PM2 (as root, but observer runs as thopter user)
 thopter_log "Starting session observer..."
 /usr/local/bin/start-observer.sh 2>&1 | while IFS= read -r line; do
     echo "$(date '+%Y-%m-%d %H:%M:%S') [OBSERVER] $line" | tee -a /thopter/log
 done
+
+# fix all ownership
+thopter_log "chown -R thopter:thopter /data"
+chown -R thopter:thopter /data
 
 thopter_log "Switching to thopter user and starting NO-INDEX web terminal..."
 

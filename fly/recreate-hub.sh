@@ -223,9 +223,19 @@ echo "5. Checking for .env.thopters file..."
 ENV_THOPTERS_ARG=""
 if [ -f ".env.thopters" ]; then
     echo -e "${INFO} Found .env.thopters file, will include in machine creation"
-    ENV_THOPTERS_ARG="--file-local /data/thopter-env/.env.thopters=.env.thopters"
+    ENV_THOPTERS_ARG="--file-local /tmp/thopter/.env.thopters=.env.thopters"
 else
     echo -e "${INFO} No .env.thopters file found (optional)"
+fi
+
+# Check for post-checkout.sh script before launching hub machine
+echo "  Checking for post-checkout.sh script..."
+POST_CHECKOUT_ARG=""
+if [ -f "post-checkout.sh" ]; then
+    echo -e "${INFO} Found post-checkout.sh script, will include in machine creation"
+    POST_CHECKOUT_ARG="--file-local /tmp/thopter/post-checkout.sh=post-checkout.sh"
+else
+    echo -e "${INFO} No post-checkout.sh script found (optional)"
 fi
 
 echo ""
@@ -258,6 +268,7 @@ fly machine run $HUB_IMAGE \
     --env FLY_DEPLOY_KEY="$FLY_DEPLOY_KEY" \
     --env METADATA_SERVICE_HOST="$METADATA_SERVICE_HOST" \
     $ENV_THOPTERS_ARG \
+    $POST_CHECKOUT_ARG \
     --metadata hub=1
 
 if [ $? -ne 0 ]; then

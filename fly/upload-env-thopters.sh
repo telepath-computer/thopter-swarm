@@ -94,13 +94,13 @@ echo ""
 echo "3. Uploading .env.thopters to hub..."
 
 # Create directory on hub if it doesn't exist
-fly ssh console --machine $HUB_MACHINE -C "mkdir -p /data/thopter-env" 2>/dev/null || true
+fly ssh console --machine $HUB_MACHINE -C "mkdir -p /tmp/thopter" 2>/dev/null || true
 
 # Delete existing file first (sftp won't replace files)
-fly ssh console --machine $HUB_MACHINE -C "rm -f /data/thopter-env/.env.thopters" 2>/dev/null || true
+fly ssh console --machine $HUB_MACHINE -C "rm -f /tmp/thopter/.env.thopters" 2>/dev/null || true
 
 # Upload the file using sftp
-echo "put .env.thopters /data/thopter-env/.env.thopters" | fly ssh sftp shell --machine $HUB_MACHINE
+echo "put .env.thopters /tmp/thopter/.env.thopters" | fly ssh sftp shell --machine $HUB_MACHINE
 
 if [ $? -eq 0 ]; then
     echo -e "${CHECK} .env.thopters uploaded successfully"
@@ -112,13 +112,13 @@ fi
 # Set permissions
 echo ""
 echo "4. Setting file permissions..."
-fly ssh console --machine $HUB_MACHINE -C "chmod 644 /data/thopter-env/.env.thopters"
+fly ssh console --machine $HUB_MACHINE -C "chmod 644 /tmp/thopter/.env.thopters"
 echo -e "${CHECK} Permissions set"
 
 # Verify the file
 echo ""
 echo "5. Verifying upload..."
-FILE_SIZE=$(fly ssh console --machine $HUB_MACHINE -C "stat -c%s /data/thopter-env/.env.thopters" 2>/dev/null)
+FILE_SIZE=$(fly ssh console --machine $HUB_MACHINE -C "stat -c%s /tmp/thopter/.env.thopters" 2>/dev/null)
 LOCAL_SIZE=$(stat -f%z .env.thopters 2>/dev/null || stat -c%s .env.thopters 2>/dev/null)
 
 if [ "$FILE_SIZE" = "$LOCAL_SIZE" ]; then

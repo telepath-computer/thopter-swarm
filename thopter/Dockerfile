@@ -93,6 +93,10 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/uv sh
 # create the thopter user now, because we need to install claude-code-log via uv
 # an uv only allows installation for the user under which it runs.
 RUN useradd -m -d /data/thopter -s /bin/bash -U thopter
+# we chown this here for good measure, but also more importantly in
+# thopter-init, because the volume mount gets written as root
+RUN chown thopter:thopter /data/thopter
+
 # install everything OUTSIDE the /data/thopter dir, because that whole tree is
 # going to get replaced by the volume mount. the binary will be:
 # /opt/uv/tools/claude-code-log/bin/claude-code-log

@@ -2,6 +2,7 @@
 .env.thopters
 .env*.local
 fly.toml
+post-checkout.sh
 
 .claude/settings.local.json
 
