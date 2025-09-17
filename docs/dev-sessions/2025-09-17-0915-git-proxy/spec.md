@@ -8,6 +8,17 @@ Create a secure git proxy system where Claude works on a non-privileged copy of 
 ## Problem Statement
 Currently, Claude has direct access to a GitHub Personal Access Token (PAT) with full read-write access to repositories. This requires complex GitHub branch rulesets and administrative overhead to prevent destructive operations. The goal is to remove Claude's direct access to the PAT and limit it to only safe operations.
 
+## Golden Claude Support
+
+Golden Claude instances are template machines used to create thopter instances. They don't have associated GitHub issues and shouldn't perform git operations. The system handles this through:
+
+1. **Environment Detection**: The `IS_GOLDEN_CLAUDE` environment variable identifies golden claude instances
+2. **Conditional Setup**: When `IS_GOLDEN_CLAUDE="true"`, all git-related setup is skipped
+3. **MCP Idle Mode**: The MCP server runs but returns friendly messages instead of performing operations
+4. **Clean Logs**: No error messages about missing repositories or configuration in golden claude mode
+
+This design ensures golden claudes remain clean templates without git state, while the same image supports full git operations for regular thopters.
+
 ## Solution Architecture
 
 ### Components
@@ -54,9 +65,18 @@ Currently, Claude has direct access to a GitHub Personal Access Token (PAT) with
 
 ### Environment Variables
 #### Passed by provisioner during machine creation:
+- `IS_GOLDEN_CLAUDE` - Set to "true" for golden claude instances (template machines)
+  - When true, all git operations are skipped
+  - MCP server runs in idle mode without errors
+  - No repository cloning or git configuration occurs
 - `GITHUB_REPO_PAT` - The GitHub personal access token (for root only)
+  - Not required for golden claude instances
+  - Only used when IS_GOLDEN_CLAUDE is not "true"
 - `REPOSITORY` - The repository to clone (e.g., "owner/repo")
+  - Not required for golden claude instances
 - `ISSUE_NUMBER` - The GitHub issue number (required for branch construction)
+  - Not provided for golden claude instances
+  - Required for normal thopter operation
 
 #### Available from Fly.io runtime:
 - `FLY_MACHINE_ID` - The Fly machine ID (automatically set by Fly.io)
@@ -67,6 +87,7 @@ Currently, Claude has direct access to a GitHub Personal Access Token (PAT) with
   - Must be constructed early in init script
   - Must be exported to PM2 config for MCP server
   - Must be added to thopter user's environment
+  - **Not constructed for golden claude instances**
 
 ### MCP Server Details
 - **Server name**: `git-proxy`
@@ -77,12 +98,17 @@ Currently, Claude has direct access to a GitHub Personal Access Token (PAT) with
 - **Transport**: HTTP server on port 8777
 - **User**: Runs as root
 - **Location**: Added to `/usr/local/bin/pm2.config.js`
+- **Golden Claude Mode**:
+  - When `IS_GOLDEN_CLAUDE="true"`, server runs in idle mode
+  - Returns friendly message for all operations: "Git operations are disabled in golden claude mode"
+  - Does not log errors or warnings about missing configuration
+  - Remains running but effectively inactive
 - **Resilience Requirements**:
   - Server MUST NOT crash on any error condition
   - Server MUST handle missing repositories gracefully
   - Server MUST handle permission errors gracefully
   - Server MUST handle network failures gracefully
-  - All errors should be logged and returned to caller
+  - All errors should be logged and returned to caller (except in golden claude mode)
   - Server should remain running and available for future requests
 - **Logging Requirements**:
   - ALL git command output (stdout and stderr) MUST be logged to console
@@ -123,15 +149,21 @@ Currently, Claude has direct access to a GitHub Personal Access Token (PAT) with
 ## Modifications Required
 
 ### 1. thopter-init.sh (Complete Replacement of Git Setup)
-- Create `/data/root` directory with 700 permissions (root only)
-- Remove all existing git clone logic for thopter user
-- Set up bare repo at `/data/root/thopter-repo` as root
-- Clone from GitHub with PAT embedded in URL (root only)
-- Set WORK_BRANCH environment variable
-- Start MCP server via pm2
-- Clone from bare repo as thopter user (no GitHub access)
-- Configure Claude's MCP settings: `claude mcp add --transport http git-proxy http://localhost:8777`
-- Remove all PAT passing to thopter user
+- Check `IS_GOLDEN_CLAUDE` environment variable early in script
+- If golden claude mode:
+  - Skip all git-related operations
+  - Log "Running in golden claude mode - git operations disabled"
+  - MCP server still starts but runs in idle mode
+- If normal thopter mode:
+  - Create `/data/root` directory with 700 permissions (root only)
+  - Remove all existing git clone logic for thopter user
+  - Set up bare repo at `/data/root/thopter-repo` as root
+  - Clone from GitHub with PAT embedded in URL (root only)
+  - Set WORK_BRANCH environment variable
+  - Start MCP server via pm2
+  - Clone from bare repo as thopter user (no GitHub access)
+  - Configure Claude's MCP settings: `claude mcp add --transport http git-proxy http://localhost:8777`
+  - Remove all PAT passing to thopter user
 - Rename start-observer.sh to start-services.sh
 - Modify permission fixing to preserve root ownership of `/data/root`
 
