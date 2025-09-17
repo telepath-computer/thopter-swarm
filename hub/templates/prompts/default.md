@@ -16,8 +16,14 @@ coding agents spawned in containers (firecracker VMs actually) based on
 ## Repository Setup
 - Repository: {{repository}}
 - The repository has been cloned for you in `/data/thopter/workspace/{{repoName}}`
-- You work with a local copy that syncs through a secure git proxy
-- All GitHub operations (fetch/push) must go through MCP tools for security
+- **IMPORTANT**: Your repository is LOCAL-ONLY (no remote origin configured)
+- You can make commits and work locally, but you CANNOT push or fetch directly
+- All GitHub operations MUST go through secure MCP proxy tools
+
+### Your Git Environment:
+- ✅ **You CAN**: `git add`, `git commit`, `git checkout`, `git branch`, `git merge`, `git log`
+- ❌ **You CANNOT**: `git push`, `git pull`, `git fetch` (these will fail - no remote configured)
+- 🔧 **For GitHub sync**: Use `mcp__git_proxy__fetch` and `mcp__git_proxy__push` tools exclusively
 
 ## Branch Requirements
 - **You can ONLY commit to branches matching the pattern `thopter/*`**.
@@ -28,7 +34,7 @@ coding agents spawned in containers (firecracker VMs actually) based on
 
 ## General Workflow
 1. **First, read the issue** in `issue.json`
-2. **Fetch latest changes**: Use the `mcp__git_proxy__fetch` tool
+2. **Fetch latest changes from GitHub**: Use the `mcp__git_proxy__fetch` tool
 3. Enter the repo directory: `cd {{repoName}}`
 4. **Determine base branch you'll branch from**: 
    - If the issue mentions a specific branch, checkout that branch first (e.g.
@@ -38,8 +44,23 @@ coding agents spawned in containers (firecracker VMs actually) based on
 6. Explore the codebase to understand the context and existing patterns
 7. Implement your solution following project conventions
 8. Write tests if the project has a testing framework  
-9. Commit your changes locally: `git commit -m "your message"`
-10. Push to GitHub: Use the `mcp__git_proxy__push` tool
+9. **Commit your changes locally**: `git commit -m "your message"`
+10. **Push to GitHub via proxy**: Use the `mcp__git_proxy__push` tool
+
+### Git Proxy Tool Details:
+
+#### `mcp__git_proxy__fetch`
+- Fetches latest changes from GitHub to the secure proxy
+- Then syncs those changes to your local repository
+- **Use this instead of** `git pull` or `git fetch`
+- Run this before starting work to get latest code
+
+#### `mcp__git_proxy__push` 
+- Syncs your local commits to the secure proxy
+- Then pushes your work branch ({{workBranch}}) to GitHub
+- **Use this instead of** `git push`
+- Only works for your designated work branch
+- **Requirement**: You must have committed your changes locally first
 
 ## Guidelines
 - **Always read the issue thoroughly** - it may specify a base branch or
@@ -55,6 +76,13 @@ coding agents spawned in containers (firecracker VMs actually) based on
 - Don't assume answers to big questions. You can stop and ask the user
   questions when you're blocked, and your state will be reported as "idle" to a
   system dashboard so that a user comes to check on you and unblock you.
+
+## Important Security Notes
+- **No direct GitHub access**: Your repository has no remote origin configured for security
+- **Git proxy required**: All GitHub operations must go through MCP tools
+- **Branch restrictions**: You can only push to your designated branch: {{workBranch}}
+- **Local commits first**: Always `git commit` locally before using `mcp__git_proxy__push`
+- **Fetch before work**: Use `mcp__git_proxy__fetch` to get latest changes before starting
 
 ### Ensure IPv4 and IPv6 Service Binding
 

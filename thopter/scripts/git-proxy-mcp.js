@@ -202,10 +202,74 @@ class GitProxyMCPServer {
         };
       }
 
-      const command = `git push origin ${this.workBranch}`;
-      this.log(`Executing: ${command}`);
+      // Get repository name and construct thopter repo path
+      const repository = process.env.REPOSITORY;
+      if (!repository) {
+        const errorMsg = "REPOSITORY environment variable not set";
+        this.log(errorMsg);
+        return {
+          content: [
+            {
+              type: "text",
+              text: errorMsg
+            }
+          ]
+        };
+      }
+
+      const repoName = repository.split('/')[1];
+      const thopterRepoPath = `/data/thopter/workspace/${repoName}`;
+
+      // Check if thopter repository exists
+      if (!fs.existsSync(thopterRepoPath)) {
+        const errorMsg = `Thopter repository not found at ${thopterRepoPath}`;
+        this.log(errorMsg);
+        return {
+          content: [
+            {
+              type: "text",
+              text: errorMsg
+            }
+          ]
+        };
+      }
+
+      // Step 1: Sync changes from thopter repository to bare repository
+      this.log(`Step 1: Syncing changes from thopter repo: ${thopterRepoPath}`);
+      const syncCommand = `git fetch ${thopterRepoPath} ${this.workBranch}:${this.workBranch}`;
+      this.log(`Executing: ${syncCommand}`);
       
-      const { stdout, stderr } = await execAsync(command, {
+      try {
+        const { stdout: syncStdout, stderr: syncStderr } = await execAsync(syncCommand, {
+          cwd: this.bareRepoPath,
+          timeout: 30000 // 30 second timeout for sync
+        });
+
+        if (syncStdout) {
+          this.log(`git fetch stdout: ${syncStdout}`);
+        }
+        if (syncStderr) {
+          this.log(`git fetch stderr: ${syncStderr}`);
+        }
+      } catch (syncError) {
+        const errorMsg = `Failed to sync from thopter repository: ${syncError.message}`;
+        this.log(errorMsg);
+        return {
+          content: [
+            {
+              type: "text",
+              text: errorMsg
+            }
+          ]
+        };
+      }
+
+      // Step 2: Push to GitHub
+      this.log(`Step 2: Pushing to GitHub`);
+      const pushCommand = `git push origin ${this.workBranch}`;
+      this.log(`Executing: ${pushCommand}`);
+      
+      const { stdout, stderr } = await execAsync(pushCommand, {
         cwd: this.bareRepoPath,
         timeout: 60000 // 60 second timeout for push operations
       });
@@ -222,7 +286,7 @@ class GitProxyMCPServer {
         content: [
           {
             type: "text",
-            text: `Push completed successfully to branch ${this.workBranch}.\nStdout: ${stdout}\nStderr: ${stderr}`
+            text: `Push completed successfully to branch ${this.workBranch}.\nStep 1 - Sync from thopter repo: ✅\nStep 2 - Push to GitHub: ✅\nOutput: ${stdout}${stderr ? '\nStderr: ' + stderr : ''}`
           }
         ]
       };

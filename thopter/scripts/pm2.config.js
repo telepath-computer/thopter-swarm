@@ -64,7 +64,8 @@ module.exports = {
     env: {
       NODE_ENV: 'production',
       WORK_BRANCH: process.env.WORK_BRANCH,
-      IS_GOLDEN_CLAUDE: process.env.IS_GOLDEN_CLAUDE
+      IS_GOLDEN_CLAUDE: process.env.IS_GOLDEN_CLAUDE,
+      REPOSITORY: process.env.REPOSITORY
     },
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     out_file: '/data/logs/git-proxy.out.log',

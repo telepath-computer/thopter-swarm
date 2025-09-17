@@ -128,9 +128,14 @@ if [ "$IS_GOLDEN_CLAUDE" != "true" ]; then
         rm -rf /data/root/thopter-repo
         git clone --bare https://${GITHUB_REPO_PAT}@github.com/${REPOSITORY} /data/root/thopter-repo
         
-        # Clone from bare repo for thopter user
+        # Clone from bare repo for thopter user (local-only, no remote origin)
         REPO_NAME=$(echo $REPOSITORY | cut -d'/' -f2)
         git clone /data/root/thopter-repo /data/thopter/workspace/$REPO_NAME
+        
+        # Remove origin remote to make repository local-only (no direct GitHub access)
+        cd /data/thopter/workspace/$REPO_NAME
+        git remote remove origin
+        cd /
     else
         thopter_log "Skipping git repository setup - missing REPOSITORY or GITHUB_REPO_PAT"
     fi
