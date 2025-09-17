@@ -12,10 +12,12 @@ Currently, Claude has direct access to a GitHub Personal Access Token (PAT) with
 
 ### Components
 
-1. **Root-owned bare repository** (`/root/thopter-repo`)
+1. **Root-owned bare repository** (`/data/root/thopter-repo`)
    - Bare git repository owned by root
+   - Located in `/data/root` for high-performance volume access
    - Contains the GitHub PAT in its git config
-   - Only accessible by root
+   - Directory permissions: 700 (only accessible by root)
+   - The `/data/root` directory is a secure enclave within the performance-optimized `/data` volume
 
 2. **Claude's working repository** (`/data/thopter/workspace/{repoName}`)
    - Regular git repository owned by thopter user
@@ -91,23 +93,39 @@ Currently, Claude has direct access to a GitHub Personal Access Token (PAT) with
   - Format: `[timestamp] Executing: {command}` followed by output
 
 ### File Locations
-- Bare repo: `/root/thopter-repo`
+- Bare repo: `/data/root/thopter-repo`
+- Root enclave: `/data/root` (700 permissions, root:root ownership)
 - MCP server script: `/usr/local/bin/git-proxy-mcp.js`
 - Claude's repo: `/data/thopter/workspace/{repoName}`
 
+### Directory Structure
+```
+/data/                      # High-performance Fly.io volume
+├── root/                   # Root-owned enclave (700 permissions)
+│   └── thopter-repo/      # Bare repository with PAT
+└── thopter/               # Thopter user space
+    ├── workspace/
+    │   └── {repoName}/    # Working repository
+    ├── logs/
+    └── .claude/
+```
+
 ### Security Model
 - Claude has no access to the GitHub PAT
+- Claude cannot access `/data/root` directory (700 permissions, root ownership)
 - Claude can only trigger push to one predefined branch
 - All git operations are logged via pm2 (complete stdout/stderr capture)
 - Every git command execution is logged with full output for audit trail
 - Root process validates branch name from environment variable
 - No command injection possible (no user input in git commands)
+- Permission isolation maintained even within the same `/data` volume
 
 ## Modifications Required
 
 ### 1. thopter-init.sh (Complete Replacement of Git Setup)
+- Create `/data/root` directory with 700 permissions (root only)
 - Remove all existing git clone logic for thopter user
-- Set up bare repo as root
+- Set up bare repo at `/data/root/thopter-repo` as root
 - Clone from GitHub with PAT embedded in URL (root only)
 - Set WORK_BRANCH environment variable
 - Start MCP server via pm2
@@ -115,6 +133,7 @@ Currently, Claude has direct access to a GitHub Personal Access Token (PAT) with
 - Configure Claude's MCP settings: `claude mcp add --transport http git-proxy http://localhost:8777`
 - Remove all PAT passing to thopter user
 - Rename start-observer.sh to start-services.sh
+- Modify permission fixing to preserve root ownership of `/data/root`
 
 ### 2. pm2.config.js
 - Add git-proxy-mcp server configuration running as root
@@ -136,6 +155,14 @@ Currently, Claude has direct access to a GitHub Personal Access Token (PAT) with
 4. Verify Claude cannot push to other branches (command will fail)
 5. Check pm2 logs for git operation audit trail
 6. Verify PAT is not accessible from thopter user
+
+## Performance Considerations
+
+The bare repository is intentionally placed at `/data/root/thopter-repo` rather than `/root/thopter-repo` because:
+- `/data` is a Fly.io volume mount optimized for I/O performance
+- `/root` resides on the VM's local filesystem which is significantly slower
+- All git operations (fetch, push, clone) benefit from the faster storage
+- The performance improvement is critical for large repositories
 
 ## Production Readiness
 This is a prototype implementation that completely replaces the existing git authentication system. There is no migration path or backwards compatibility. All existing thopters and golden claudes must be recreated after deployment.

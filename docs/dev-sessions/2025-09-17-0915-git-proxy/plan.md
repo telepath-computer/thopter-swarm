@@ -33,6 +33,8 @@ This division of labor ensures clean code delivery while acknowledging the execu
 - **NO BACKWARDS COMPATIBILITY** - This completely replaces the existing git system
 - All existing thopters and golden claudes will be broken and must be recreated
 - The MCP server needs to run as root but be accessible to the thopter user
+- **PERFORMANCE CRITICAL**: Bare repository must be in `/data/root` not `/root` for volume performance
+- The `/data/root` directory is a secure enclave with 700 permissions within the `/data` volume
 - Environment variables (WORK_BRANCH, GITHUB_PAT, GITHUB_REPOSITORY) are critical for configuration
 - This is a prototype replacement - simplicity over sophistication
 - Manual testing only, no automated tests required
@@ -89,7 +91,7 @@ Develop the core MCP server that will handle git proxy operations. This server w
    - No parameters required
    - Wrap git execution in try-catch
    - Check if repository exists before executing
-   - Execute `git fetch` in `/root/thopter-repo`
+   - Execute `git fetch` in `/data/root/thopter-repo`
    - **ALWAYS log to console**: `[timestamp] Executing: git fetch`
    - **ALWAYS log git stdout/stderr to console** (success or failure)
    - Return stdout and stderr as text content on success
@@ -103,7 +105,7 @@ Develop the core MCP server that will handle git proxy operations. This server w
    - Wrap git execution in try-catch
    - Read WORK_BRANCH from environment (return error if missing)
    - Check if repository exists before executing
-   - Execute `git push origin ${WORK_BRANCH}` in `/root/thopter-repo`
+   - Execute `git push origin ${WORK_BRANCH}` in `/data/root/thopter-repo`
    - **ALWAYS log to console**: `[timestamp] Executing: git push origin ${WORK_BRANCH}`
    - **ALWAYS log git stdout/stderr to console** (success or failure)
    - Return stdout and stderr as text content on success
@@ -213,6 +215,9 @@ Update the thopter initialization script to set up the dual-repository system an
 ### Keep in Mind
 - Initialization happens as root before switching to thopter user
 - PAT must not be accessible to thopter user at all (complete isolation)
+- **CRITICAL**: Must create `/data/root` directory with 700 permissions for performance
+- Bare repository goes in `/data/root/thopter-repo` NOT `/root/thopter-repo`
+- Permission fixing at end of script must preserve root ownership of `/data/root`
 - Repository names come from existing provisioning logic (can modify if needed)
 - Work branch is already generated - need to export as WORK_BRANCH
 - Completely replace all existing git clone/setup logic - no preservation of old approach
@@ -244,16 +249,23 @@ Update the thopter initialization script to set up the dual-repository system an
      ```
    - REPOSITORY and GITHUB_REPO_PAT are available as env vars from provisioner
 
-3. **Set up root-owned bare repository**
+3. **Create secure root enclave and set up bare repository**
    - **File to modify**: `/thopter/scripts/thopter-init.sh`
    - Add after line 95 (after firewall setup), as root:
      ```bash
+     # Create secure root enclave in /data for performance
+     thopter_log "Creating secure root enclave..."
+     mkdir -p /data/root
+     chmod 700 /data/root
+     chown root:root /data/root
+     
      # Clone bare repo as root with PAT
      thopter_log "Setting up root-owned bare repository..."
-     rm -rf /root/thopter-repo
-     git clone --bare https://${GITHUB_REPO_PAT}@github.com/${REPOSITORY} /root/thopter-repo
+     rm -rf /data/root/thopter-repo
+     git clone --bare https://${GITHUB_REPO_PAT}@github.com/${REPOSITORY} /data/root/thopter-repo
      ```
    - The PAT will be embedded in the remote URL in the git config
+   - Using `/data/root` ensures high-performance I/O operations
 
 4. **Start MCP server via PM2**
    - **File to modify**: `/thopter/scripts/start-services.sh` (renamed from start-observer.sh)
@@ -266,20 +278,34 @@ Update the thopter initialization script to set up the dual-repository system an
      ```bash
      # Clone from bare repo for thopter user
      REPO_NAME=$(echo $REPOSITORY | cut -d'/' -f2)
-     git clone /root/thopter-repo /data/thopter/workspace/$REPO_NAME
+     git clone /data/root/thopter-repo /data/thopter/workspace/$REPO_NAME
      chown -R thopter:thopter /data/thopter/workspace/$REPO_NAME
      ```
 
 6. **Configure Claude's MCP settings**
    - **File to modify**: `/thopter/scripts/thopter-init.sh`
-   - Add after line 165 (after chown, before switching to thopter user):
+   - Add BEFORE the blanket chown but after services start:
      ```bash
      # Configure Claude's MCP settings as thopter user
      runuser -u thopter -- claude mcp add --transport http git-proxy http://localhost:8777
      ```
    - This adds the MCP server to Claude's user configuration
 
-7. **Update prompts to use MCP tools**
+7. **Fix permissions while preserving root enclave**
+   - **File to modify**: `/thopter/scripts/thopter-init.sh`
+   - Replace the blanket chown at line 165 with:
+     ```bash
+     # Fix all ownership but preserve root enclave
+     thopter_log "chown -R thopter:thopter /data"
+     chown -R thopter:thopter /data
+     
+     # Restore root ownership of the secure enclave
+     chown -R root:root /data/root
+     chmod 700 /data/root
+     ```
+   - This ensures the root enclave remains secure after the blanket permission fix
+
+8. **Update prompts to use MCP tools**
    - **File to modify**: `/hub/templates/prompts/default.md`
    - Replace direct git push instructions with:
      ```markdown
@@ -329,13 +355,19 @@ thopter_log "Constructed WORK_BRANCH: $WORK_BRANCH"
 
 # REPOSITORY and GITHUB_REPO_PAT are set by provisioner
 
-# Clone bare repo as root with PAT
-rm -rf /root/thopter-repo
-git clone --bare https://${GITHUB_REPO_PAT}@github.com/${REPOSITORY} /root/thopter-repo
+# Create secure root enclave in /data volume for performance
+thopter_log "Creating secure root enclave..."
+mkdir -p /data/root
+chmod 700 /data/root
+chown root:root /data/root
+
+# Clone bare repo as root with PAT (using fast /data volume)
+rm -rf /data/root/thopter-repo
+git clone --bare https://${GITHUB_REPO_PAT}@github.com/${REPOSITORY} /data/root/thopter-repo
 
 # Clone from bare repo for thopter user
 REPO_NAME=$(echo $REPOSITORY | cut -d'/' -f2)
-git clone /root/thopter-repo /data/thopter/workspace/$REPO_NAME
+git clone /data/root/thopter-repo /data/thopter/workspace/$REPO_NAME
 
 # Export WORK_BRANCH for thopter user
 echo "export WORK_BRANCH='$WORK_BRANCH'" >> /data/thopter/.bashrc
@@ -356,6 +388,7 @@ runuser -u thopter -- claude mcp add --transport http git-proxy http://localhost
 
 #### Final Setup (lines 166-175)
 - Ownership fixed: `chown -R thopter:thopter /data`
+- **Root enclave restored**: `chown -R root:root /data/root && chmod 700 /data/root`
 - Switch to thopter user
 - Launch tmux and gotty web terminal
 
@@ -363,15 +396,18 @@ runuser -u thopter -- claude mcp add --transport http git-proxy http://localhost
 Once initialization is complete:
 
 - **Root process** has:
-  - Bare repository at `/root/thopter-repo` with PAT in URL
+  - Secure enclave at `/data/root` (700 permissions)
+  - Bare repository at `/data/root/thopter-repo` with PAT in URL
   - MCP server running on port 8777
   - Full access to push/fetch from GitHub
+  - High-performance I/O via `/data` volume
 
 - **Thopter user** has:
   - Working repository at `/data/thopter/workspace/{repoName}`
-  - Origin pointing to `/root/thopter-repo` (no GitHub access)
+  - Origin pointing to `/data/root/thopter-repo` (no GitHub access)
   - Claude configured with git-proxy MCP server
   - WORK_BRANCH environment variable set
+  - Cannot access `/data/root` directory (permission denied)
 
 - **Claude** can:
   - Commit and push to local bare repo
@@ -423,7 +459,9 @@ Once initialization is complete:
 
 2. **Verify repository setup**
    - SSH into thopter and check repository structure
-   - Confirm bare repo exists at `/root/thopter-repo`
+   - Confirm bare repo exists at `/data/root/thopter-repo`
+   - Verify `/data/root` has 700 permissions and root ownership
+   - Confirm thopter user cannot access `/data/root`
    - Verify thopter repo origin points to bare repo
    - Check that PAT is not in thopter user environment
 
@@ -440,9 +478,11 @@ Once initialization is complete:
    - Confirm push to other branches would fail
 
 5. **Verify security boundaries**
-   - As thopter user, attempt to access `/root/thopter-repo`
+   - As thopter user, attempt to access `/data/root/thopter-repo`
+   - Verify permission denied when trying to read `/data/root`
    - Try to read PAT from environment or git config
    - Ensure MCP server only responds to valid requests
+   - Test that root enclave survives permission repairs
 
 6. **Check logging and audit trail**
    - Review PM2 logs for git-proxy-mcp
