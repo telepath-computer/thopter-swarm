@@ -82,6 +82,9 @@ RUN ARCH=$(dpkg --print-architecture) && \
 # Install Claude CLI
 RUN npm install -g @anthropic-ai/claude-code
 
+# Install MCP SDK globally for git proxy
+RUN npm install -g @modelcontextprotocol/sdk
+
 # for metadata service
 RUN apt-get install -y redis
 RUN npm install -g ioredis
@@ -119,12 +122,14 @@ WORKDIR /root
 COPY scripts/observer.js /usr/local/bin/observer.js
 COPY scripts/claude-log-generator.js /usr/local/bin/claude-log-generator.js
 COPY scripts/pm2.config.js /usr/local/bin/pm2.config.js
-COPY scripts/start-observer.sh /usr/local/bin/start-observer.sh
+COPY scripts/start-services.sh /usr/local/bin/start-services.sh
+COPY scripts/git-proxy-mcp.js /usr/local/bin/git-proxy-mcp.js
 
 # Set permissions for session observer scripts
 RUN chmod +x /usr/local/bin/observer.js && \
     chmod +x /usr/local/bin/claude-log-generator.js && \
-    chmod +x /usr/local/bin/start-observer.sh
+    chmod +x /usr/local/bin/start-services.sh && \
+    chmod +x /usr/local/bin/git-proxy-mcp.js
 
 ### # Copy firewall setup script  
 ### COPY scripts/setup-firewall.sh /usr/local/bin/setup-firewall.sh
@@ -142,10 +147,8 @@ RUN echo "set -g mouse on" > /etc/tmux.conf && \
 COPY scripts/firewall.sh /usr/local/bin/firewall.sh
 RUN chmod +x /usr/local/bin/firewall.sh
 
-# Create thopter log directory for capturing initialization and provisioning events
-RUN mkdir -p /thopter && \
-    touch /thopter/log && \
-    chmod 666 /thopter/log
+# Create thopter log directory placeholder (actual logs will be in /data/logs)
+RUN mkdir -p /thopter
 
 # Create init script that transitions from root to thopter user
 COPY scripts/thopter-init.sh /usr/local/bin/thopter-init.sh

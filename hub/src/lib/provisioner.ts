@@ -125,7 +125,7 @@ export class ThopterProvisioner {
       
       // Simple command with no backslashes or complex quoting
       await execAsync(
-        `fly ssh console -C "sh -c 'echo ${encoded} | base64 -d >> /thopter/log'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+        `fly ssh console -C "sh -c 'echo ${encoded} | base64 -d >> /data/logs/init.log'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
         { 
           cwd: process.cwd()
         }
@@ -176,11 +176,9 @@ export class ThopterProvisioner {
       await this.copyGoldenClaudeData(machineId, requestId, request.gc);
       await this.logToThopterAsync(machineId, "Golden Claude data copy operation completed");
 
-      // Setup Git configuration and clone repository
-      console.log(`🔧 [${requestId}] Setting up Git configuration and cloning repository...`);
-      await this.logToThopterAsync(machineId, `Setting up Git configuration and cloning repository ${request.repository}`);
-      await this.setupGitAndCloneRepo(machineId, request, requestId);
-      await this.logToThopterAsync(machineId, "Git configuration and repository clone completed");
+      // Git operations are now handled by init script with git proxy
+      console.log(`🔧 [${requestId}] Git operations will be handled by thopter-init.sh with git proxy`);
+      await this.logToThopterAsync(machineId, "Git operations will be handled by init script with git proxy");
 
       // Copy issue and prompt files to the machine after it's ready
       console.log(`📄 [${requestId}] Copying context files to machine...`);
@@ -307,6 +305,7 @@ export class ThopterProvisioner {
       '--env', `GITHUB_REPO_PAT=${repoConfig.agentCoderPAT}`,
       '--env', `REPOSITORY=${request.repository}`,
       '--env', `ISSUE_NUMBER=${request.github.issueNumber}`,
+      '--env', `IS_GOLDEN_CLAUDE=false`,
       '--env', `GIT_USER_NAME=${repoConfig.userName}`,
       '--env', `GIT_USER_EMAIL=${repoConfig.userEmail}`,
       '--env', `DANGEROUSLY_SKIP_FIREWALL=${process.env.DANGEROUSLY_SKIP_FIREWALL || '0'}`,
@@ -686,7 +685,7 @@ ${request.github.issueBody}
   }
 
   /**
-   * Setup Git configuration and clone repository in the thopter machine
+   * Setup Git configuration and clone repository in the thopter machine\n   * NOTE: This method is now obsolete - git operations are handled by thopter-init.sh with git proxy
    */
   private async setupGitAndCloneRepo(machineId: string, request: ProvisionRequest, requestId: string): Promise<void> {
     const startTime = Date.now();

@@ -1,14 +1,33 @@
 #!/bin/bash
 set -e
 
-# Logging function that outputs to both stdout and /thopter/log
-# Captures both stdout and stderr to the log file
+# Create centralized logging directory on fast filesystem
+mkdir -p /data/logs
+chmod 755 /data/logs
+chown thopter:thopter /data/logs
+
+# Update logging function to use new location
+LOG_FILE="/data/logs/init.log"
 thopter_log() {
     local message="$(date '+%Y-%m-%d %H:%M:%S') [THOPTER-INIT] $*"
-    echo "$message" | tee -a /thopter/log
+    echo "$message" | tee -a "$LOG_FILE"
 }
 
 thopter_log "Starting Thopter agent container as PID 1..."
+
+# Check if this is a golden claude instance
+if [ "$IS_GOLDEN_CLAUDE" = "true" ]; then
+    thopter_log "Running in golden claude mode - git operations will be disabled"
+    export GOLDEN_CLAUDE_MODE=true
+else
+    # Construct work branch from issue number and machine ID
+    if [ -n "$ISSUE_NUMBER" ] && [ -n "$FLY_MACHINE_ID" ]; then
+        export WORK_BRANCH="thopter/${ISSUE_NUMBER}--${FLY_MACHINE_ID}"
+        thopter_log "Constructed WORK_BRANCH: $WORK_BRANCH"
+    else
+        thopter_log "Warning: Cannot construct WORK_BRANCH - missing ISSUE_NUMBER or FLY_MACHINE_ID"
+    fi
+fi
 
 # important: the golden claude copy logic will *bulldoze* files in the homedir,
 # with unpredictable timing relative to this script. for example, .bashrc --
@@ -91,8 +110,33 @@ fi
 # Phase 4: Setup network firewall (as root before switching to thopter user)
 thopter_log "Setting up network firewall..."
 /usr/local/bin/firewall.sh 2>&1 | while IFS= read -r line; do
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [FIREWALL] $line" | tee -a /thopter/log
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [FIREWALL] $line" | tee -a "$LOG_FILE"
 done
+
+# Skip all git setup for golden claude instances
+if [ "$IS_GOLDEN_CLAUDE" != "true" ]; then
+    # Create secure root enclave in /data for performance
+    thopter_log "Creating secure root enclave..."
+    mkdir -p /data/root
+    chmod 700 /data/root
+    chown root:root /data/root
+    
+    # Only proceed if we have required environment variables
+    if [ -n "$REPOSITORY" ] && [ -n "$GITHUB_REPO_PAT" ]; then
+        # Clone bare repo as root with PAT
+        thopter_log "Setting up root-owned bare repository..."
+        rm -rf /data/root/thopter-repo
+        git clone --bare https://${GITHUB_REPO_PAT}@github.com/${REPOSITORY} /data/root/thopter-repo
+        
+        # Clone from bare repo for thopter user
+        REPO_NAME=$(echo $REPOSITORY | cut -d'/' -f2)
+        git clone /data/root/thopter-repo /data/thopter/workspace/$REPO_NAME
+    else
+        thopter_log "Skipping git repository setup - missing REPOSITORY or GITHUB_REPO_PAT"
+    fi
+else
+    thopter_log "Skipping git setup in golden claude mode"
+fi
 
 # If credentials were injected during container setup, fix ownership
 if [ -d "/data/thopter/.claude" ]; then
@@ -147,9 +191,7 @@ echo 'export UV_TOOL_DIR="/opt/uv/tools"' >> /data/thopter/.bashrc
 # ensure bashrc is loaded on login shells
 echo 'source ~/.bashrc' >> /data/thopter/.bash_profile
 
-# Ensure logs directory exists with proper ownership for pm2 service logging
-thopter_log "create and chmod /data/thopter/logs (for pm2)"
-mkdir -p /data/thopter/logs
+# Note: PM2 logs now go to /data/logs (created at top of script)
 
 # Create directory for claude-code-log HTML output (webserver working directory)
 thopter_log "chmod .claude dir"
@@ -157,13 +199,30 @@ mkdir -p /data/thopter/.claude/projects
 
 # Start session observer with PM2 (as root, but observer runs as thopter user)
 thopter_log "Starting session observer..."
-/usr/local/bin/start-observer.sh 2>&1 | while IFS= read -r line; do
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [OBSERVER] $line" | tee -a /thopter/log
+/usr/local/bin/start-services.sh 2>&1 | while IFS= read -r line; do
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [SERVICES] $line" | tee -a "$LOG_FILE"
 done
 
-# fix all ownership
+# Export WORK_BRANCH for thopter user (only if not golden claude mode)
+if [ "$IS_GOLDEN_CLAUDE" != "true" ] && [ -n "$WORK_BRANCH" ]; then
+    echo "export WORK_BRANCH='$WORK_BRANCH'" >> /data/thopter/.bashrc
+fi
+
+# Configure Claude's MCP settings as thopter user
+runuser -u thopter -- claude mcp add --transport http git-proxy http://localhost:8777
+
+# Fix all ownership but preserve root enclave and shared logs
 thopter_log "chown -R thopter:thopter /data"
 chown -R thopter:thopter /data
+
+# Restore root ownership of the secure enclave
+if [ -d "/data/root" ]; then
+    chown -R root:root /data/root
+    chmod 700 /data/root
+fi
+
+# Keep logs directory accessible to both root and thopter
+chmod 755 /data/logs
 
 thopter_log "Switching to thopter user and starting NO-INDEX web terminal..."
 
