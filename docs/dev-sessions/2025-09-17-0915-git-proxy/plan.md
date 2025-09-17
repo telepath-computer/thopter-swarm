@@ -6,6 +6,23 @@
 
 This plan implements a secure git proxy system as described in `spec.md`. The goal is to remove Claude's direct access to GitHub PATs while maintaining its ability to fetch and push code changes. This is achieved through a root-owned MCP server that acts as a controlled gateway for git operations.
 
+### Implementation Constraints and Strategy
+
+**IMPORTANT**: Claude (the AI assistant) has the following constraints during implementation:
+- **Cannot run Docker builds** - Can only write Dockerfiles and verify syntax
+- **Cannot deploy to Fly.io** - Can only write deployment scripts
+- **Cannot execute the MCP server** - Can only write and verify JavaScript/TypeScript syntax
+- **Cannot test the full integration** - Can only ensure code compiles without errors
+
+**Implementation Strategy**:
+1. Claude will write all necessary code files and modifications
+2. Claude will run `npm run build` to verify TypeScript compilation
+3. Claude will ensure all syntax is valid and follows best practices
+4. User will perform manual Docker builds, deployments, and testing
+5. User will provide feedback on any issues for Claude to fix
+
+This division of labor ensures clean code delivery while acknowledging the execution boundaries.
+
 ### Key Requirements
 - Claude works on a non-privileged copy of the repository
 - Git operations are proxied through a root-owned MCP server
@@ -37,12 +54,21 @@ Develop the core MCP server that will handle git proxy operations. This server w
 - Server implements both fetch and push tools
 - TypeScript compiles without errors
 - Server can be manually tested locally (outside thopter environment)
+- All git command output is logged to stdout for pm2 capture
+- Logging includes timestamps, commands, and full output
 
 ### Keep in Mind
 - Use the MCP SDK's createSdkMcpServer pattern from Claude Code documentation
 - Server must be HTTP-based for cross-user communication
-- Keep it simple - just execute git commands and return output
-- No sophisticated error handling needed - pass through git's output
+- **CRITICAL**: Server MUST be resilient to all failures and never crash
+- Wrap all operations in try-catch blocks
+- Return errors as tool results, not exceptions
+- Server must continue running even if:
+  - Repository doesn't exist
+  - Permissions are wrong
+  - Network is unavailable
+  - Environment variables are missing
+- Log all errors clearly for debugging
 - Branch name comes from WORK_BRANCH environment variable
 
 ### Steps
@@ -61,28 +87,52 @@ Develop the core MCP server that will handle git proxy operations. This server w
    - **File being modified**: `/thopter/scripts/git-proxy-mcp.js`
    - Tool name: `fetch` (becomes `mcp__git_proxy__fetch`)
    - No parameters required
+   - Wrap git execution in try-catch
+   - Check if repository exists before executing
    - Execute `git fetch` in `/root/thopter-repo`
-   - Return stdout and stderr as text content
+   - **ALWAYS log to console**: `[timestamp] Executing: git fetch`
+   - **ALWAYS log git stdout/stderr to console** (success or failure)
+   - Return stdout and stderr as text content on success
+   - Return error message as text content on failure
+   - PM2 will capture all console output for audit trail
 
 3. **Implement the push tool (in git-proxy-mcp.js)**
    - **File being modified**: `/thopter/scripts/git-proxy-mcp.js`
    - Tool name: `push` (becomes `mcp__git_proxy__push`)
    - No parameters required
-   - Read WORK_BRANCH from environment
+   - Wrap git execution in try-catch
+   - Read WORK_BRANCH from environment (return error if missing)
+   - Check if repository exists before executing
    - Execute `git push origin ${WORK_BRANCH}` in `/root/thopter-repo`
-   - Return stdout and stderr as text content
+   - **ALWAYS log to console**: `[timestamp] Executing: git push origin ${WORK_BRANCH}`
+   - **ALWAYS log git stdout/stderr to console** (success or failure)
+   - Return stdout and stderr as text content on success
+   - Return error message as text content on failure
+   - PM2 will capture all console output for audit trail
 
 4. **Add HTTP server setup (in git-proxy-mcp.js)**
    - **File being modified**: `/thopter/scripts/git-proxy-mcp.js`
    - Configure server to listen on port 8777 (unique and greppable)
-   - Add basic logging to stdout for pm2 capture
+   - Log server startup: `[timestamp] Git proxy MCP server started on port 8777`
+   - Log each incoming request: `[timestamp] Received request for tool: {toolName}`
+   - Ensure ALL output goes to stdout for pm2 capture
    - Ensure server stays running and handles multiple requests
 
-5. **Add basic validation (in git-proxy-mcp.js)**
+5. **Add error resilience and comprehensive logging (in git-proxy-mcp.js)**
    - **File being modified**: `/thopter/scripts/git-proxy-mcp.js`
-   - Check that `/root/thopter-repo` exists before operations
-   - Verify WORK_BRANCH is set for push operations
-   - Log all operations with timestamps
+   - Wrap entire server initialization in try-catch
+   - Gracefully handle missing `/root/thopter-repo`
+   - Gracefully handle missing WORK_BRANCH for push
+   - Never let an error crash the server process
+   - **Comprehensive logging requirements**:
+     - Log all operations with ISO timestamps
+     - Log git command before execution
+     - Log git command output (stdout AND stderr)
+     - Log success/failure status
+     - Format: `[YYYY-MM-DD HH:mm:ss] message`
+   - Use process.on('uncaughtException') with logging
+   - Use process.on('unhandledRejection') with logging
+   - All logs go to stdout for pm2 capture
 
 ---
 
@@ -136,11 +186,11 @@ Integrate the MCP server into the thopter container build and process management
      - Update `/thopter/Dockerfile` line 122 to reference new name
      - Update `/thopter/scripts/thopter-init.sh` line 160 to call new script name
 
-5. **Build and verify Docker image**
+5. **Verify code compilation**
    - **Command location**: Run from repo root
    - Run `npm run build` in `/hub` to check TypeScript compilation
-   - Build Docker image locally to verify no syntax errors
-   - Check that all files are in expected locations
+   - Verify all JavaScript files have valid syntax
+   - Note: Docker build and deployment will be done by user manually
 
 ---
 
@@ -170,22 +220,29 @@ Update the thopter initialization script to set up the dual-repository system an
 
 ### Steps
 
-1. **Update provisioner to pass WORK_BRANCH environment variable**
+1. **Update provisioner to pass ISSUE_NUMBER environment variable**
    - **File to modify**: `/hub/src/lib/provisioner.ts`
-   - Add WORK_BRANCH to environment variables when creating machine (around line 280):
+   - Ensure ISSUE_NUMBER is passed as environment variable during machine creation:
      ```typescript
-     '--env', `WORK_BRANCH=${branchName}`,
+     '--env', `ISSUE_NUMBER=${issueNumber}`,
      ```
    - Comment out or remove git clone operations around lines 320-380
    - Keep PAT passing but rename to be clear it's for root only
+   - Note: WORK_BRANCH will be constructed by init script using ISSUE_NUMBER + FLY_MACHINE_ID
 
-2. **Update thopter-init to use environment variables**
+2. **Construct WORK_BRANCH in thopter-init.sh**
    - **File to modify**: `/thopter/scripts/thopter-init.sh`
-   - WORK_BRANCH, REPOSITORY, and GITHUB_REPO_PAT are now available as env vars
+   - Add early in script (after line 10) to construct WORK_BRANCH:
+     ```bash
+     # Construct work branch from issue number and machine ID
+     export WORK_BRANCH="thopter/${ISSUE_NUMBER}--${FLY_MACHINE_ID}"
+     thopter_log "Constructed WORK_BRANCH: $WORK_BRANCH"
+     ```
    - Add after line 95 to export WORK_BRANCH for thopter user:
      ```bash
      echo "export WORK_BRANCH='$WORK_BRANCH'" >> /data/thopter/.bashrc
      ```
+   - REPOSITORY and GITHUB_REPO_PAT are available as env vars from provisioner
 
 3. **Set up root-owned bare repository**
    - **File to modify**: `/thopter/scripts/thopter-init.sh`
@@ -247,8 +304,8 @@ This section describes the complete flow of how a thopter is initialized with th
 - **Machine creation**: Fly machine created with environment variables:
   - `GITHUB_REPO_PAT` - The personal access token (for root only)
   - `REPOSITORY` - The repository to clone (e.g., "owner/repo")
-  - `ISSUE_NUMBER` - The GitHub issue number
-  - **NEW: `WORK_BRANCH`** - Pre-computed branch name (e.g., "thopter/123--machine-id")
+  - `ISSUE_NUMBER` - The GitHub issue number (MUST be passed for branch construction)
+  - Note: `FLY_MACHINE_ID` is automatically set by Fly.io at runtime
 - **Context files uploaded** (AFTER init completes):
   - `issue.json` - Contains `workBranch` field with branch name
   - `prompt.md` - Updated to reference MCP tools instead of direct git commands
@@ -265,8 +322,12 @@ The init script runs as root (PID 1) and performs these steps in order:
 #### Git Repository Setup (NEW - after line 95)
 
 ```bash
-# WORK_BRANCH is already set as environment variable by provisioner
-# REPOSITORY and GITHUB_REPO_PAT are also set by provisioner
+# Construct WORK_BRANCH from ISSUE_NUMBER and FLY_MACHINE_ID
+# ISSUE_NUMBER is set by provisioner, FLY_MACHINE_ID is set by Fly.io
+export WORK_BRANCH="thopter/${ISSUE_NUMBER}--${FLY_MACHINE_ID}"
+thopter_log "Constructed WORK_BRANCH: $WORK_BRANCH"
+
+# REPOSITORY and GITHUB_REPO_PAT are set by provisioner
 
 # Clone bare repo as root with PAT
 rm -rf /root/thopter-repo
@@ -328,13 +389,13 @@ Once initialization is complete:
 
 ---
 
-## Phase 4: Integration Testing and Validation
+## Phase 4: User Testing and Validation
 
 ### Summary
-Deploy and test the complete system to ensure all requirements are met.
+**This phase will be executed by the user**, not by Claude. After Claude completes code implementation and verifies compilation, the user will deploy and test the system.
 
 ### Phase Relationships
-- **Dependencies**: All previous phases
+- **Dependencies**: All previous phases completed by Claude
 - **Enables**: Production deployment
 
 ### Success Criteria
@@ -345,18 +406,20 @@ Deploy and test the complete system to ensure all requirements are met.
 - All operations are logged in PM2
 
 ### Keep in Mind
+- **User will execute all steps in this phase**
+- Claude will be available to fix any issues found
 - This is manual testing only
 - Need to test both success and failure cases
 - Should verify security boundaries are maintained
 - This is a complete replacement - old functionality will be broken and that's expected
 - All existing thopters will need to be recreated
 
-### Steps
+### Steps for User to Execute
 
 1. **Deploy test thopter**
-   - Use fly/recreate-gc.sh to create new golden claude
-   - Provision a test thopter with `/thopter` command
-   - Monitor logs during provisioning
+   - User runs: `./fly/recreate-gc.sh` to create new golden claude
+   - User provisions a test thopter with `/thopter` command
+   - User monitors logs during provisioning
 
 2. **Verify repository setup**
    - SSH into thopter and check repository structure
@@ -392,4 +455,6 @@ Deploy and test the complete system to ensure all requirements are met.
    - Update spec if implementation differs
 
 ### Post-Phase Status
-At the end of this phase, the system should be fully functional as a complete replacement for the existing git authentication. All old thopters will be broken - this is expected. New thopters created after deployment will use the new git proxy system exclusively. Any remaining issues should be documented for future enhancement.
+At the end of this phase (executed by the user), the system should be fully functional as a complete replacement for the existing git authentication. All old thopters will be broken - this is expected. New thopters created after deployment will use the new git proxy system exclusively.
+
+**Claude's role**: If the user encounters issues during testing, they will provide error messages and logs to Claude for debugging. Claude will then provide fixes for any issues found, which the user can deploy and test again. This iterative process continues until the system works correctly.
