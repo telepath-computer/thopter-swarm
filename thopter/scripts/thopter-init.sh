@@ -42,6 +42,9 @@ for i in {1..30}; do
     fi
 done
 
+# the mount comes as root owned
+chown -R thopter:thopter /data
+
 if [ "$DATA_MOUNT_READY" = false ]; then
     thopter_log "ERROR: Data mount point failed readiness check after 60 seconds"
     exit 1
@@ -152,6 +155,10 @@ echo 'export UV_BIN_DIR="/opt/uv/bin"' >> /data/thopter/.bashrc
 echo 'export UV_CACHE_DIR="/opt/uv/cache"' >> /data/thopter/.bashrc
 echo 'export UV_PYTHON_INSTALL_DIR="/opt/uv/pys"' >> /data/thopter/.bashrc
 echo 'export UV_TOOL_DIR="/opt/uv/tools"' >> /data/thopter/.bashrc
+
+# ensure bashrc is loaded on login shells
+echo 'source ~/.bashrc' >> /data/thopter/.bash_profile
+chown thopter:thopter /data/thopter/.bash_profile
 
 # Ensure logs directory exists with proper ownership for pm2 service logging
 thopter_log "create and chmod /data/thopter/logs (for pm2)"
