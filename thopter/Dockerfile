@@ -79,9 +79,6 @@ RUN ARCH=$(dpkg --print-architecture) && \
     chmod +x /usr/local/bin/gotty && \
     rm gotty_v1.6.0_linux_${GOTTY_ARCH}.tar.gz
 
-# Install Claude CLI
-RUN npm install -g @anthropic-ai/claude-code
-
 # for metadata service
 RUN apt-get install -y redis
 RUN npm install -g ioredis
@@ -159,5 +156,9 @@ EXPOSE 7681
 # minimize cache busting.
 ARG CURRENT_IMAGE
 ENV CURRENT_IMAGE=${CURRENT_IMAGE}
+
+# Install Claude CLI last - after current image arg so that docker image
+# caching does not prevent installation of the latest version.
+RUN npm install -g @anthropic-ai/claude-code
 
 CMD ["/usr/local/bin/thopter-init.sh"]
