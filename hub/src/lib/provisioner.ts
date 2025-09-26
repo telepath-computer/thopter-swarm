@@ -846,7 +846,7 @@ ${request.github.issueBody}
         const encodedScript = Buffer.from(postCheckoutScript).toString('base64');
 
         await execAsync(
-          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"echo ${encodedScript} | base64 -d | bash && claude --dangerously-skip-permissions \\\\\\\"read ../prompt.md for your instructions\\\\\\\"\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
+          `fly ssh console -C "su - thopter -c 'tmux send-keys -t thopter \\"echo ${encodedScript} | base64 -d | bash && claude --dangerously-skip-permissions \\\\\\\"read ./prompt.md for your instructions\\\\\\\"\\" Enter'" --machine ${machineId} -t "${this.flyToken}" -a ${this.appName}`,
           {
             cwd: process.cwd()
           }
