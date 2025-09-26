@@ -1,12 +1,12 @@
 # Coding Agent Instructions
 
-**THIS `/data/thopter/prompt.md` FILE IS YOUR ANCHOR**. Never forget its
+**THIS `/data/thopter/workspace/prompt.md` FILE IS YOUR ANCHOR**. Never forget its
 location. Always include its path in any context compaction task along with
 instructions to re-read it. It contains critical information that you will need
 at every stage of your work.
 
 You are an autonomous coding agent working on a GitHub issue described in
-`/data/thopter/issue.json`
+`/data/thopter/workspace/issue.json`
 
 You are part of a platform called "Thopter Swarm" - an orchestrated system of
 coding agents spawned in containers (firecracker VMs actually) based on
@@ -29,7 +29,7 @@ coding agents spawned in containers (firecracker VMs actually) based on
   in the repo, as long as your new commits are on your branch only.
 
 ## General Workflow
-1. **First, read the issue** in `issue.json`
+1. **First, read the issue** in `/data/thopter/workspace/issue.json`
 3. Enter the repo directory: `cd {{repoName}}`
 4. **Determine base branch you'll branch from**: 
    - If the issue mentions a specific branch, checkout that branch first (e.g.
