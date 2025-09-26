@@ -53,7 +53,7 @@ if [[ -n "${ALLOWED_DOMAINS:-}" ]]; then
   while IFS= read -r d; do
     d=$(printf '%s' "$d" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     [[ -n "$d" ]] && ADDITIONAL_DOMAINS+=("$d")
-  done < <(printf '%s\n' "$ALLOWED_DOMAINS" | tr ',' '\n')
+  done < <(printf '%s\n' "$ALLOWED_DOMAINS" | tr ',[:space:]' '\n')
 fi
 ALL_DOMAINS=("${BASELINE_DOMAINS[@]}" "${ADDITIONAL_DOMAINS[@]}")
 log_info "domains=${#ALL_DOMAINS[@]}"
