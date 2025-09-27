@@ -324,13 +324,13 @@ class SessionObserver {
 
   async loadIssueContext() {
     try {
-      const issueJsonPath = '/data/thopter/issue.json';
+      const issueJsonPath = '/data/thopter/workspace/issue.json';
       if (fs.existsSync(issueJsonPath)) {
         const issueData = fs.readFileSync(issueJsonPath, 'utf8');
         this.issueContext = JSON.parse(issueData);
-        console.log('[SessionObserver] Issue context loaded from /data/thopter/issue.json');
+        console.log('[SessionObserver] Issue context loaded from /data/thopter/workspace/issue.json');
       } else {
-        console.log('[SessionObserver] No issue.json found, observer will report basic status only');
+        console.log('[SessionObserver] No issue.json found at /data/thopter/workspace/issue.json, observer will report basic status only');
       }
     } catch (error) {
       console.warn('[SessionObserver] Failed to load issue context:', error.message);
