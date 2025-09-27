@@ -2,7 +2,6 @@ import { execSync } from 'child_process';
 import { ThopterState, ProvisionRequest, DestroyRequest, LogEvent, OperatingMode, ThopterStatusUpdate, GoldenClaudeState, GitHubIntegrationConfig, GitHubContext } from './types';
 import { isValidThopterPattern } from './thopter-utils';
 import { logger } from './logger';
-import { metadataClient } from './metadata-client';
 import tinyspawn from 'tinyspawn';
 
 // Our own flyctl wrapper that properly handles arguments with spaces
@@ -111,20 +110,7 @@ class StateManager {
       // Build state from fly data + preserved session/context
       for (const machine of thopterMachines) {
         const existing = this.thopters.get(machine.id);
-
-        // Restore GitHub context from Redis if not already present
-        let githubContext = existing?.github || this.expectedThopters.get(machine.id);
-        if (!githubContext) {
-          try {
-            githubContext = await metadataClient.getThopterGitHubContext(machine.id) || undefined;
-            if (githubContext) {
-              logger.info(`Restored GitHub context from Redis for thopter ${machine.id}`, machine.id, 'state-manager');
-            }
-          } catch (error) {
-            logger.warn(`Failed to restore GitHub context for thopter ${machine.id}: ${error instanceof Error ? error.message : String(error)}`, machine.id, 'state-manager');
-          }
-        }
-
+        
         // TODO i'd prefer to use something like { ...existing, fly: { ... } }
         // that blanket preserves existing keys instead of manually preserving
         // existing keys.
@@ -138,19 +124,19 @@ class StateManager {
             image: machine.image_ref?.tag || existing?.fly?.image || 'unknown',
             createdAt: new Date(machine.created_at)
           },
-
+          
           // === HUB MANAGEMENT (preserve existing) ===
           hub: {
             killRequested: existing?.hub?.killRequested || false
           },
-
+          
           // === SESSION STATE (preserve existing) ===
           session: existing?.session,
-
-          // === GITHUB CONTEXT (preserve existing or use expected or restore from Redis) ===
-          github: githubContext
+          
+          // === GITHUB CONTEXT (preserve existing or use expected) ===
+          github: existing?.github || this.expectedThopters.get(machine.id)
         };
-
+        
         newThopters.set(machine.id, thopterState);
         
         // Clean up expected entry if it was used
@@ -203,7 +189,7 @@ class StateManager {
    */
   updateThopterFromStatus(status: ThopterStatusUpdate): void {
     let thopter = this.thopters.get(status.thopterId);  // UPDATED field name
-
+    
     if (!thopter) {
       // NEW: Check if this is a golden claude reporting
       const goldenClaude = this.goldenClaudes.get(status.thopterId);
@@ -211,13 +197,13 @@ class StateManager {
         this.updateGoldenClaudeFromStatus(goldenClaude, status);
         return;
       }
-
+      
       logger.warn(`Received status for unknown thopter: ${status.thopterId}`, status.thopterId, 'state-manager');
       // Don't auto-create - fly reconciliation will discover it if it exists
       // This prevents phantom thopters from bad status updates
       return;
     }
-
+    
     // Update session state (best-effort metadata) - ALL camelCase
     thopter.session = {
       tmuxState: status.tmuxState,
@@ -226,18 +212,13 @@ class StateManager {
       idleSince: status.idleSince ? new Date(status.idleSince) : undefined,
       screenDump: status.screenDump
     };
-
+    
     // Update GitHub context if provided (best-effort metadata)
     // Note: status.github should include repository field now
     if (status.github) {
       thopter.github = status.github;
-
-      // Persist GitHub context to Redis for recovery after hub restarts
-      metadataClient.setThopterGitHubContext(status.thopterId, status.github).catch(error => {
-        logger.warn(`Failed to persist GitHub context for thopter ${status.thopterId}: ${error instanceof Error ? error.message : String(error)}`, status.thopterId, 'state-manager');
-      });
     }
-
+    
     // Log successful status update
     logger.debug(`Updated thopter session state: ${status.thopterId}`, status.thopterId, 'state-manager');
   }
@@ -389,12 +370,6 @@ class StateManager {
     const thopter = this.thopters.get(thopterId);
     if (thopter) {
       this.thopters.delete(thopterId);
-
-      // Clean up persisted GitHub context
-      metadataClient.deleteThopterGitHubContext(thopterId).catch(error => {
-        logger.warn(`Failed to delete persisted GitHub context for thopter ${thopterId}: ${error instanceof Error ? error.message : String(error)}`, thopterId, 'state-manager');
-      });
-
       logger.info(`Removed thopter from state`, thopterId, 'state-manager');
     } else {
       logger.warn(`Thopter not found for removal: ${thopterId}`, thopterId, 'state-manager');

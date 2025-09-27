@@ -1,6 +1,5 @@
 import Redis from 'ioredis';
 import { logger } from './logger';
-import { GitHubContext } from './types';
 
 export interface MetadataValues {
   thopterImage?: string;
@@ -189,62 +188,6 @@ export class MetadataClient {
     } catch (error) {
       logger.error(`Metadata validation failed: ${error}`, undefined, 'metadata-client');
       throw error;
-    }
-  }
-
-  /**
-   * Store GitHub context for a thopter
-   */
-  async setThopterGitHubContext(thopterId: string, github: GitHubContext): Promise<void> {
-    if (!this.redis) {
-      throw new Error('Metadata client not connected');
-    }
-
-    try {
-      const key = `thopter:${thopterId}:github`;
-      await this.redis.set(key, JSON.stringify(github));
-      logger.debug(`Stored GitHub context for thopter ${thopterId}`, thopterId, 'metadata-client');
-    } catch (error) {
-      logger.error(`Failed to store GitHub context for thopter ${thopterId}: ${error}`, thopterId, 'metadata-client');
-      throw error;
-    }
-  }
-
-  /**
-   * Retrieve GitHub context for a thopter
-   */
-  async getThopterGitHubContext(thopterId: string): Promise<GitHubContext | null> {
-    if (!this.redis) {
-      throw new Error('Metadata client not connected');
-    }
-
-    try {
-      const key = `thopter:${thopterId}:github`;
-      const value = await this.redis.get(key);
-      if (!value) {
-        return null;
-      }
-      return JSON.parse(value) as GitHubContext;
-    } catch (error) {
-      logger.error(`Failed to get GitHub context for thopter ${thopterId}: ${error}`, thopterId, 'metadata-client');
-      return null;
-    }
-  }
-
-  /**
-   * Delete GitHub context for a thopter
-   */
-  async deleteThopterGitHubContext(thopterId: string): Promise<void> {
-    if (!this.redis) {
-      throw new Error('Metadata client not connected');
-    }
-
-    try {
-      const key = `thopter:${thopterId}:github`;
-      await this.redis.del(key);
-      logger.debug(`Deleted GitHub context for thopter ${thopterId}`, thopterId, 'metadata-client');
-    } catch (error) {
-      logger.error(`Failed to delete GitHub context for thopter ${thopterId}: ${error}`, thopterId, 'metadata-client');
     }
   }
 
