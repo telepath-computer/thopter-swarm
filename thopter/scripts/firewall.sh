@@ -2,6 +2,9 @@
 # OUTPUT-only nftables egress allowlist (Fly.io-safe). INPUT is untouched.
 # No here-strings. No shell redirections inside nft batch. Single-shot apply.
 
+# note, as root the firewall can be disabled with:
+# nft flush ruleset
+
 set -euo pipefail
 
 log_info(){ printf '[INFO] %s\n' "$*" >&2; }
