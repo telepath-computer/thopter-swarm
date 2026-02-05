@@ -10,67 +10,37 @@ thopter_log() {
 
 thopter_log "Starting Thopter agent container as PID 1..."
 
-# important: the golden claude copy logic will *bulldoze* files in the homedir,
-# with unpredictable timing relative to this script. for example, .bashrc --
-# which i have explicitly excluded from the tarball snapshot in the copy script
-# over in the provisioner. dont write files here that you expect to also exist
-# in the golden claude, and if you do, you need to exclude them in the
-# provisioner's snapshot logic.
+# The thopter user is created in the Dockerfile with homedir at /data/thopter.
+# The home directory persists from the Docker image (including Claude CLI).
+# Only the workspace (/data/thopter/workspace) is a volume mount for performance.
 
-# note the thopter user is created in the Dockerfile, and homedir is set to
-# /data/thopter - and files might end up in there in that workflow (like uv's
-# .local binary references) but they're going to be replaced by the mounted
-# volume on machine creation.
-
-# Wait for /data mount point to be fully ready before proceeding
-thopter_log "Checking data mount point readiness..."
-DATA_MOUNT_READY=false
+# Wait for workspace volume mount to be ready
+thopter_log "Checking workspace mount point readiness..."
+WORKSPACE_MOUNT_READY=false
 for i in {1..30}; do
-    # Test that we can write and read from the mount point
-    TEST_FILE="/data/.mount-test-$$-$(date +%s%N)"
+    TEST_FILE="/data/thopter/workspace/.mount-test-$$-$(date +%s%N)"
     if echo "mount-test-$(date +%s)" > "$TEST_FILE" 2>/dev/null && \
        [ -f "$TEST_FILE" ] && \
        read -r test_content < "$TEST_FILE" && \
        [ -n "$test_content" ] && \
        rm -f "$TEST_FILE" 2>/dev/null; then
-        thopter_log "Data mount point is ready (attempt $i/30)"
-        DATA_MOUNT_READY=true
+        thopter_log "Workspace mount point is ready (attempt $i/30)"
+        WORKSPACE_MOUNT_READY=true
         break
     else
-        thopter_log "Data mount not ready, waiting... (attempt $i/30)"
+        thopter_log "Workspace mount not ready, waiting... (attempt $i/30)"
         sleep 2
     fi
 done
 
-if [ "$DATA_MOUNT_READY" = false ]; then
-    thopter_log "ERROR: Data mount point failed readiness check after 60 seconds"
+if [ "$WORKSPACE_MOUNT_READY" = false ]; then
+    thopter_log "ERROR: Workspace mount point failed readiness check after 60 seconds"
     exit 1
 fi
 
-thopter_log "chmod 755 /data"
-# /data is the fly volume mount which is installed for first command runs and
-# we set the new user's homedir there, because these mounts have much higher
-# performance than the VM's local volumes and claude needs to do active work.
-chmod 755 /data
-
-thopter_log "rm -rf /data/*"
-# clear the volume mounted data dir as the volumes are reused across images
-# unpredictably. also note that cloning a machine does not copy the contents of
-# the data volume, the clone just grabs any available data volume with the same
-# name (spec) or makes a new volume if needed. so this is a bit strange in both
-# the sense that workers end up sharing the leftovers of each other's work, yet,
-# we also can't reliably copy data (like from a golden claude to an instance
-# agent).
-# TODO: i have seen this hang forever, stuck on cleaning up uv cache
-# directories. i have no idea how that is possible or what to do about it.
-# i am considering not using a volume pool and just creating a new volume for
-# every thopter, then regularly destroying unattached thopter volumes, because
-# this is a fatal provisioning problem that has no apparent explanation or
-# proper fix right now.
-rm -rf /data/*
-
-thopter_log "create workspace dir"
-mkdir -p /data/thopter/workspace
+# Clean the workspace volume (volumes are reused across thopters)
+thopter_log "Cleaning workspace directory..."
+rm -rf /data/thopter/workspace/*
 
 thopter_log "create yolo-claude alias"
 # Create useful aliases for thopter user
@@ -144,6 +114,11 @@ echo 'export UV_CACHE_DIR="/opt/uv/cache"' >> /data/thopter/.bashrc
 echo 'export UV_PYTHON_INSTALL_DIR="/opt/uv/pys"' >> /data/thopter/.bashrc
 echo 'export UV_TOOL_DIR="/opt/uv/tools"' >> /data/thopter/.bashrc
 
+thopter_log "add ~/.local/bin to PATH in bashrc"
+echo "" >> /data/thopter/.bashrc
+echo "# add local bin to PATH for claude CLI" >> /data/thopter/.bashrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> /data/thopter/.bashrc
+
 # ensure bashrc is loaded on login shells
 echo 'source ~/.bashrc' >> /data/thopter/.bash_profile
 
@@ -161,9 +136,9 @@ thopter_log "Starting session observer..."
     echo "$(date '+%Y-%m-%d %H:%M:%S') [OBSERVER] $line" | tee -a /thopter/log
 done
 
-# fix all ownership
-thopter_log "chown -R thopter:thopter /data"
-chown -R thopter:thopter /data
+# fix workspace ownership (home directory ownership is set in Dockerfile)
+thopter_log "chown -R thopter:thopter /data/thopter/workspace"
+chown -R thopter:thopter /data/thopter/workspace
 
 thopter_log "Switching to thopter user and starting NO-INDEX web terminal..."
 

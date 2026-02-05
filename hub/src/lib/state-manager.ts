@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { ThopterState, ProvisionRequest, DestroyRequest, LogEvent, OperatingMode, ThopterStatusUpdate, GoldenClaudeState, GitHubIntegrationConfig, GitHubContext } from './types';
+import { ThopterState, ProvisionRequest, DestroyRequest, LogEvent, OperatingMode, ThopterStatusUpdate, GitHubIntegrationConfig, GitHubContext } from './types';
 import { isValidThopterPattern } from './thopter-utils';
 import { logger } from './logger';
 import tinyspawn from 'tinyspawn';
@@ -20,17 +20,15 @@ const createFlyWrapper = (appName: string) => {
 
 class StateManager {
   private thopters: Map<string, ThopterState> = new Map();
-  private goldenClaudes: Map<string, GoldenClaudeState> = new Map();
   private expectedThopters: Map<string, GitHubContext> = new Map(); // Pre-register GitHub context
   private provisionRequests: ProvisionRequest[] = [];
   private destroyRequests: DestroyRequest[] = [];
   private operatingMode: OperatingMode = 'initializing';
-  
+
   private readonly maxProvisionRequests = 50;
   private readonly maxDestroyRequests = 50;
-  
+
   private reconcileInterval: NodeJS.Timeout | null = null;
-  private gcRefreshInterval: NodeJS.Timeout | null = null;
   
   private readonly appName: string;
   private readonly flyToken: string;
@@ -79,10 +77,7 @@ class StateManager {
         logger.error(`Fly reconciliation failed: ${error.message}`, undefined, 'state-manager');
       });
     }, 30000);
-    
-    // Start Golden Claude refresh
-    this.startGoldenClaudeRefresh();
-    
+
     logger.info('Fly-first reconciliation system started', undefined, 'state-manager');
   }
   
@@ -189,15 +184,8 @@ class StateManager {
    */
   updateThopterFromStatus(status: ThopterStatusUpdate): void {
     let thopter = this.thopters.get(status.thopterId);  // UPDATED field name
-    
+
     if (!thopter) {
-      // NEW: Check if this is a golden claude reporting
-      const goldenClaude = this.goldenClaudes.get(status.thopterId);
-      if (goldenClaude) {
-        this.updateGoldenClaudeFromStatus(goldenClaude, status);
-        return;
-      }
-      
       logger.warn(`Received status for unknown thopter: ${status.thopterId}`, status.thopterId, 'state-manager');
       // Don't auto-create - fly reconciliation will discover it if it exists
       // This prevents phantom thopters from bad status updates
@@ -223,21 +211,6 @@ class StateManager {
     logger.debug(`Updated thopter session state: ${status.thopterId}`, status.thopterId, 'state-manager');
   }
 
-  /**
-   * Handle golden claude status updates (NEW METHOD)
-   */
-  updateGoldenClaudeFromStatus(goldenClaude: GoldenClaudeState, status: ThopterStatusUpdate): void {
-    goldenClaude.session = {
-      tmuxState: status.tmuxState,
-      claudeProcess: status.claudeProcess,
-      lastActivity: new Date(status.lastActivity),
-      idleSince: status.idleSince ? new Date(status.idleSince) : undefined,
-      screenDump: status.screenDump
-    };
-    
-    logger.debug(`Updated golden claude session state: ${status.thopterId}`, status.thopterId, 'state-manager');
-  }
-  
   /**
    * Add a new provision request to the queue
    */
@@ -437,8 +410,6 @@ class StateManager {
       clearInterval(this.reconcileInterval);
       this.reconcileInterval = null;
     }
-    
-    this.stopGoldenClaudeRefresh();
   }
   
   /**
@@ -471,123 +442,6 @@ class StateManager {
       operatingMode: this.operatingMode,
       recentLogCount: this.getRecentLogs().length
     };
-  }
-  
-  /**
-   * Bootstrap Golden Claude state by querying fly.io machines
-   */
-  async bootstrapGoldenClaudes(): Promise<void> {
-    logger.info('Bootstrapping Golden Claude state from fly.io machines', undefined, 'state-manager');
-    
-    try {
-      const output = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
-      const machines = JSON.parse(output);
-      
-      // Filter for golden claude machines (gc-*)
-      const gcMachines = machines.filter((m: any) => 
-        m.name && m.name.startsWith('gc-')
-      );
-      
-      logger.info(`Found ${gcMachines.length} Golden Claude machines`, undefined, 'state-manager');
-      
-      // Create a new map to replace the current one (this handles removals)
-      const newGoldenClaudes = new Map<string, GoldenClaudeState>();
-      
-      // Add each GC machine to our tracking
-      for (const machine of gcMachines) {
-        // Extract name from machine name (gc-default -> default)
-        const name = machine.name.replace(/^gc-/, '');
-        
-        // PRESERVE existing session data if it exists
-        const existing = this.goldenClaudes.get(machine.id);
-        
-        const gcState: GoldenClaudeState = {
-          // === FLY INFRASTRUCTURE (authoritative) ===
-          fly: {
-            id: machine.id,
-            name: machine.name,
-            machineState: machine.state,  // Use actual Fly states
-            region: machine.region || existing?.fly?.region || 'unknown',
-            image: machine.image_ref?.tag || existing?.fly?.image || 'unknown',
-            createdAt: new Date(machine.created_at)
-          },
-          
-          // === HUB MANAGEMENT (preserve existing) ===
-          hub: {
-            killRequested: existing?.hub?.killRequested || false
-          },
-          
-          // === SESSION STATE (preserve existing) ===
-          session: existing?.session,
-          
-          // === GOLDEN CLAUDE SPECIFIC FIELDS ===
-          goldenClaudeName: name  // e.g. "default" from "gc-default"
-          // webTerminalUrl is derived - computed in templates/utils
-        };
-        
-        newGoldenClaudes.set(machine.id, gcState);
-        
-        // Log changes
-        if (!existing) {
-          logger.info(`Added Golden Claude: ${name} (${machine.id}) - ${gcState.fly.machineState}`, undefined, 'state-manager');
-        } else if (existing.fly?.machineState !== gcState.fly.machineState) {
-          logger.info(`Golden Claude ${name} state changed: ${existing.fly?.machineState} → ${gcState.fly.machineState}`, undefined, 'state-manager');
-        }
-      }
-      
-      // Log removed GCs
-      for (const [machineId, existing] of this.goldenClaudes) {
-        if (!newGoldenClaudes.has(machineId)) {
-          logger.info(`Removed Golden Claude: ${existing.goldenClaudeName} (${machineId}) - no longer exists`, undefined, 'state-manager');
-        }
-      }
-      
-      // Replace the map
-      this.goldenClaudes = newGoldenClaudes;
-      
-    } catch (error) {
-      logger.error(`Failed to bootstrap Golden Claudes: ${error instanceof Error ? error.message : String(error)}`, undefined, 'state-manager');
-    }
-  }
-  
-  /**
-   * Start periodic refresh of Golden Claude state
-   */
-  startGoldenClaudeRefresh(): void /*this comment fixes neovim syntax highlighting*/ {
-    // Refresh every 30 seconds
-    this.gcRefreshInterval = setInterval(() => {
-      this.bootstrapGoldenClaudes().catch(error => {
-        logger.error(`Golden Claude refresh failed: ${error instanceof Error ? error.message : String(error)}`, undefined, 'state-manager');
-      });
-    }, 30000);
-    
-    logger.info('Started Golden Claude periodic refresh (30s interval)', undefined, 'state-manager');
-  }
-  
-  /**
-   * Stop Golden Claude refresh interval
-   */
-  stopGoldenClaudeRefresh(): void {
-    if (this.gcRefreshInterval) {
-      clearInterval(this.gcRefreshInterval);
-      this.gcRefreshInterval = null;
-      logger.info('Stopped Golden Claude periodic refresh', undefined, 'state-manager');
-    }
-  }
-  
-  /**
-   * Get all Golden Claudes
-   */
-  getAllGoldenClaudes(): GoldenClaudeState[] {
-    return Array.from(this.goldenClaudes.values());
-  }
-  
-  /**
-   * Get Golden Claude by name
-   */
-  getGoldenClaude(name: string): GoldenClaudeState | undefined {
-    // Find by golden claude name, not machine ID
-    return Array.from(this.goldenClaudes.values()).find(gc => gc.goldenClaudeName === name);
   }
   
   /**

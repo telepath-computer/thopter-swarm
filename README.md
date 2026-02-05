@@ -62,20 +62,15 @@ Set APP_NAME, REGION, GITHUB_INTEGRATION_JSON, FLY_DEPLOY_KEY
 ```bash
 ./fly/preflight.sh         # validate setup
 ./fly/ensure-metadata.sh   # deploy metadata server
-./fly/recreate-gc.sh       # deploy a golden claude
 ./fly/recreate-hub.sh      # deploy the central hub
 ./fly/status.sh            # check deployment
 ```
 
-### 5. Setup auth in golden claude
+### 5. Make "/thopter" comments on GitHub issues
 
-Access the golden claude web terminal (in the output of `recreate-gc.sh`) and run `yolo-claude` (an alias for `claude --dangerously-skip-permissions`). Authenticate, accept all the initial trust questions until you're at the interactive chat prompt, and then quit claude code.
+`/thopter` (on a line by itself) in a comment will provision a thopter with the default prompt. See "Comment Syntax" for more controls. The thopter gets the issue context and the default prompt tells Claude what's going on and how to get to work (see `fly/thopter-swarm/hub/templates/prompts/default.md`)
 
-**IMPORTANT:** don't leave Claude Code running in a golden claude instance. It's background operations sometimes write to the filesystem during new thopter provisioning which can break the data transfer.
-
-### 6. Make "/thopter" comments on GitHub issues
-
-`/thopter` (on a line by itself) in a comment will provision a thopter with the default golden claude machine and default prompt. See "Comment Syntax" for more controls. The thopter gets the issue context and the default prompt tells Claude what's going on and how to get to work (see `fly/thopter-swarm/hub/templates/prompts/default.md`)
+**Note:** Each thopter requires manual Claude authentication. Access the thopter's web terminal and run `yolo-claude` (an alias for `claude --dangerously-skip-permissions`), then authenticate.
 
 ## Adding team members
 
@@ -88,7 +83,7 @@ fly wireguard create # be sure to use a .conf extension e.g. swarm.conf (see "Se
 
 This gives them access to the dashboard, the ability to ssh and see logs on machines, etc.
 
-But to do admin stuff like (re)creating golden claudes or recreating the hub with new prompt templates, they need all the same `.env` config contents in their local clone.
+But to do admin stuff like recreating the hub with new prompt templates, they need all the same `.env` config contents in their local clone.
 
 TODO: make this easier. Sharing complex `.env` files with credentials in them is a pain.
 
@@ -97,11 +92,9 @@ TODO: make this easier. Sharing complex `.env` files with credentials in them is
 Use `/thopter (params)` on its own line in an issue comment or the initial body.
 
 Parameters:
-`--gc name` (`-g`) will use a named golden claude `gc-{name}` if present, otherwise falls back to `gc-default`
-
 `--prompt name` (`-p`) will use a named prompt file `{name}.md` in the `hub/templates/prompts/` dir if found, otherwise uses `default.md` -- see "Custom Prompts" below.
 
-You can put these instructions all together: `/thopter -g josh-maxplan -p architect` runs a thopter with homedirs cloned from the `gc-josh-maxplan` golden claude, using the `hub/templates/prompts/architect.md` initial prompt content.
+Example: `/thopter -p architect` runs a thopter using the `hub/templates/prompts/architect.md` initial prompt content.
 
 You can create multiple thopters by issuing multiple comments with /thopter commands, like to compare multiple parallel attempts at the same task. Note it won't handle multiple slash commands in a single comment: use a new comment for each command.
 
@@ -111,19 +104,14 @@ You can create multiple thopters by issuing multiple comments with /thopter comm
 
 **Hub** - Central TypeScript/Express server
 - `http://1.hub.kv._metadata.{your fly app name}.internal:8080` on wireguard network
-- Dashboard (port 8080), status collector (port 8081)  
+- Dashboard (port 8080), status collector (port 8081)
 - GitHub issue monitoring and thopter provisioning
 - In-memory state management, bootstrapped from inspecting fly machines list
 
-**Golden Claudes** - Authentication template
-- Persistent instances with authenticated homedir
-- Homedir contents copied to new thopters (except `.bashrc` as thopter initialization depends on it)
-- Tmux sessions with web terminal access for auth setup
-- The Claude credentials time out. You have to hop back in, run claude, and `/login` every couple of days, then quit claude.
-- **IMPORTANT:** don't leave Claude Code running in these machines. The filesystem needs to be static during copy to new thopters, and Claude Code runs background stuff that breaks that.
-
 **Thopters** - Autonomous agents
-- Copies of a golden claude plus issue context, a prompt, the git repo and access token.
+- Self-contained instances with Claude Code pre-installed
+- Issue context, a prompt, the git repo and access token provided at provisioning
+- Each thopter requires manual Claude authentication after provisioning
 - Tmux session with web terminal access, auto-launches claude in yolo mode
 - Session log html generator and a mini webserver to serve it (port 9971)
 - Egress firewall, configurable
@@ -149,9 +137,9 @@ You can create multiple thopters by issuing multiple comments with /thopter comm
 
 Inside a thopter, you have:
 ```
-├── /data/thopter        # thopter user homedir
-│   ├── .claude/         # copied from golden claude, session log html is here too
-│   └── workspace/       # task-specific workspace
+├── /data/thopter        # thopter user homedir (persists from Docker image)
+│   ├── .claude/         # Claude CLI config, session log html is here too
+│   └── workspace/       # task-specific workspace (volume mount, cleaned each run)
 │       ├── .env.thopters    # developer environment variables, sourced in .bashrc
 │       ├── post-checkout.sh # custom setup script, runs after repo clone
 │       ├── issue.json       # generated from github issue details
@@ -270,12 +258,6 @@ echo "✅ Post-checkout setup completed!"
 - Manually update existing hub after edits with `./fly/upload-post-checkout-script.sh`
 - Changes apply only to new thopters and only after uploading to the hub
 
-#### Alternative: Golden Claude Files
-
-If Claude Code or your dev environment needs files (not just environment variables), you can manually set them up in a file in `/data/thopter` on your golden claude(s). The full contents of `/data/thopter` on your golden claude are copied to each new thopter upon provisioning it.
-
-Note: env vars are NOT copied from golden claudes, only the `/data/thopter` folder tree contents.
-
 ### Thopter firewall
 
 Thopters run inside an egress firewall (`thopter/scripts/firewall.sh`) to prevent secrets and code exfil. This means Claude Code cannot do web searches, read docs for libraries etc. A whitelist of common package repos (e.g. npm, pypy, etc) are whitelisted by default, just like the [official Anthropic devcontainer example](https://github.com/anthropics/claude-code/tree/main/.devcontainer) (but we do a better job than that example for github in particular, since we use github's published CIDR blocks instead of more naive IP resolution, which helps a lot with github access reliability.)
@@ -300,9 +282,7 @@ Thopter Swarm uses Fly's private networking for secure access:
 - Select the new interface from the list on the left and click "activate"
 - `preflight.sh` should now detect the tunnel is active via DNS query
 
-## Adding prompts and golden claude options
-
-### Custom Prompts
+## Custom Prompts
 
 Create/edit prompt templates in `hub/templates/prompts/*.md`
 
@@ -323,27 +303,16 @@ Hub recreation does change the machine ID of the hub, which is why we use the `1
 Say you added a prompt `architect.md`, launch a thopter with it in a GitHub issue comment like so:
 `/thopter --prompt architect`
 
-### Adding golden Claude Instances
-
-You can create more specialized "golden claude" machine with pre-configured environments:
-
-```bash
-./fly/recreate-gc.sh josh-maxplan
-```
-
-The use it in github issues with `/thopter --gc josh-maxplan`
-
-We use this to maintain an authenticated max plan per team member, and each person requests thopters assigned to their own plan.
-
 ## Thopter lifecycle in detail
 
 1. **Issue mention detected**: GitHub polling loop finds a new `/thopter` mention in an issue on an integrated repo, and fires off an internal request for provisioning.
-2. **Provisioning**: Fly machine created from base image in `thopter/Dockerfile`, with a volume mounted to `/data/thopter` for claude configs and dev workspace.
-3. **Initialization**: Golden Claude homedir copied over, `.env.thopters` file sourced in `.bashrc`, firewall initiated, tmux session started, web terminal (gotty) server launched, dashboard status observer and html session logs generator processes launched (via pm2)
-4. **Repository**: Git repo cloned, issue files (prompt.md, issue.json) created in workspace
-5. **Launch**: Claude Code started in tmux session with web terminal access, pointed to prompt file as first instruction
-6. **Monitoring**: Status reported to hub's HTTP collector via observer script, dashboard shows agent details ongoing
-7. **Task done / code committed / pushed**: presumably Claude finishes its task and commits code per its prompting, then goes idle.
-8. **Manual review and cleanup**: Developer reviews status, issues more instructions interactively as needed, terminates thopter via dashboard when done
+2. **Provisioning**: Fly machine created from base image in `thopter/Dockerfile`, with a volume mounted to `/data/thopter/workspace` for the dev workspace.
+3. **Initialization**: `.env.thopters` file sourced in `.bashrc`, firewall initiated, tmux session started, web terminal (gotty) server launched, dashboard status observer and html session logs generator processes launched (via pm2)
+4. **Authentication**: User accesses web terminal and authenticates Claude CLI (required for each thopter)
+5. **Repository**: Git repo cloned, issue files (prompt.md, issue.json) created in workspace
+6. **Launch**: Claude Code started in tmux session with web terminal access, pointed to prompt file as first instruction
+7. **Monitoring**: Status reported to hub's HTTP collector via observer script, dashboard shows agent details ongoing
+8. **Task done / code committed / pushed**: presumably Claude finishes its task and commits code per its prompting, then goes idle.
+9. **Manual review and cleanup**: Developer reviews status, issues more instructions interactively as needed, terminates thopter via dashboard when done
 
 

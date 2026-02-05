@@ -7,6 +7,7 @@ post-checkout.sh
 .claude/settings.local.json
 
 *.pem
+fly/wg-swarm.conf
 
 node_modules/
 dist/

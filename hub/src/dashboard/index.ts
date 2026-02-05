@@ -34,7 +34,6 @@ export function setupDashboard(app: express.Application, manager?: AgentManager)
 router.get('/', (req: Request, res: Response) => {
   try {
     const thopters = stateManager.getAllThopters();
-    const goldenClaudes = stateManager.getAllGoldenClaudes();
     const provisionRequests = stateManager.getRecentProvisionRequests(5);
     const destroyRequests = stateManager.getRecentDestroyRequests(5);
     const logs = stateManager.getRecentLogs(50);
@@ -76,9 +75,8 @@ router.get('/', (req: Request, res: Response) => {
     res.render('dashboard', {
       thopters,
       healthyGroups,
-      orphanedGroups, 
+      orphanedGroups,
       stoppedGroups,
-      goldenClaudes,
       provisionRequests,
       destroyRequests,
       logs,

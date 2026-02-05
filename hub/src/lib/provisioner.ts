@@ -170,12 +170,6 @@ export class ThopterProvisioner {
       // Log provisioning start to machine
       await this.logToThopterAsync(machineId, `Starting provisioning for issue ${request.github.issueNumber}: ${request.github.issueTitle}`);
 
-      // Copy Golden Claude data if available (optional step)
-      console.log(`🏆 [${requestId}] Checking for Golden Claude data...`);
-      await this.logToThopterAsync(machineId, "Checking for Golden Claude data to copy");
-      await this.copyGoldenClaudeData(machineId, requestId, request.gc);
-      await this.logToThopterAsync(machineId, "Golden Claude data copy operation completed");
-
       // Setup Git configuration and clone repository
       console.log(`🔧 [${requestId}] Setting up Git configuration and cloning repository...`);
       await this.logToThopterAsync(machineId, `Setting up Git configuration and cloning repository ${request.repository}`);
@@ -299,7 +293,7 @@ export class ThopterProvisioner {
       '--region', this.region,
       '--autostop=off',
       '--vm-size', this.thopterVmSize,
-      '--volume', `${volumeName}:/data`,
+      '--volume', `${volumeName}:/data/thopter/workspace`,
       '--env', `METADATA_SERVICE_HOST=${process.env.METADATA_SERVICE_HOST}`,
       '--env', `APP_NAME=${this.appName}`,
       '--env', `WEB_TERMINAL_PORT=${this.webTerminalPort}`,
@@ -552,137 +546,6 @@ ${request.github.issueBody}
     };
     
     return JSON.stringify(issueContext, null, 2);
-  }
-
-  /**
-   * Find a specific Golden Claude machine for credential copying
-   */
-  private async findAvailableGoldenClaude(gcName: string = 'default'): Promise<string | null> {
-    try {
-      // Get list of all machines using async flyctl
-      const output = await this.fly(['machines', 'list', '--json', '-t', this.flyToken]);
-      
-      const machines = JSON.parse(output);
-      
-      // Handle both "xyz" and "gc-xyz" formats
-      const targetName = gcName.startsWith('gc-') ? gcName : `gc-${gcName}`;
-      
-      // Look for the specific GC machine in started state
-      const gcMachine = machines.find((m: any) => 
-        m.name === targetName && m.state === 'started'
-      );
-      
-      if (gcMachine) {
-        console.log(`✅ Found available Golden Claude: ${gcMachine.name} (${gcMachine.id})`);
-        return gcMachine.id;
-      }
-      
-      // If specific GC not found, fall back to gc-default if not already trying it
-      if (gcName !== 'default') {
-        console.log(`ℹ️ Golden Claude '${gcName}' not found, falling back to 'default'`);
-        return this.findAvailableGoldenClaude('default');
-      }
-      
-      console.log(`ℹ️ No Golden Claude machines found (looking for ${targetName} in started state)`);
-      return null;
-      
-    } catch (error) {
-      console.warn('Failed to find Golden Claude machines:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Copy Golden Claude home directory data to a newly provisioned thopter
-   */
-  private async copyGoldenClaudeData(thopterMachineId: string, requestId: string, gcName?: string): Promise<void> {
-    const startTime = Date.now();
-    
-    try {
-      // Find an available Golden Claude machine
-      const gcMachineId = await this.findAvailableGoldenClaude(gcName);
-      if (!gcMachineId) {
-        console.log(`ℹ️ [${requestId}] Skipping Golden Claude data copy - no Golden Claude available`);
-        return;
-      }
-      
-      console.log(`📦 [${requestId}] Copying data from Golden Claude ${gcMachineId} to thopter ${thopterMachineId}`);
-      
-      // Generate unique filenames to avoid conflicts
-      const timestamp = Date.now();
-      const gcSnapshotPath = `/tmp/gc-snapshot-${timestamp}.tgz`;
-      const localSnapshotPath = `/tmp/gc-local-${timestamp}.tgz`;
-      
-      try {
-        // Step 1: Create tarball on Golden Claude machine
-        console.log(`  1️⃣ Creating snapshot on Golden Claude...`);
-        const execAsync = promisify(exec);
-        await execAsync(
-          `fly ssh console -C "tar czf ${gcSnapshotPath} -C /data/thopter --exclude='.bashrc' --exclude='.claude/projects' ." --machine ${gcMachineId} -t "${this.flyToken}" -a ${this.appName}`,
-          { 
-            cwd: process.cwd()
-          }
-        );
-        
-        // Step 2: Download tarball from Golden Claude
-        console.log(`  2️⃣ Downloading snapshot from Golden Claude...`);
-        await execAsync(
-          `fly ssh sftp get ${gcSnapshotPath} ${localSnapshotPath} --machine ${gcMachineId} -t "${this.flyToken}" -a ${this.appName}`,
-          { 
-            cwd: process.cwd()
-          }
-        );
-        
-        // Step 3: Upload tarball to thopter
-        console.log(`  3️⃣ Uploading snapshot to thopter...`);
-        await execAsync(
-          `echo "put ${localSnapshotPath} /data/thopter/gc-snapshot.tgz" | fly ssh sftp shell --machine ${thopterMachineId} -t "${this.flyToken}" -a ${this.appName}`,
-          { 
-            cwd: process.cwd(),
-            shell: '/bin/bash'
-          }
-        );
-        
-        // Step 4: Extract tarball and fix permissions on thopter
-        console.log(`  4️⃣ Extracting snapshot and setting permissions...`);
-        await execAsync(
-          `fly ssh console -C "sh -c 'cd /data/thopter && tar -xzf gc-snapshot.tgz && rm gc-snapshot.tgz && chown -R thopter:thopter /data/thopter'" --machine ${thopterMachineId} -t "${this.flyToken}" -a ${this.appName}`,
-          { 
-            cwd: process.cwd()
-          }
-        );
-        
-        // Step 5: Clean up Golden Claude temp file
-        console.log(`  5️⃣ Cleaning up temporary files...`);
-        try {
-          await execAsync(
-            `fly ssh console -C "rm -f ${gcSnapshotPath}" --machine ${gcMachineId} -t "${this.flyToken}" -a ${this.appName}`,
-            { 
-              cwd: process.cwd()
-            }
-          );
-        } catch (cleanupError) {
-          console.warn(`    ⚠️ Failed to cleanup GC temp file: ${cleanupError}`);
-        }
-        
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log(`✅ [${requestId}] Golden Claude data copied successfully in ${elapsed}s`);
-        
-      } finally {
-        // Always try to clean up local temp file
-        try {
-          require('fs').unlinkSync(localSnapshotPath);
-        } catch (error) {
-          // Ignore cleanup errors
-        }
-      }
-      
-    } catch (error) {
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.error(`⚠️ [${requestId}] Golden Claude data copy failed after ${elapsed}s:`, error);
-      console.log(`ℹ️ [${requestId}] Continuing provisioning without Golden Claude data`);
-      // Don't throw - this is an optional step
-    }
   }
 
   /**

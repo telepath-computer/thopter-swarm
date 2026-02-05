@@ -309,7 +309,6 @@ main {
 
 .thopters-section,
 .requests-section,
-.golden-claudes-section,
 .logs-section,
 .test-provision-section {
   background: white;
@@ -320,7 +319,6 @@ main {
 
 .thopters-section h2,
 .requests-section h2,
-.golden-claudes-section h2,
 .logs-section h2,
 .test-provision-section h2 {
   color: #2c3e50;
@@ -366,49 +364,6 @@ main {
   overflow-x: auto;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* Golden Claudes table */
-.gc-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-  font-size: 0.9rem;
-}
-
-.gc-table th {
-  background: #f8f9fa;
-  color: #2c3e50;
-  font-weight: 600;
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 2px solid #e9ecef;
-  white-space: nowrap;
-}
-
-.gc-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #e9ecef;
-  vertical-align: middle;
-}
-
-.gc-row:hover {
-  background: #f8f9fa;
-}
-
-.gc-name {
-  font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.gc-state {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  display: inline-block;
 }
 
 .machine-id {
@@ -1289,7 +1244,7 @@ main {
   font-weight: 500;
 }
 
-/* For golden claudes - inverted logic */
+/* Claude process status indicators */
 .claude-process-good {
   color: #28a745;
   background-color: #d4edda;

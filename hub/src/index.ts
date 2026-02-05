@@ -115,8 +115,8 @@ async function startHub() {
         
         logger.info('Provision request received', undefined, 'hub', req.body);
         
-        const { repository, github, gc = 'default', prompt } = req.body;
-        
+        const { repository, github, prompt } = req.body;
+
         // Validate required fields
         if (!repository || !github?.issueNumber || !github?.issueTitle || !github?.issueBody) {
           res.status(400).json({
@@ -124,9 +124,9 @@ async function startHub() {
           });
           return;
         }
-        
+
         // Create provision request via agent manager
-        const requestId = agentManager.createProvisionRequest(repository, github, undefined, gc, prompt);
+        const requestId = agentManager.createProvisionRequest(repository, github, undefined, prompt);
         
         res.json({
           success: true,

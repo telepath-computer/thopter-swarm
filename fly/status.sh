@@ -36,9 +36,6 @@ fi
 
 # 1. Environment Overview
 echo -e "${BLUE}Environment:${NC} ${APP_NAME:-unknown} (${REGION:-unknown})"
-# Count Golden Claudes dynamically by detecting gc-* machines
-GC_COUNT=$(fly machines list --json 2>/dev/null | jq '[.[] | select(.name and (.name | startswith("gc-")))] | length' 2>/dev/null || echo "0")
-echo -e "${BLUE}Golden Claudes:${NC} $GC_COUNT found (use './fly/recreate-gc.sh [name]' to create)"
 
 # 2. Metadata Service Status
 echo ""
@@ -106,34 +103,7 @@ else
     echo -e "  ${CROSS} No hub machine found - run fly/recreate-hub.sh"
 fi
 
-# 4. Golden Claude Status
-echo ""
-echo -e "${BLUE}Golden Claude Status:${NC}"
-FOUND_GC=false
-
-# Check for all gc-* machines
-while IFS= read -r machine_info; do
-    if [ -n "$machine_info" ]; then
-        FOUND_GC=true
-        MACHINE_ID=$(echo "$machine_info" | cut -d'|' -f1)
-        MACHINE_NAME=$(echo "$machine_info" | cut -d'|' -f2)
-        MACHINE_STATE=$(echo "$machine_info" | cut -d'|' -f3)
-        MACHINE_REGION=$(echo "$machine_info" | cut -d'|' -f4)
-        
-        GC_DISPLAY_NAME=$(echo "$MACHINE_NAME" | sed 's/^gc-//')
-        if [ "$MACHINE_STATE" = "started" ]; then
-            echo -e "  ${STAR} $GC_DISPLAY_NAME ($MACHINE_ID) running in $MACHINE_REGION - http://$MACHINE_ID.vm.${APP_NAME:-thopter-swarm}.internal:${WEB_TERMINAL_PORT:-7681}/"
-        else
-            echo -e "  ${WARNING} $GC_DISPLAY_NAME ($MACHINE_ID) $MACHINE_STATE in $MACHINE_REGION"
-        fi
-    fi
-done < <(fly machines list --json | jq -r '.[] | select(.name and (.name | startswith("gc-"))) | "\(.id)|\(.name)|\(.state)|\(.region)"' 2>/dev/null || true)
-
-if [ "$FOUND_GC" = false ]; then
-    echo -e "  ${CROSS} No golden claude machines found - run fly/recreate-gc.sh"
-fi
-
-# 5. Platform App Machines (dummy processes for fly.io platform requirements)
+# 4. Platform App Machines (dummy processes for fly.io platform requirements)
 echo ""
 echo -e "${BLUE}Platform App Machines:${NC}"
 FOUND_APP_MACHINES=false
@@ -190,14 +160,13 @@ echo -e "${BLUE}Resource Summary:${NC}"
 TOTAL_MACHINES=$(fly machines list --json | jq '. | length' 2>/dev/null || echo "0")
 HUB_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("hub-"))] | length' 2>/dev/null || echo "0")
 METADATA_COUNT=$(fly machines list --json | jq '[.[] | select(.name=="metadata")] | length' 2>/dev/null || echo "0")
-GC_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("gc-"))] | length' 2>/dev/null || echo "0")
 THOPTER_COUNT=$(fly machines list --json | jq '[.[] | select(.name | startswith("thopter-"))] | length' 2>/dev/null || echo "0")
 APP_COUNT=$(fly machines list --json | jq '[.[] | select(.config.env.FLY_PROCESS_GROUP == "app")] | length' 2>/dev/null || echo "0")
 
-echo -e "  ${INFO} Machines: $TOTAL_MACHINES total (hub: $HUB_COUNT, metadata: $METADATA_COUNT, golden: $GC_COUNT, thopters: $THOPTER_COUNT, platform: $APP_COUNT)"
+echo -e "  ${INFO} Machines: $TOTAL_MACHINES total (hub: $HUB_COUNT, metadata: $METADATA_COUNT, thopters: $THOPTER_COUNT, platform: $APP_COUNT)"
 
 # Check for unknown/unclassified machines
-EXPECTED_COUNT=$((HUB_COUNT + METADATA_COUNT + GC_COUNT + THOPTER_COUNT + APP_COUNT))
+EXPECTED_COUNT=$((HUB_COUNT + METADATA_COUNT + THOPTER_COUNT + APP_COUNT))
 if [ "$TOTAL_MACHINES" -gt "$EXPECTED_COUNT" ]; then
     UNKNOWN_COUNT=$((TOTAL_MACHINES - EXPECTED_COUNT))
     echo ""
@@ -216,7 +185,7 @@ if [ "$TOTAL_MACHINES" -gt "$EXPECTED_COUNT" ]; then
                 echo -e "  ${WARNING} $machine_name ($MACHINE_ID) $MACHINE_STATE in $MACHINE_REGION"
             fi
         fi
-    done < <(fly machines list --json | jq -r '.[] | select(.name != "hub" and .name != "metadata" and (.name | startswith("gc-") | not) and (.name | startswith("thopter-") | not) and (.config.env.FLY_PROCESS_GROUP != "app")) | .name' 2>/dev/null || true)
+    done < <(fly machines list --json | jq -r '.[] | select(.name != "hub" and .name != "metadata" and (.name | startswith("hub-") | not) and (.name | startswith("thopter-") | not) and (.config.env.FLY_PROCESS_GROUP != "app")) | .name' 2>/dev/null || true)
 fi
 
 echo ""
@@ -226,7 +195,6 @@ ALL_VOLUMES=$(fly volumes list --json 2>/dev/null || echo "[]")
 TOTAL_VOLUMES=$(echo "$ALL_VOLUMES" | jq '. | length' 2>/dev/null || echo "0")
 METADATA_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name=="metadata_redis")] | length' 2>/dev/null || echo "0")
 HUB_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name=="hub_data")] | length' 2>/dev/null || echo "0")
-GC_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name | startswith("gc_volume_"))] | length' 2>/dev/null || echo "0")
 THOPTER_VOLUMES=$(echo "$ALL_VOLUMES" | jq '[.[] | select(.name=="thopter_data")] | length' 2>/dev/null || echo "0")
 
 
@@ -272,10 +240,10 @@ echo "========================================"
 # Volume Summary
 if [ "$TOTAL_VOLUMES" -gt 0 ]; then
     TOTAL_SIZE=$(echo "$ALL_VOLUMES" | jq '[.[] | .size_gb] | add' 2>/dev/null || echo "0")
-    echo -e "${GREEN}Volumes: $TOTAL_VOLUMES total, ${TOTAL_SIZE}GB (metadata: $METADATA_VOLUMES, hub: $HUB_VOLUMES, golden: $GC_VOLUMES, thopter_data: $THOPTER_VOLUMES)${NC}"
-    
+    echo -e "${GREEN}Volumes: $TOTAL_VOLUMES total, ${TOTAL_SIZE}GB (metadata: $METADATA_VOLUMES, hub: $HUB_VOLUMES, thopter_data: $THOPTER_VOLUMES)${NC}"
+
     # Check for unknown/unclassified volumes
-    EXPECTED_VOLUME_COUNT=$((METADATA_VOLUMES + HUB_VOLUMES + GC_VOLUMES + THOPTER_VOLUMES))
+    EXPECTED_VOLUME_COUNT=$((METADATA_VOLUMES + HUB_VOLUMES + THOPTER_VOLUMES))
     if [ "$TOTAL_VOLUMES" -gt "$EXPECTED_VOLUME_COUNT" ]; then
         UNKNOWN_VOLUME_COUNT=$((TOTAL_VOLUMES - EXPECTED_VOLUME_COUNT))
         echo -e "${YELLOW}Unknown Volumes (${UNKNOWN_VOLUME_COUNT}):${NC}"
@@ -295,7 +263,7 @@ if [ "$TOTAL_VOLUMES" -gt 0 ]; then
                     echo -e "  ${WARNING} $VOLUME_NAME ($VOLUME_ID) ${VOLUME_SIZE}GB in $VOLUME_REGION - unattached"
                 fi
             fi
-        done < <(echo "$ALL_VOLUMES" | jq -r '.[] | select(.name != "metadata_redis" and .name != "hub_data" and (.name | startswith("gc_volume_") | not) and .name != "thopter_data") | "\(.id)|\(.name)|\(.size_gb)|\(.region)|\(.attached_machine_id // "null")"' 2>/dev/null || true)
+        done < <(echo "$ALL_VOLUMES" | jq -r '.[] | select(.name != "metadata_redis" and .name != "hub_data" and .name != "thopter_data") | "\(.id)|\(.name)|\(.size_gb)|\(.region)|\(.attached_machine_id // "null")"' 2>/dev/null || true)
     fi
 else
     echo -e "${YELLOW}No volumes found${NC}"

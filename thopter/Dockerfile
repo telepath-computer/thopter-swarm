@@ -48,6 +48,8 @@ RUN apt-get update && apt-get install -y \
     # Firewall tools. note: nftables takes 10+ minutes to install?!?
     dnsutils \
     nftables \
+    # Virtual framebuffer for headless browser support
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # Generate locale properly
@@ -56,6 +58,9 @@ RUN locale-gen en_US.UTF-8
 # Install Node.js 20 via NodeSource
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 RUN apt-get install -y nodejs
+
+# Install Playwright browser dependencies (browsers installed by agents as needed)
+RUN npx playwright install-deps
 
 # Install PM2 globally for process management
 RUN npm install -g pm2
@@ -94,10 +99,9 @@ RUN useradd -m -d /data/thopter -s /bin/bash -U thopter
 # thopter-init, because the volume mount gets written as root
 RUN chown thopter:thopter /data/thopter
 
-# install everything OUTSIDE the /data/thopter dir, because that whole tree is
-# going to get replaced by the volume mount. the binary will be:
-# /opt/uv/tools/claude-code-log/bin/claude-code-log
-# note these same vars are also added to bashrc in the thopter-init.sh script
+# Install uv tools to /opt/uv (outside home dir for cleaner separation).
+# The binary will be: /opt/uv/tools/claude-code-log/bin/claude-code-log
+# Note: these same vars are also added to bashrc in the thopter-init.sh script
 RUN mkdir -p /opt/uv/tools /opt/uv/cache /opt/uv/pys /opt/uv/bin \
  && chown -R thopter:thopter /opt/uv \
  && chmod -R 755 /opt/uv
@@ -128,7 +132,7 @@ RUN chmod +x /usr/local/bin/observer.js && \
 ### RUN chmod +x /usr/local/bin/setup-firewall.sh
 
 # Default tmux configuration with proper terminal support (system-wide)
-RUN echo "set -g mouse on" > /etc/tmux.conf && \
+RUN echo "set -g mouse off" > /etc/tmux.conf && \
     echo "setw -g mode-keys vi" >> /etc/tmux.conf && \
     echo "set -g prefix C-a" >> /etc/tmux.conf && \
     echo "unbind C-b" >> /etc/tmux.conf && \
@@ -157,8 +161,13 @@ EXPOSE 7681
 ARG CURRENT_IMAGE
 ENV CURRENT_IMAGE=${CURRENT_IMAGE}
 
-# Install Claude CLI last - after current image arg so that docker image
-# caching does not prevent installation of the latest version.
-RUN npm install -g @anthropic-ai/claude-code
+# Install Claude CLI as thopter user (installs to ~/.local/bin)
+# Since volume only mounts at /data/thopter/workspace now, the home directory
+# persists from the build and Claude CLI doesn't need to be reinstalled at runtime.
+USER thopter
+WORKDIR /data/thopter
+RUN curl -fsSL https://claude.ai/install.sh | bash
+USER root
+WORKDIR /root
 
 CMD ["/usr/local/bin/thopter-init.sh"]

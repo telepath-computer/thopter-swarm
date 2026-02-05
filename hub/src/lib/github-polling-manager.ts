@@ -269,7 +269,7 @@ class GitHubPollingManager {
 
     try {
       // Parse command arguments
-      const { gc, prompt } = this.parseThopterCommand(commandLine);
+      const { prompt } = this.parseThopterCommand(commandLine);
 
       // Use the already-fetched comments instead of making another API call
       const commentsToUse = allComments || [];
@@ -310,7 +310,7 @@ class GitHubPollingManager {
       if (!this.agentManager) {
         throw new Error('AgentManager not set - call setAgentManager() before starting polling');
       }
-      const requestId = this.agentManager.createProvisionRequest(repository, github, undefined, gc, prompt);
+      const requestId = this.agentManager.createProvisionRequest(repository, github, undefined, prompt);
       
       // Comment back to acknowledge the command
       await this.acknowledgeCommand(octokit, repository, issue.number, fullCommand, commandInstance, requestId);
@@ -327,21 +327,19 @@ class GitHubPollingManager {
   /**
    * Parse /thopter command arguments
    */
-  private parseThopterCommand(commandLine: string): { gc?: string; prompt?: string } {
+  private parseThopterCommand(commandLine: string): { prompt?: string } {
     // Split command line into arguments, handling quoted strings
     const args = commandLine.length > 0 ? commandLine.split(/\s+/) : [];
-    
+
     // Parse with minimist
     const parsed = minimist(args, {
-      string: ['gc', 'g', 'prompt', 'p'],
+      string: ['prompt', 'p'],
       alias: {
-        'g': 'gc',
         'p': 'prompt'
       }
     });
 
     return {
-      gc: parsed.gc || parsed.g,
       prompt: parsed.prompt || parsed.p
     };
   }

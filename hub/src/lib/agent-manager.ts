@@ -256,9 +256,9 @@ export class AgentManager {
   /**
    * Create a new provision request
    */
-  createProvisionRequest(repository: string, github: ProvisionRequest['github'], workBranch?: string, gc?: string, prompt?: string): string {
+  createProvisionRequest(repository: string, github: ProvisionRequest['github'], workBranch?: string, prompt?: string): string {
     const requestId = generateRequestId('provision');
-    
+
     const request: ProvisionRequest = {
       requestId,
       source: 'github',
@@ -266,7 +266,6 @@ export class AgentManager {
       status: 'pending',
       repository,
       workBranch,
-      gc,
       prompt,
       github
     };

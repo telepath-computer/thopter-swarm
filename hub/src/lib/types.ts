@@ -83,40 +83,6 @@ export interface OrphanStatus {
 }
 
 
-// Golden Claude state tracking - now using ThopterState structure
-export interface GoldenClaudeState {
-  // === FLY INFRASTRUCTURE (authoritative, always present) ===
-  fly: {
-    id: string;              // machine.id
-    name: string;            // machine.name (e.g. "gc-default")
-    machineState: 'started' | 'stopped' | 'suspended' | 'destroyed';
-    region: string;          // machine.region
-    image: string;           // machine.image_ref.tag
-    createdAt: Date;         // machine.created_at (actual spawn time)
-  };
-  
-  // === HUB MANAGEMENT (ephemeral) ===
-  hub: {
-    killRequested: boolean;  // true when user requests kill, cleared on fail/timeout
-  };
-  
-  // === THOPTER SESSION (nullable, best-effort from observer) ===
-  session?: {
-    tmuxState: 'active' | 'idle';
-    claudeProcess: 'running' | 'notFound';
-    lastActivity: Date;
-    idleSince?: Date;
-    screenDump: string;
-  };
-  
-  // === GITHUB CONTEXT (nullable, not used for golden claudes) ===
-  // github field omitted - golden claudes don't have GitHub context
-  
-  // === GOLDEN CLAUDE SPECIFIC FIELDS ===
-  goldenClaudeName: string;  // e.g. "default", "josh", "xyz" (extracted from fly.name)
-  // webTerminalUrl is derived - computed from fly.machineState and fly.id
-}
-
 // Separate request types for provisioning and destroying
 export interface ProvisionRequest {
   // TODO this could be cleaned up a bit, e.g. github payload already includes repo, workBranch should be derived, etc.
@@ -131,7 +97,6 @@ export interface ProvisionRequest {
   // Required for provisioning
   repository: string;
   workBranch?: string;
-  gc?: string;  // Golden Claude to use (default: "default")
   prompt?: string;  // Prompt template to use (default: "default")
   
   // GitHub context (always present since only source)

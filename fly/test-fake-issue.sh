@@ -1,10 +1,10 @@
 #!/bin/bash
-# Test script to exercise the thopter provisioning endpoint
+# Provision a thopter locally without going through GitHub
 #
 # Usage:
-#   ./test-fake-issue.sh                    # Auto-detect hub and test
-#   ./test-fake-issue.sh --url <URL>        # Test against custom URL
-#   ./test-fake-issue.sh --gc <name>        # Use specific Golden Claude (default: default)
+#   ./test-fake-issue.sh --repo owner/name           # Provision for a specific repo
+#   ./test-fake-issue.sh --repo owner/name -p arch   # With specific prompt
+#   ./test-fake-issue.sh                             # Uses first repo from GITHUB_INTEGRATION_JSON
 
 set -e
 
@@ -15,62 +15,85 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Source environment if available
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/../.env" ]; then
+    source "$SCRIPT_DIR/../.env"
+fi
+
 # Default values
 HUB_URL=""
-GOLDEN_CLAUDE="default"
+PROMPT_NAME="default"
+REPO=""
+TITLE="Local test thopter"
 ISSUE_NUMBER=$(date +%s)  # Use timestamp for unique issue numbers
 
 # Parse command line arguments
-for arg in "$@"; do
-    case $arg in
+while [[ $# -gt 0 ]]; do
+    case $1 in
         --url)
             HUB_URL="$2"
             shift 2
             ;;
-        --gc)
-            GOLDEN_CLAUDE="$2"
+        --prompt|-p)
+            PROMPT_NAME="$2"
             shift 2
             ;;
+        --repo|-r)
+            REPO="$2"
+            shift 2
+            ;;
+        --title|-t)
+            TITLE="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--repo owner/name] [--title <label>] [--prompt <name>]"
+            echo "  --repo, -r <owner/name>: Repository to provision for (required or auto-detected)"
+            echo "  --title, -t <label>: Label shown on dashboard (default: 'Local test thopter')"
+            echo "  --prompt, -p <name>: Use specific prompt template (default: default)"
+            echo "  --url <URL>: Test against custom hub URL"
+            exit 0
+            ;;
         *)
-            if [ -z "$1" ]; then
-                break
-            fi
-            echo "Usage: $0 [--local] [--url <URL>] [--gc <name>]"
-            echo "  --local: Test against localhost:8080"
-            echo "  --url <URL>: Test against custom URL"
-            echo "  --gc <name>: Use specific Golden Claude (default: default)"
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--repo owner/name] [--title <label>] [--prompt <name>]"
             exit 1
             ;;
     esac
 done
+
+# Auto-detect repo from GITHUB_INTEGRATION_JSON if not specified
+if [ -z "$REPO" ]; then
+    if [ -n "$GITHUB_INTEGRATION_JSON" ]; then
+        REPO=$(echo "$GITHUB_INTEGRATION_JSON" | jq -r '.repositories | keys[0]' 2>/dev/null || echo "")
+        if [ -n "$REPO" ] && [ "$REPO" != "null" ]; then
+            echo -e "${BLUE}Auto-detected repo from .env: $REPO${NC}"
+        fi
+    fi
+fi
+
+if [ -z "$REPO" ]; then
+    echo -e "${RED}❌ No repository specified${NC}"
+    echo "Use --repo owner/name or configure GITHUB_INTEGRATION_JSON in .env"
+    exit 1
+fi
 
 echo -e "${BLUE}🧪 Testing Thopter Provisioning Endpoint${NC}"
 echo "========================================="
 
 # Auto-detect hub if no URL specified
 if [ -z "$HUB_URL" ]; then
-    echo "Auto-detecting hub from metadata service..."
-    
-    # Source environment if available
-    if [ -f ".env" ]; then
-        source .env
-    fi
-    
+    echo "Auto-detecting hub..."
+
     # Get metadata service machine ID
     APP_NAME=${APP_NAME:-"swarm1"}
     METADATA_ID=$(fly machines list --json -a "$APP_NAME" 2>/dev/null | jq -r '.[] | select(.name=="metadata") | .id' || echo "")
     
     if [ -n "$METADATA_ID" ]; then
-        APP_NAME=${APP_NAME:-"swarm1"}
-        METADATA_HOST="$METADATA_ID.vm.$APP_NAME.internal"
-        
-        echo "Connecting to metadata service: $METADATA_HOST:6379"
-        
-        # Use static hub service discovery - no need to check metadata
         HUB_SERVICE_HOST="1.hub.kv._metadata.${APP_NAME}.internal"
         HUB_URL="http://$HUB_SERVICE_HOST:8080"
-        echo -e "${GREEN}✅ Using hub service discovery: $HUB_SERVICE_HOST${NC}"
-        echo -e "${BLUE}   Hub URL: $HUB_URL${NC}"
+        echo -e "${GREEN}✅ Hub: $HUB_URL${NC}"
     else
         echo -e "${RED}❌ No metadata service found${NC}"
         echo "Run './fly/recreate-hub.sh' to deploy services, or use --local/--url flags"
@@ -91,49 +114,38 @@ else
 fi
 
 echo ""
-echo "Testing provisioning with sample GitHub issue..."
-echo -e "${YELLOW}Issue #42${NC}"
-echo -e "${BLUE}Golden Claude: default${NC}"
+echo "Provisioning thopter..."
+echo -e "${BLUE}Repo: $REPO${NC}"
+echo -e "${BLUE}Title: $TITLE${NC}"
+echo -e "${BLUE}Prompt: $PROMPT_NAME${NC}"
 
-# Sample provision request with complete mock data
+# Build JSON payload with variable interpolation
+JSON_PAYLOAD=$(cat <<EOF
+{
+  "repository": "$REPO",
+  "prompt": "$PROMPT_NAME",
+  "github": {
+    "repository": "$REPO",
+    "issueNumber": "$ISSUE_NUMBER",
+    "issueTitle": "$TITLE",
+    "issueBody": "Claude: This is a test thopter. Your only task is to say hello to prove you have read this message, then STOP and wait for further instructions. Do NOT make any commits, code changes, or take any other actions.",
+    "issueUrl": "https://github.com/$REPO/issues/$ISSUE_NUMBER",
+    "issueAuthor": "local-user",
+    "mentionCommentId": $ISSUE_NUMBER,
+    "mentionAuthor": "local-provisioner",
+    "mentionLocation": "body",
+    "assignees": [],
+    "labels": ["test"],
+    "comments": []
+  }
+}
+EOF
+)
+
+# Send provision request
 RESPONSE=$(curl -s -X POST "$HUB_URL/provision" \
   -H "Content-Type: application/json" \
-  -d '{
-    "repository": "telepath-computer/thopter-issue-test",
-    "gc": "default",
-    "prompt": "default",
-    "github": {
-      "repository": "telepath-computer/thopter-issue-test",
-      "issueNumber": "0",
-      "issueTitle": "Dummy issue",
-      "issueBody": "This issue exists only to test provisioning of a thopter instance. Claude, your task is to just say hello and not make any code changes or commits, as proof that the issue handling and provisioning system is working.\n\n/thopter",
-      "issueUrl": "https://github.com/telepath-computer/thopter-issue-test/issues/0",
-      "issueAuthor": "test-user",
-      "mentionCommentId": 123456789,
-      "mentionAuthor": "test-provisioner",
-      "mentionLocation": "body",
-      "assignees": ["test-user", "maintainer"],
-      "labels": ["bug"],
-      "comments": [
-        {
-          "id": 123456789,
-          "author": "test-provisioner",
-          "body": "dummy comment",
-          "createdAt": "2024-01-15T10:30:00Z",
-          "updatedAt": "2024-01-15T10:30:00Z",
-          "url": "https://github.com/telepath-computer/thopter-issue-test/issues/0#issuecomment-123456789"
-        },
-        {
-          "id": 123456790,
-          "author": "test-user",
-          "body": "Claude: when you say hello, impress the room and do it in a haiku form!",
-          "createdAt": "2024-01-15T11:45:00Z",
-          "updatedAt": "2024-01-15T11:45:00Z",
-          "url": "https://github.com/telepath-computer/thopter-issue-test/issues/0#issuecomment-123456790"
-        }
-      ]
-    }
-  }')
+  -d "$JSON_PAYLOAD")
 
 echo ""
 echo "Response:"
@@ -147,12 +159,11 @@ if echo "$RESPONSE" | jq -e '.success' > /dev/null 2>&1; then
     echo ""
     echo -e "${GREEN}🚁 Provision request created successfully!${NC}"
     echo -e "${GREEN}Request ID: $REQUEST_ID${NC}"
-    echo -e "${GREEN}Message: $MESSAGE${NC}"
     echo ""
-    echo "You can now:"
-    echo "1. Check status: ./fly/status.sh"
-    echo "2. Watch hub dashboard for provisioning progress"
-    echo "3. Clean up when done: ./cleanup-thopters.sh"
+    echo "Next steps:"
+    echo "1. Watch dashboard: $HUB_URL/"
+    echo "2. Access thopter web terminal and run 'yolo-claude' to authenticate"
+    echo "3. Check status: ./fly/status.sh"
 else
     echo ""
     echo -e "${RED}❌ Provisioning failed${NC}"

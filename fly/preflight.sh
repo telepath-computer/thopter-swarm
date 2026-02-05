@@ -106,7 +106,7 @@ else
     if [ "$ENV_OK" = true ]; then
         show_success "All required environment variables are configured"
         show_info "App: $APP_NAME, Region: $REGION"
-        
+
         # Parse GitHub integration config and show repositories
         if [ -n "$GITHUB_INTEGRATION_JSON" ] && [ "$GITHUB_INTEGRATION_JSON" != "..." ]; then
             REPOS=$(echo "$GITHUB_INTEGRATION_JSON" | jq -r '.repositories | keys[]' 2>/dev/null || echo "")
@@ -116,8 +116,6 @@ else
                 add_warning "Could not parse GITHUB_INTEGRATION_JSON repositories"
             fi
         fi
-        
-        show_info "Golden Claudes: Use './fly/recreate-gc.sh [name]' to create gc-* machines"
     fi
 fi
 
@@ -161,6 +159,52 @@ if [ -n "$INTERNAL_APPS" ]; then
 else
     add_warning "Wireguard VPN not connected or not working. You need an active Fly.io Wireguard connection to access thopter web terminals."
     add_warning "To fix: Run 'fly wireguard create' and activate the VPN connection on your system"
+fi
+
+# macOS-specific: Check if system resolver can resolve .internal domains
+# This catches cases where wireguard works but Tailscale or other software intercepts DNS
+if [ "$(uname)" = "Darwin" ] && [ -n "$INTERNAL_APPS" ]; then
+    echo ""
+    echo "5b. Checking macOS DNS resolver configuration..."
+
+    # Test if system resolver can resolve .internal domains using dscacheutil
+    # Use $APP_NAME.internal which resolves to machine IPs (unlike _apps.internal which is TXT)
+    SYSTEM_RESOLVE_WORKS=false
+    if dscacheutil -q host -a name "$APP_NAME.internal" 2>/dev/null | grep -q "ip.*_address"; then
+        SYSTEM_RESOLVE_WORKS=true
+    fi
+
+    if [ "$SYSTEM_RESOLVE_WORKS" = true ]; then
+        show_success "macOS system resolver is correctly configured for .internal domains"
+    else
+        # Check for Tailscale as a common conflicting service
+        TAILSCALE_DETECTED=false
+        if scutil --dns 2>/dev/null | grep -qi "tailscale\|ts\.net"; then
+            TAILSCALE_DETECTED=true
+        fi
+
+        # Find Fly's DNS server for the fix instructions
+        FLY_DNS=$(scutil --dns 2>/dev/null | grep -E "nameserver.*: fdaa:" | head -1 | awk '{print $3}')
+        if [ -z "$FLY_DNS" ]; then
+            FLY_DNS="fdaa::3"  # fallback to generic Fly DNS
+        fi
+
+        add_issue "macOS system resolver cannot resolve .internal domains"
+        show_info "The wireguard tunnel works, but your system's DNS is not routing .internal queries to Fly's DNS."
+        show_info "Tools like redis-cli, curl, etc. will fail to connect to .internal hostnames."
+        echo ""
+        if [ "$TAILSCALE_DETECTED" = true ]; then
+            show_info "Tailscale detected: Tailscale's DNS may be intercepting .internal queries."
+            show_info "Option 1: Disconnect Tailscale while using Fly wireguard"
+            show_info "Option 2: Create a DNS resolver override (see below)"
+            echo ""
+        fi
+        show_info "To fix, create a macOS resolver file:"
+        echo -e "    ${BLUE}sudo mkdir -p /etc/resolver${NC}"
+        echo -e "    ${BLUE}sudo bash -c 'echo \"nameserver $FLY_DNS\" > /etc/resolver/internal'${NC}"
+        echo ""
+        show_info "Then verify with: dscacheutil -q host -a name _apps.internal"
+    fi
 fi
 
 echo ""
