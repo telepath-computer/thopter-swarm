@@ -5,6 +5,12 @@ import argparse
 import sys
 
 
+def cmd_setup(args):
+    from setup import run_setup
+
+    run_setup()
+
+
 def cmd_create(args):
     from sandbox import create_sandbox
 
@@ -59,6 +65,10 @@ def main():
         description="Manage Modal sandboxes for Claude Code development",
     )
     sub = parser.add_subparsers(dest="command", required=True)
+
+    # setup
+    p = sub.add_parser("setup", help="Check Modal auth and configure secrets")
+    p.set_defaults(func=cmd_setup)
 
     # create
     p = sub.add_parser("create", help="Create a new sandbox")
