@@ -23,7 +23,7 @@ STATE_FILE = STATE_DIR / "state.json"
 def _load_state() -> dict:
     if STATE_FILE.exists():
         return json.loads(STATE_FILE.read_text())
-    return {"snapshots": {}, "sandboxes": {}}
+    return {"snapshots": {}}
 
 
 def _save_state(state: dict) -> None:
@@ -48,40 +48,5 @@ def get_snapshot(label_or_id: str) -> str:
     return snapshots[label_or_id]
 
 
-def save_sandbox(name: str, sandbox_id: str) -> None:
-    state = _load_state()
-    state["sandboxes"][name] = sandbox_id
-    _save_state(state)
-
-
-def remove_sandbox(name_or_id: str) -> None:
-    state = _load_state()
-    sandboxes = state.get("sandboxes", {})
-    # Remove by name
-    if name_or_id in sandboxes:
-        del sandboxes[name_or_id]
-    else:
-        # Remove by ID
-        to_remove = [k for k, v in sandboxes.items() if v == name_or_id]
-        for k in to_remove:
-            del sandboxes[k]
-    _save_state(state)
-
-
-def resolve_sandbox(name_or_id: str) -> str:
-    """Resolve a sandbox name to an ID. If it looks like an ID, return as-is."""
-    if name_or_id.startswith("sb-"):
-        return name_or_id
-    state = _load_state()
-    sandboxes = state.get("sandboxes", {})
-    if name_or_id not in sandboxes:
-        raise KeyError(f"No sandbox with name '{name_or_id}'. Available: {list(sandboxes.keys())}")
-    return sandboxes[name_or_id]
-
-
 def list_snapshots() -> dict[str, str]:
     return _load_state().get("snapshots", {})
-
-
-def list_sandboxes() -> dict[str, str]:
-    return _load_state().get("sandboxes", {})
