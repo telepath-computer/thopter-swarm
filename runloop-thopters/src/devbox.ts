@@ -26,6 +26,8 @@ set -e
 if [ -n "$GITHUB_PAT" ]; then
     git config --global credential.helper store
     echo "https://thopterbot:\${GITHUB_PAT}@github.com" > ~/.git-credentials
+    # Rewrite SSH-style URLs to HTTPS so the PAT credential is used automatically
+    git config --global url."https://github.com/".insteadOf "git@github.com:"
     git config --global user.name "ThopterBot"
     git config --global user.email "thopterbot@telepath.computer"
     echo "Git configured with PAT credentials"
@@ -51,10 +53,16 @@ curl -fsSL https://claude.ai/install.sh | bash
 # Install OpenAI Codex
 npm i -g @openai/codex
 
-# Ensure ~/.local/bin is on PATH and set yolo-claude alias
+# Install starship prompt (non-interactive)
+curl -sS https://starship.rs/install.sh | sh -s -- -y
+
+# Ensure ~/.local/bin is on PATH and set aliases
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'alias yolo-claude="claude --dangerously-skip-permissions"' >> ~/.bashrc
 echo 'alias tt="tmux -CC attach || tmux -CC"' >> ~/.bashrc
+
+# Activate starship prompt
+echo 'eval "$(starship init bash)"' >> ~/.bashrc
 
 echo "Devbox init complete"
 `.trim();
@@ -88,6 +96,24 @@ async function installThopterScripts(
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/tmp/thopter-cron-install.sh",
     contents: readScript("thopter-cron-install.sh"),
+  });
+
+  // Neovim options (OSC 52 clipboard, etc.)
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/home/user/.config/nvim/lua/options.lua",
+    contents: readScript("nvim-options.lua"),
+  });
+
+  // Starship prompt config
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/home/user/.config/starship.toml",
+    contents: readScript("starship.toml"),
+  });
+
+  // tmux config (Ctrl-a prefix, etc.)
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/home/user/.tmux.conf",
+    contents: readScript("tmux.conf"),
   });
 
   // Install scripts to /usr/local/bin and set up cron

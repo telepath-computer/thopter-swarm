@@ -10,3 +10,27 @@
 - Upgrade Runloop account to enable suspend/resume, then test heartbeat survives suspend/resume cycle via tini.
 - review the auto suspend logic make sure it's sane and that it works
 - Try building a task system in Redis
+
+- starship. The problem is getting it installed because the installer script requires input and apt-get doesn't work for it.
+curl -sS https://starship.rs/install.sh | sh
+```
+$ cat ~/.config/starship.toml
+format = """$username$env_var$directory$git_branch$git_status
+\\$ """
+
+[username]
+show_always = true
+format = "[$user](bold yellow)@"
+
+[env_var.THOPTER_NAME]
+format = "[$env_value](bold green) "
+
+[hostname]
+disabled = true
+```
+
+note user recommended iterm2 changes:
+- enable "Applications in terminal may access Clipboard."
+- enable "copy to clipboard on selection"
+- enable "mirror tmux paste buffer to clipoard"
+

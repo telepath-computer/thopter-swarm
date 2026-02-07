@@ -1,0 +1,12 @@
+format = """$username$env_var$directory$git_branch$git_status
+\\$ """
+
+[username]
+show_always = true
+format = "[$user](bold yellow)@"
+
+[env_var.THOPTER_NAME]
+format = "[$env_value](bold green) "
+
+[hostname]
+disabled = true
