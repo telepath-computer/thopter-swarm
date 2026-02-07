@@ -116,9 +116,35 @@ async function installThopterScripts(
     contents: readScript("tmux.conf"),
   });
 
-  // Install scripts to /usr/local/bin and set up cron
+  // Claude Code hooks for redis status updates
+  const hookFiles: Record<string, string> = {
+    "claude-hook-stop.sh": "on-stop.sh",
+    "claude-hook-prompt.sh": "on-prompt.sh",
+    "claude-hook-notification.sh": "on-notification.sh",
+    "claude-hook-session-start.sh": "on-session-start.sh",
+    "claude-hook-session-end.sh": "on-session-end.sh",
+  };
+  for (const [src, dest] of Object.entries(hookFiles)) {
+    await client.devboxes.writeFileContents(devboxId, {
+      file_path: `/home/user/.claude/hooks/${dest}`,
+      contents: readScript(src),
+    });
+  }
+  // Transcript parser for Stop hook (extracts last assistant message)
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/tmp/thopter-last-message.mjs",
+    contents: readScript("thopter-last-message.mjs"),
+  });
+
+  // Installer merges hooks into existing settings.json (idempotent)
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/tmp/install-claude-hooks.mjs",
+    contents: readScript("install-claude-hooks.mjs"),
+  });
+
+  // Install scripts to /usr/local/bin, make hooks executable, register hooks, set up cron
   await client.devboxes.executeAsync(devboxId, {
-    command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && bash /tmp/thopter-cron-install.sh",
+    command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-last-message.mjs /usr/local/bin/thopter-last-message && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
   });
 }
 
@@ -455,6 +481,41 @@ export async function snapshotDevbox(
     console.log(`Named: ${snapshotName}`);
   }
 
+  return snapshot.id;
+}
+
+export async function replaceSnapshot(
+  devboxNameOrId: string,
+  snapshotName: string,
+): Promise<string> {
+  const { id: devboxId } = await resolveDevbox(devboxNameOrId);
+  const client = getClient();
+
+  // Find existing snapshot(s) with this name
+  const oldIds: string[] = [];
+  for await (const s of client.devboxes.diskSnapshots.list({ limit: 100 })) {
+    if (s.name === snapshotName) oldIds.push(s.id);
+  }
+
+  if (oldIds.length === 0) {
+    throw new Error(
+      `No snapshot named '${snapshotName}' to replace. Use 'snapshot create' instead.`,
+    );
+  }
+
+  // Delete old snapshot(s), then create new with the same name
+  for (const oldId of oldIds) {
+    console.log(`Deleting old snapshot ${oldId}...`);
+    await client.devboxes.diskSnapshots.delete(oldId);
+  }
+
+  console.log(`Snapshotting devbox ${devboxId}...`);
+  const snapshot = await client.devboxes.snapshotDisk(devboxId, {
+    name: snapshotName,
+    metadata: { [MANAGED_BY_KEY]: MANAGED_BY_VALUE },
+  });
+
+  console.log(`Replaced snapshot '${snapshotName}': ${snapshot.id}`);
   return snapshot.id;
 }
 

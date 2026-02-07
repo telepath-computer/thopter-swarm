@@ -30,6 +30,7 @@ interface ThopterInfo {
   heartbeat: string | null;
   alive: boolean;
   claudeRunning: string | null;
+  lastMessage: string | null;
 }
 
 async function scanThopters(redis: Redis): Promise<ThopterInfo[]> {
@@ -47,12 +48,13 @@ async function scanThopters(redis: Redis): Promise<ThopterInfo[]> {
     const name = key.replace(/^thopter:/, "").replace(/:heartbeat$/, "");
     const prefix = `thopter:${name}`;
 
-    const [id, status, heartbeat, alive, claudeRunning] = await redis.mget(
+    const [id, status, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
       `${prefix}:id`,
       `${prefix}:status`,
       `${prefix}:heartbeat`,
       `${prefix}:alive`,
       `${prefix}:claude_running`,
+      `${prefix}:last_message`,
     );
 
     thopters.push({
@@ -62,6 +64,7 @@ async function scanThopters(redis: Redis): Promise<ThopterInfo[]> {
       heartbeat,
       alive: alive === "1",
       claudeRunning,
+      lastMessage,
     });
   }
 
@@ -96,15 +99,22 @@ export async function showAllStatus(): Promise<void> {
     }
 
     printTable(
-      ["NAME", "STATUS", "ALIVE", "CLAUDE", "HEARTBEAT", "ID"],
-      thopters.map((t) => [
-        t.name,
-        t.status ?? "-",
-        t.alive ? "yes" : "no",
-        t.claudeRunning === "1" ? "yes" : t.claudeRunning === "0" ? "no" : "-",
-        t.heartbeat ? relativeTime(t.heartbeat) : "-",
-        t.id ?? "-",
-      ]),
+      ["NAME", "STATUS", "ALIVE", "CLAUDE", "HEARTBEAT", "LAST MESSAGE"],
+      thopters.map((t) => {
+        // Truncate last message for table display: first line, max 60 chars
+        let msg = t.lastMessage ?? "-";
+        const nl = msg.indexOf("\n");
+        if (nl > 0) msg = msg.slice(0, nl);
+        if (msg.length > 60) msg = msg.slice(0, 57) + "...";
+        return [
+          t.name,
+          t.status ?? "-",
+          t.alive ? "yes" : "no",
+          t.claudeRunning === "1" ? "yes" : t.claudeRunning === "0" ? "no" : "-",
+          t.heartbeat ? relativeTime(t.heartbeat) : "-",
+          msg,
+        ];
+      }),
     );
   } finally {
     redis.disconnect();
@@ -116,12 +126,13 @@ export async function showThopterStatus(name: string): Promise<void> {
   try {
     const prefix = `thopter:${name}`;
 
-    const [id, status, heartbeat, alive, claudeRunning] = await redis.mget(
+    const [id, status, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
       `${prefix}:id`,
       `${prefix}:status`,
       `${prefix}:heartbeat`,
       `${prefix}:alive`,
       `${prefix}:claude_running`,
+      `${prefix}:last_message`,
     );
 
     if (!heartbeat && !status && !id) {
@@ -135,6 +146,9 @@ export async function showThopterStatus(name: string): Promise<void> {
     console.log(`Alive:          ${alive === "1" ? "yes" : "no"}`);
     console.log(`Claude running: ${claudeRunning === "1" ? "yes" : claudeRunning === "0" ? "no" : "-"}`);
     console.log(`Heartbeat:      ${heartbeat ? `${heartbeat} (${relativeTime(heartbeat)})` : "-"}`);
+    if (lastMessage) {
+      console.log(`Last message:   ${lastMessage}`);
+    }
 
     // Show recent logs
     const logs = await redis.lrange(`${prefix}:logs`, -20, -1);

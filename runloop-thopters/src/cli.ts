@@ -198,6 +198,16 @@ snapshotCmd
   });
 
 snapshotCmd
+  .command("replace")
+  .description("Replace an existing snapshot with a fresh one from a devbox")
+  .argument("<devbox>", "Devbox name or ID")
+  .argument("<name>", "Name of the snapshot to replace")
+  .action(async (devbox: string, name: string) => {
+    const { replaceSnapshot } = await import("./devbox.js");
+    await replaceSnapshot(devbox, name);
+  });
+
+snapshotCmd
   .command("destroy")
   .alias("rm")
   .description("Delete a snapshot")
