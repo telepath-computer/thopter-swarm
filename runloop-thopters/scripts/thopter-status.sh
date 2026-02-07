@@ -50,7 +50,7 @@ cmd_running() {
 
 cmd_heartbeat() {
     rcli SET "$PREFIX:heartbeat" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" EX 86400 > /dev/null
-    rcli SET "$PREFIX:alive" "1" EX 90 > /dev/null
+    rcli SET "$PREFIX:alive" "1" EX 30 > /dev/null
     if [ -n "${THOPTER_ID:-}" ]; then
         rcli SET "$PREFIX:id" "$THOPTER_ID" EX 86400 > /dev/null
     fi
@@ -71,7 +71,11 @@ cmd_heartbeat() {
 cmd_message() {
     # Read message from stdin to avoid shell escaping issues.
     # Uses redis-cli -x (read last arg from stdin) with SETEX.
-    rcli -x SETEX "$PREFIX:last_message" 86400 > /dev/null
+    # Skip if stdin is empty to avoid overwriting with blank.
+    local msg
+    msg=$(cat)
+    [ -z "$msg" ] && return 0
+    printf '%s' "$msg" | rcli -x SETEX "$PREFIX:last_message" 86400 > /dev/null
 }
 
 cmd_show() {
