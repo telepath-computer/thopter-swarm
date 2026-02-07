@@ -1,0 +1,12 @@
+- Test this with a real developer implementation task round-tripping from Git
+- Teach Claude how to update it's task status, give it a skill maybe
+- Implement hooks to update status for when a thopter is waiting on input or is done and install them in new thopters
+- Set up some common slash commands
+- Have developer names and associate them with thopters.
+- completely replace this repo with the run loop implementation.
+- Write better docs.
+- Put API keys and such in team 1Password.
+- Sign up for a paid run loop account.
+- Upgrade Runloop account to enable suspend/resume, then test heartbeat survives suspend/resume cycle via tini.
+- review the auto suspend logic make sure it's sane and that it works
+- Try building a task system in Redis

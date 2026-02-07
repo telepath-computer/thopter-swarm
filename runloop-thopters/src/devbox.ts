@@ -3,6 +3,9 @@
  */
 
 import { execSync, spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { getClient } from "./client.js";
 import { printTable } from "./output.js";
 import {
@@ -31,7 +34,8 @@ else
 fi
 
 # Install essential tools
-sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq > /dev/null
+sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron > /dev/null
+sudo /usr/sbin/cron 2>/dev/null || true
 
 # Install Neovim (latest stable, NvChad requires 0.10+)
 NVIM_ARCH=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/x86_64/')
@@ -50,17 +54,68 @@ npm i -g @openai/codex
 # Ensure ~/.local/bin is on PATH and set yolo-claude alias
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'alias yolo-claude="claude --dangerously-skip-permissions"' >> ~/.bashrc
+echo 'alias tt="tmux -CC attach || tmux -CC"' >> ~/.bashrc
 
 echo "Devbox init complete"
 `.trim();
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SCRIPTS_DIR = resolve(__dirname, "..", "scripts");
+
+function readScript(name: string): string {
+  return readFileSync(resolve(SCRIPTS_DIR, name), "utf-8");
+}
+
+/**
+ * Upload thopter-status scripts and install cron heartbeat on a running devbox.
+ */
+async function installThopterScripts(
+  devboxId: string,
+  name: string,
+  redisUrl?: string,
+): Promise<void> {
+  const client = getClient();
+
+  // Upload scripts
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/tmp/thopter-status",
+    contents: readScript("thopter-status.sh"),
+  });
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/tmp/thopter-heartbeat",
+    contents: readScript("thopter-heartbeat.sh"),
+  });
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/tmp/thopter-cron-install.sh",
+    contents: readScript("thopter-cron-install.sh"),
+  });
+
+  // Install scripts to /usr/local/bin and set up cron
+  await client.devboxes.executeAsync(devboxId, {
+    command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && bash /tmp/thopter-cron-install.sh",
+  });
+}
 
 /**
  * Resolve a snapshot by name or ID.
  */
 async function resolveSnapshotId(nameOrId: string): Promise<string> {
-  if (nameOrId.startsWith("snp_")) return nameOrId;
-
   const client = getClient();
+
+  // Direct ID — validate it still exists via queryStatus (single API call)
+  if (nameOrId.startsWith("snp_")) {
+    try {
+      const status = await client.devboxes.diskSnapshots.queryStatus(nameOrId);
+      if (status.status === "deleted") {
+        throw new Error(`Snapshot '${nameOrId}' has been deleted.`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("deleted")) throw e;
+      throw new Error(`Snapshot '${nameOrId}' not found.`);
+    }
+    return nameOrId;
+  }
   const matches: string[] = [];
   for await (const s of client.devboxes.diskSnapshots.list({ limit: 100 })) {
     if (s.name === nameOrId) matches.push(s.id);
@@ -125,8 +180,15 @@ export async function createDevbox(opts: {
   if (!snapshotId) {
     const defaultSnap = getDefaultSnapshot();
     if (defaultSnap) {
-      snapshotId = await resolveSnapshotId(defaultSnap);
-      console.log(`Using default snapshot: ${snapshotId}`);
+      try {
+        snapshotId = await resolveSnapshotId(defaultSnap);
+        console.log(`Using default snapshot: ${defaultSnap}`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(
+          `${msg}\nThis is the default snapshot. To clear it: ./rt snapshot default --clear`,
+        );
+      }
     }
   }
 
@@ -165,6 +227,21 @@ export async function createDevbox(opts: {
     const devbox = await client.devboxes.createAndAwaitRunning(createParams);
     console.log(`Devbox created: ${devbox.id}`);
     console.log("Devbox is running.");
+
+    // Persist identity + secrets-injected vars to .bashrc (cron doesn't inherit process env)
+    // THOPTER_NAME and THOPTER_ID are known values; REDIS_URL must be captured from the running env
+    await client.devboxes.writeFileContents(devbox.id, {
+      file_path: "/tmp/thopter-env.sh",
+      contents: `export THOPTER_NAME="${opts.name}"\nexport THOPTER_ID="${devbox.id}"\n`,
+    });
+    await client.devboxes.executeAsync(devbox.id, {
+      command: `cat /tmp/thopter-env.sh >> ~/.bashrc && echo "export REDIS_URL=\\"$REDIS_URL\\"" >> ~/.bashrc`,
+    });
+
+    // Upload and install thopter-status scripts + cron
+    console.log("Installing thopter scripts...");
+    await installThopterScripts(devbox.id, opts.name);
+
     return devbox.id;
   } catch (e) {
     // If it failed after creation, try to extract the ID from the error or re-fetch

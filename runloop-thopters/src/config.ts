@@ -30,6 +30,7 @@ export const SECRETS: Array<{
   { runloopName: "thopter_anthropic_api_key", envVar: "ANTHROPIC_API_KEY", description: "Anthropic API key (for Claude Code)" },
   { runloopName: "thopter_github_pat", envVar: "GITHUB_PAT", description: "GitHub personal access token (repo read/write)" },
   { runloopName: "thopter_openai_api_key", envVar: "OPENAI_API_KEY", description: "OpenAI API key" },
+  { runloopName: "thopter_redis_url", envVar: "REDIS_URL", description: "Upstash Redis URL (redis://default:...@host:port)" },
 ];
 
 /** Secret mappings to pass to devbox create (env var name → Runloop secret name). */

@@ -9,8 +9,8 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 
-// Load .env.local from package root if RUNLOOP_API_KEY not already set
-if (!process.env.RUNLOOP_API_KEY) {
+// Load .env.local from package root (won't override existing env vars)
+{
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const envPath = resolve(__dirname, "..", ".env.local");
   try {
@@ -57,6 +57,8 @@ examples:
   runloop-thopters snapshot default               View default snapshot
   runloop-thopters snapshot default --clear        Clear default snapshot
   runloop-thopters list                           Show running devboxes
+  runloop-thopters status                         Overview of all thopters from redis
+  runloop-thopters status dev                     Detailed status + logs for a thopter
   runloop-thopters suspend dev                    Suspend a devbox
   runloop-thopters resume dev                     Resume a suspended devbox
   runloop-thopters destroy dev                    Shut down a devbox`,
@@ -103,6 +105,20 @@ program
   .action(async () => {
     const { listDevboxes } = await import("./devbox.js");
     await listDevboxes();
+  });
+
+// --- status ---
+program
+  .command("status")
+  .description("Show thopter status from redis")
+  .argument("[name]", "Thopter name (omit for overview of all)")
+  .action(async (name?: string) => {
+    const { showAllStatus, showThopterStatus } = await import("./status.js");
+    if (name) {
+      await showThopterStatus(name);
+    } else {
+      await showAllStatus();
+    }
   });
 
 // --- destroy ---
