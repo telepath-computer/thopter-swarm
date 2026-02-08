@@ -1,16 +1,5 @@
-- DONE setup ntfy.sh integration - when claude hooks for done/waiting/notify fire, publish to ntfy. the channel name should be decided by the dev in their homedir thopter config which then sets up THOPTER_NTFY_CHANEL in the env of the thopter. readme should instruct how to do that. setup cli mode should walk them thru it.
-- DONE Have developer names associated with thopters. use github name. tag them owner:name in runloop, give an environment var THOPTER_OWNER, and include owner in redis status bits.
-- maybe: session-start ntfy notification (notify when claude begins a new session)
-- make sure ntfy channel is optional and setup, hooks/heartbeats, etc dont fail w/o it
-- config file should be ~/.thopter.settings.json
-- allow cascade of overrides of config, walk tree from current finding all .thopter.setttings.json and applying a cascade
 - purge redis statue on dead thopters (does it expire automatically?)
-- DONE use 'thopter' for the command
-- last message in redis doesn't seem to be the actual last message? shouldn't each heartbeat update that.
-- have thopter cmd install somewhere global.
-- move runloop api key and redis url to homedir config file, not .env.local 
 - replace the api keys with team keys
-- DONE add read access to github issues to the PAT, tell claude md it can read the repo, read issues, but only push on thopter branches, no other privs. (can it create PRs? i should have it be able to do that)
 - Write better docs.
   - in particular write the developer guide for my coworkers.
     - i've setup the runloop workspace already. secrets etc
@@ -56,6 +45,11 @@ Runloop platform wishlist:
   on its own devbox ID. This removes the need for external keepalive proxies
   or operator-side watchers.
 
+maybe list:
+- maybe: allow cascade of overrides of config, walk tree from current finding all .thopter.json and applying a cascade
+- MAYBE: session-start ntfy notification (notify when claude begins a new session)
+
+done list:
 - DONE Test this with a real developer implementation task round-tripping from Git
 - DONE test heartbeat survives suspend/resume cycle
 - DONE Upgrade Runloop account to enable suspend/resume
@@ -74,5 +68,13 @@ Runloop platform wishlist:
   - Added ./thopter keepalive <name> for operator-side idle timer reset
   - Heartbeat now uses touch file mtime to set "running" (< 1 min) or "inactive" (stale)
   - Hooks (SessionStart, Prompt, ToolUse) touch the activity file; only heartbeat sets "running"
-
+- DONE setup ntfy.sh integration - when claude hooks for done/waiting/notify fire, publish to ntfy. the channel name should be decided by the dev in their homedir thopter config which then sets up THOPTER_NTFY_CHANEL in the env of the thopter. readme should instruct how to do that. setup cli mode should walk them thru it.
+- DONE Have developer names associated with thopters. use github name. tag them owner:name in runloop, give an environment var THOPTER_OWNER, and include owner in redis status bits.
+- DONE use 'thopter' for the command
+- DONE add read access to github issues to the PAT, tell claude md it can read the repo, read issues, but only push on thopter branches, no other privs. (can it create PRs? i should have it be able to do that)
+- DONE make sure ntfy channel is optional and setup, hooks/heartbeats, etc dont fail w/o it
+- DONE config file should be ~/.thopter.json
+- DONE last message in redis doesn't seem to be the actual last message? shouldn't each heartbeat update that.
+- DONE have thopter cmd install somewhere global.
+- DONE move runloop api key and redis url to .thopter.json not .env.local 
 
