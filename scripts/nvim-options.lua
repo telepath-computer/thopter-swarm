@@ -4,6 +4,8 @@
 -- over SSH and tmux. The osc52 module is built into neovim 0.10+ but must be
 -- explicitly configured. The terminal escape sequence travels through
 -- tmux -> SSH -> iTerm, which sets the local macOS clipboard.
+vim.opt.clipboard = "unnamedplus"
+
 vim.g.clipboard = {
   name = "OSC 52",
   copy = {
