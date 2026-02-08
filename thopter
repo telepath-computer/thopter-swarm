@@ -1,3 +1,11 @@
 #!/usr/bin/env bash
 # Thopter Swarm CLI wrapper
-exec "$(dirname "$0")/node_modules/.bin/tsx" "$(dirname "$0")/src/cli.ts" "$@"
+# Resolve symlinks so this works when invoked via npm link
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+exec "$DIR/node_modules/.bin/tsx" "$DIR/src/cli.ts" "$@"
