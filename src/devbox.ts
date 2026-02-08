@@ -64,6 +64,9 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'alias yolo-claude="claude --dangerously-skip-permissions"' >> ~/.bashrc
 echo 'alias attach-or-launch-tmux-cc="tmux -CC attach || tmux -CC"' >> ~/.bashrc
 
+# Source thopter identity env vars (written by create command after boot)
+echo '. ~/.thopter-env' >> ~/.bashrc
+
 # Activate starship prompt
 echo 'eval "$(starship init bash)"' >> ~/.bashrc
 
@@ -289,14 +292,20 @@ export async function createDevbox(opts: {
     console.log(`Devbox created: ${devbox.id}`);
     console.log("Devbox is running.");
 
-    // Persist identity + secrets-injected vars to .bashrc (cron doesn't inherit process env)
-    // THOPTER_NAME and THOPTER_ID are known values; REDIS_URL must be captured from the running env
+    // Write thopter identity and secrets to ~/.thopter-env (overwritten on each create).
+    // Runloop injects secrets as process env vars, so interactive shells already have
+    // them — but cron runs in a minimal environment without Runloop's injected vars.
+    // This file is sourced from .bashrc so the heartbeat cron (which needs REDIS_URL,
+    // THOPTER_NAME, THOPTER_ID) gets them via: cron → heartbeat → .bashrc → .thopter-env.
+    // On snapshot creates, this overwrites stale values from the previous devbox identity.
     await client.devboxes.writeFileContents(devbox.id, {
-      file_path: "/tmp/thopter-env.sh",
+      file_path: "/home/user/.thopter-env",
       contents: `export THOPTER_NAME="${opts.name}"\nexport THOPTER_ID="${devbox.id}"\n`,
     });
+    // REDIS_URL must be captured inside the devbox (we don't have it operator-side).
+    // Also ensure .bashrc sources the env file (idempotent — skips if already present).
     await client.devboxes.executeAsync(devbox.id, {
-      command: `cat /tmp/thopter-env.sh >> ~/.bashrc && echo "export REDIS_URL=\\"$REDIS_URL\\"" >> ~/.bashrc`,
+      command: `echo "export REDIS_URL=\\"$REDIS_URL\\"" >> ~/.thopter-env && grep -q 'source.*thopter-env' ~/.bashrc || echo '. ~/.thopter-env' >> ~/.bashrc`,
     });
 
     // Upload and install thopter-status scripts + cron
