@@ -12,10 +12,12 @@ import {
   MANAGED_BY_KEY,
   MANAGED_BY_VALUE,
   NAME_KEY,
+  OWNER_KEY,
   DEFAULT_RESOURCE_SIZE,
   DEFAULT_IDLE_TIMEOUT_SECONDS,
   getSecretMappings,
   getDefaultSnapshot,
+  getNtfyChannel,
 } from "./config.js";
 
 /** Git setup script that runs inside the devbox on first create. */
@@ -238,6 +240,19 @@ export async function createDevbox(opts: {
 }): Promise<string> {
   const client = getClient();
 
+  // Get owner from operator's git config (required)
+  let ownerName: string;
+  try {
+    ownerName = execSync("git config --get user.name", { encoding: "utf-8" }).trim();
+  } catch {
+    ownerName = "";
+  }
+  if (!ownerName) {
+    throw new Error(
+      "Git user.name not configured. Set it with: git config --global user.name 'Your Name'",
+    );
+  }
+
   // Determine snapshot (resolve name → ID if needed)
   let snapshotId = opts.snapshotId
     ? await resolveSnapshotId(opts.snapshotId)
@@ -261,6 +276,7 @@ export async function createDevbox(opts: {
   const metadata: Record<string, string> = {
     [MANAGED_BY_KEY]: MANAGED_BY_VALUE,
     [NAME_KEY]: opts.name,
+    [OWNER_KEY]: ownerName,
   };
 
   const secrets = await getSecretMappings();
@@ -298,9 +314,14 @@ export async function createDevbox(opts: {
     // This file is sourced from .bashrc so the heartbeat cron (which needs REDIS_URL,
     // THOPTER_NAME, THOPTER_ID) gets them via: cron → heartbeat → .bashrc → .thopter-env.
     // On snapshot creates, this overwrites stale values from the previous devbox identity.
+    let thopterEnv = `export THOPTER_NAME="${opts.name}"\nexport THOPTER_ID="${devbox.id}"\nexport THOPTER_OWNER="${ownerName}"\n`;
+    const ntfyChannel = getNtfyChannel();
+    if (ntfyChannel) {
+      thopterEnv += `export THOPTER_NTFY_CHANNEL="${ntfyChannel}"\n`;
+    }
     await client.devboxes.writeFileContents(devbox.id, {
       file_path: "/home/user/.thopter-env",
-      contents: `export THOPTER_NAME="${opts.name}"\nexport THOPTER_ID="${devbox.id}"\n`,
+      contents: thopterEnv,
     });
     // REDIS_URL must be captured inside the devbox (we don't have it operator-side).
     // GH_TOKEN is the env var the gh CLI expects for authentication — we derive it
@@ -344,14 +365,15 @@ export async function listDevboxes(): Promise<void> {
       const meta = db.metadata ?? {};
       if (meta[MANAGED_BY_KEY] !== MANAGED_BY_VALUE) continue;
       const name = meta[NAME_KEY] ?? "";
+      const owner = meta[OWNER_KEY] ?? "";
       const created = db.create_time_ms
         ? new Date(db.create_time_ms).toLocaleString()
         : "";
-      rows.push([name, db.id, db.status, created]);
+      rows.push([name, owner, db.id, db.status, created]);
     }
   }
 
-  printTable(["NAME", "ID", "STATUS", "CREATED"], rows);
+  printTable(["NAME", "OWNER", "ID", "STATUS", "CREATED"], rows);
 }
 
 export async function listSnapshotsCmd(): Promise<void> {

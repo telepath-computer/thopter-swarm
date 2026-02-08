@@ -1,11 +1,16 @@
-- setup ntfy.sh integration - when claude hooks for done/waiting/notify fire, publish to ntfy. the channel name should be decided by the dev in their homedir thopter config which then sets up THOPTER_NTFY_CHANEL in the env of the thopter. readme should instruct how to do that. setup cli mode should walk them thru it.
-- Have developer names associated with thopters. use github name. tag them owner:name in runloop, give an environment var THOPTER_OWNER, and include owner in redis status bits.
+- DONE setup ntfy.sh integration - when claude hooks for done/waiting/notify fire, publish to ntfy. the channel name should be decided by the dev in their homedir thopter config which then sets up THOPTER_NTFY_CHANEL in the env of the thopter. readme should instruct how to do that. setup cli mode should walk them thru it.
+- DONE Have developer names associated with thopters. use github name. tag them owner:name in runloop, give an environment var THOPTER_OWNER, and include owner in redis status bits.
+- maybe: session-start ntfy notification (notify when claude begins a new session)
+- make sure ntfy channel is optional and setup, hooks/heartbeats, etc dont fail w/o it
+- config file should be ~/.thopter.settings.json
+- allow cascade of overrides of config, walk tree from current finding all .thopter.setttings.json and applying a cascade
 - purge redis statue on dead thopters (does it expire automatically?)
 - DONE use 'thopter' for the command
+- last message in redis doesn't seem to be the actual last message? shouldn't each heartbeat update that.
 - have thopter cmd install somewhere global.
 - move runloop api key and redis url to homedir config file, not .env.local 
 - replace the api keys with team keys
-- IN PROGRESS add read access to github issues to the PAT, tell claude md it can read the repo, read issues, but only push on thopter branches, no other privs. (can it create PRs? i should have it be able to do that)
+- DONE add read access to github issues to the PAT, tell claude md it can read the repo, read issues, but only push on thopter branches, no other privs. (can it create PRs? i should have it be able to do that)
 - Write better docs.
   - in particular write the developer guide for my coworkers.
     - i've setup the runloop workspace already. secrets etc

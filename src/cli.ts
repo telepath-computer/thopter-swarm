@@ -258,6 +258,60 @@ snapshotCmd
     }
   });
 
+// --- config ---
+const configCmd = program
+  .command("config")
+  .description("Manage local configuration (~/.runloop-thopters/config.json)");
+
+configCmd
+  .command("set")
+  .description("Set a config value")
+  .argument("<key>", "Config key (ntfyChannel)")
+  .argument("<value>", "Config value")
+  .action(async (key: string, value: string) => {
+    const { setNtfyChannel, setDefaultSnapshot } = await import("./config.js");
+    switch (key) {
+      case "ntfyChannel":
+        setNtfyChannel(value);
+        console.log(`Set ntfyChannel to: ${value}`);
+        console.log(`Subscribe at: https://ntfy.sh/${value}`);
+        break;
+      case "defaultSnapshotId":
+        setDefaultSnapshot(value);
+        console.log(`Set defaultSnapshotId to: ${value}`);
+        break;
+      default:
+        console.error(`Unknown config key: ${key}`);
+        console.error("Available keys: ntfyChannel, defaultSnapshotId");
+        process.exit(1);
+    }
+  });
+
+configCmd
+  .command("get")
+  .description("Get a config value")
+  .argument("[key]", "Config key (omit to show all)")
+  .action(async (key?: string) => {
+    const { getNtfyChannel, getDefaultSnapshot } = await import("./config.js");
+    if (!key) {
+      console.log(`ntfyChannel:       ${getNtfyChannel() ?? "(not set)"}`);
+      console.log(`defaultSnapshotId: ${getDefaultSnapshot() ?? "(not set)"}`);
+    } else {
+      switch (key) {
+        case "ntfyChannel":
+          console.log(getNtfyChannel() ?? "(not set)");
+          break;
+        case "defaultSnapshotId":
+          console.log(getDefaultSnapshot() ?? "(not set)");
+          break;
+        default:
+          console.error(`Unknown config key: ${key}`);
+          console.error("Available keys: ntfyChannel, defaultSnapshotId");
+          process.exit(1);
+      }
+    }
+  });
+
 // --- secrets ---
 const secretsCmd = program
   .command("secrets")

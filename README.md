@@ -190,4 +190,27 @@ The devbox init script specifically checks for `GITHUB_PAT` to configure git cre
 
 ### Local Config
 
-`~/.runloop-thopters/config.json` stores the default snapshot ID. Managed via `./thopter snapshot default`.
+`~/.runloop-thopters/config.json` stores local settings. Managed via `./thopter config` and `./thopter snapshot default`.
+
+| Key | Description |
+|-----|-------------|
+| `defaultSnapshotId` | Default snapshot for `create` (set via `snapshot default`) |
+| `ntfyChannel` | ntfy.sh channel for push notifications (set via `config set`) |
+
+### Notifications (ntfy.sh)
+
+Thopters can push notifications to your phone or desktop via [ntfy.sh](https://ntfy.sh) when Claude stops working or sends a notification.
+
+1. Pick a unique channel name (e.g. `my-thopters-abc123`)
+2. Subscribe on your phone ([iOS](https://apps.apple.com/app/ntfy/id1625396347) / [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy)) or desktop
+3. Configure the channel:
+
+```bash
+./thopter config set ntfyChannel my-thopters-abc123
+```
+
+New thopters created after this will send notifications. Existing thopters need to be re-created or have `THOPTER_NTFY_CHANNEL` added to their `~/.thopter-env` manually.
+
+**What triggers notifications:**
+- **Claude stops** — includes the last assistant message so you can see what happened
+- **Claude Code notifications** — permission requests, errors, etc.

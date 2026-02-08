@@ -14,6 +14,7 @@ const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 export const MANAGED_BY_KEY = "managed_by";
 export const MANAGED_BY_VALUE = "runloop-thopters";
 export const NAME_KEY = "thopter_name";
+export const OWNER_KEY = "thopter_owner";
 
 /** Default devbox resource size. */
 export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
@@ -35,6 +36,7 @@ export async function getSecretMappings(): Promise<Record<string, string>> {
 
 interface LocalConfig {
   defaultSnapshotId?: string;
+  ntfyChannel?: string;
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -62,5 +64,17 @@ export function setDefaultSnapshot(snapshotId: string): void {
 }
 
 export function clearDefaultSnapshot(): void {
-  saveLocalConfig({});
+  const config = loadLocalConfig();
+  delete config.defaultSnapshotId;
+  saveLocalConfig(config);
+}
+
+export function getNtfyChannel(): string | undefined {
+  return loadLocalConfig().ntfyChannel;
+}
+
+export function setNtfyChannel(channel: string): void {
+  const config = loadLocalConfig();
+  config.ntfyChannel = channel;
+  saveLocalConfig(config);
 }

@@ -59,6 +59,9 @@ cmd_heartbeat() {
     if [ -n "${THOPTER_ID:-}" ]; then
         rcli SET "$PREFIX:id" "$THOPTER_ID" EX 86400 > /dev/null
     fi
+    if [ -n "${THOPTER_OWNER:-}" ]; then
+        rcli SET "$PREFIX:owner" "$THOPTER_OWNER" EX 86400 > /dev/null
+    fi
     # Check if claude is running
     if pgrep -x claude > /dev/null 2>&1; then
         rcli SET "$PREFIX:claude_running" "1" EX 86400 > /dev/null

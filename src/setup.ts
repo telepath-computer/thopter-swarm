@@ -4,6 +4,7 @@
 
 import { getClient } from "./client.js";
 import { listSecrets } from "./secrets.js";
+import { getNtfyChannel } from "./config.js";
 
 async function checkAuth(): Promise<boolean> {
   console.log("Checking Runloop authentication...");
@@ -64,6 +65,18 @@ Common secrets you might want to add:
   REDIS_URL           Redis URL for status reporting from inside devboxes
 
 The secret name becomes the env var name in your devboxes.`);
+
+  // ntfy.sh notifications
+  const ntfyChannel = getNtfyChannel();
+  console.log("\n--- Notifications (ntfy.sh) ---");
+  if (ntfyChannel) {
+    console.log(`  Channel: ${ntfyChannel}`);
+    console.log(`  Subscribe: https://ntfy.sh/${ntfyChannel}`);
+  } else {
+    console.log("  No ntfy.sh channel configured.");
+    console.log("  Set one with: ./thopter config set ntfyChannel <channel-name>");
+    console.log("  Then subscribe on your phone/desktop at https://ntfy.sh/<channel-name>");
+  }
 
   console.log("\nSetup complete.");
 }

@@ -25,6 +25,7 @@ function getRedis(): Redis {
 
 interface ThopterInfo {
   name: string;
+  owner: string | null;
   id: string | null;
   status: string | null;
   task: string | null;
@@ -49,8 +50,9 @@ async function scanThopters(redis: Redis): Promise<ThopterInfo[]> {
     const name = key.replace(/^thopter:/, "").replace(/:heartbeat$/, "");
     const prefix = `thopter:${name}`;
 
-    const [id, status, task, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
+    const [id, owner, status, task, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
       `${prefix}:id`,
+      `${prefix}:owner`,
       `${prefix}:status`,
       `${prefix}:task`,
       `${prefix}:heartbeat`,
@@ -61,6 +63,7 @@ async function scanThopters(redis: Redis): Promise<ThopterInfo[]> {
 
     thopters.push({
       name,
+      owner,
       id,
       status,
       task,
@@ -120,7 +123,7 @@ export async function showAllStatus(opts: { all?: boolean } = {}): Promise<void>
     }
 
     printTable(
-      ["NAME", "STATUS", "TASK", "ALIVE", "CLAUDE", "HEARTBEAT", "LAST MESSAGE"],
+      ["NAME", "OWNER", "STATUS", "TASK", "ALIVE", "CLAUDE", "HEARTBEAT", "LAST MESSAGE"],
       thopters.map((t) => {
         // Truncate task for table display: max 40 chars
         let task = t.task ?? "-";
@@ -132,6 +135,7 @@ export async function showAllStatus(opts: { all?: boolean } = {}): Promise<void>
         if (msg.length > 60) msg = msg.slice(0, 57) + "...";
         return [
           t.name,
+          t.owner ?? "-",
           t.status ?? "-",
           task,
           t.alive ? "yes" : "no",
@@ -151,8 +155,9 @@ export async function showThopterStatus(name: string): Promise<void> {
   try {
     const prefix = `thopter:${name}`;
 
-    const [id, status, task, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
+    const [id, owner, status, task, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
       `${prefix}:id`,
+      `${prefix}:owner`,
       `${prefix}:status`,
       `${prefix}:task`,
       `${prefix}:heartbeat`,
@@ -168,6 +173,7 @@ export async function showThopterStatus(name: string): Promise<void> {
 
     console.log(`=== ${name} ===`);
     console.log(`ID:             ${id ?? "-"}`);
+    console.log(`Owner:          ${owner ?? "-"}`);
     console.log(`Status:         ${status ?? "-"}`);
     console.log(`Task:           ${task ?? "-"}`);
     console.log(`Alive:          ${alive === "1" ? "yes" : "no"}`);
