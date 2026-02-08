@@ -21,8 +21,9 @@ fi
 for i in 1 2 3 4 5 6; do
     /usr/local/bin/thopter-status heartbeat >/dev/null 2>&1
 
-    # Update last message from active Claude transcript
-    TRANSCRIPT=$(cat /tmp/thopter-transcript-path 2>/dev/null)
+    # Update last message from active Claude transcript.
+    # /tmp/thopter-active contains the transcript path (written by hooks).
+    TRANSCRIPT=$(cat /tmp/thopter-active 2>/dev/null | tr -d '\n')
     if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
         node /usr/local/bin/thopter-last-message "$TRANSCRIPT" | /usr/local/bin/thopter-status message 2>/dev/null || true
     fi

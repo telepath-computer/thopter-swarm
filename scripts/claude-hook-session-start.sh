@@ -4,11 +4,9 @@
 read -t 1 INPUT || true
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
-# Persist transcript path for heartbeat to read
-[ -n "$TRANSCRIPT" ] && echo "$TRANSCRIPT" > /tmp/thopter-transcript-path
+# Signal activity with transcript path — heartbeat reads this to update last_message
+[ -n "$TRANSCRIPT" ] && echo "$TRANSCRIPT" > /tmp/thopter-active || touch /tmp/thopter-active
 
-# Signal activity — heartbeat will set status to "running"
-touch /tmp/thopter-active
 thopter-status log "session started" 2>/dev/null || true
 
 if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
