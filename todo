@@ -1,13 +1,11 @@
-- install a ~/.claude/CLAUDE.md for host level instructions about thopter context, headless vm, using and pushing only to thopter/* git branches for workspace, yolo mode, etc.
+- test heartbeat survives suspend/resume cycle via tini. (looks like not yet?)
+- install a ~/.claude/CLAUDE.md for host level instructions about thopter context as a runloop devbox, it's a headless kvm context, using and pushing only to thopter/* git branches for workspace. the main thing is that it needs to know to use thopter/* pattern branches for any pushes to remote git. it should be told about the github pat and how git config is setup to use that.
 - Test this with a real developer implementation task round-tripping from Git
 - Teach Claude how to update it's task status, give it a skill maybe
 - Set up some common slash commands
 - Have developer names and associate them with thopters.
-- completely replace this repo with the run loop implementation.
 - Write better docs.
 - Put API keys and such in team 1Password.
-- Sign up for a paid run loop account.
-- Upgrade Runloop account to enable suspend/resume, then test heartbeat survives suspend/resume cycle via tini.
 - review the auto suspend logic make sure it's sane and that it works
 - claude statuses per claude PID instead of per thopter
 - document recommended iterm2 changes:
@@ -28,6 +26,9 @@
   Stored in local config (~/.runloop-thopters/profiles/).
   Usage: ./rt create --profile my-project
 
+- DONE Upgrade Runloop account to enable suspend/resume
+- DONE Sign up for a paid run loop account.
+- DONE completely replace this repo with the run loop implementation.
 - DONE setup starship.
 - DONE Implement hooks to update status for when a thopter is waiting on input or is done and install them in new thopters
 
