@@ -1,5 +1,5 @@
 - i think the correct time to send a notif is on the notification hook the stop hook will be irritating when you're doing conversation because it's going to notify you every time which is not what you want. Really what you want is a notification when you don't have focus. I don't know if that's possible. I assume Claude does not send the actual notification hook if the user has focus. I'm not sure, but that hook is definitely better in this regard. It's just unfortunately that it takes a full minute to fire.
-- Fix the dashboard status. It's wonky in a number of ways. First of all, inactive seems to be showing even when Claude is active. Also, a bunch of dead Thopters are showing up as having Claude active, so that's bad. I mean, they're not heart beating, but it just happened to be the last state that they had was Claude was active, so they still show up that way in the dashboard. It should also really just only show the running Thopters and then maybe recently dead Thopters as a separate section but not the invalid status bits.
+- Fix the dashboard status. It's wonky in a number of ways. First of all, inactive seems to be showing even when Claude is active. Also, a bunch of dead Thopters are showing up as having Claude active, so that's bad. I mean, they're not heart beating, but it just happened to be the last state that they had was Claude was active, so they still show up that way in the dashboard. It should also really just only show the running Thopters and then maybe recently dead Thopters as a separate section but not the invalid status bits. ALSO: merge "list" and "status" these should be the same combined thing.
 - I think I want to move the OpenAI and Enthropic keys into the developer config file instead of having them be secrets at the platform level so we can each set our own.
 - Claude loses it's cursor when I reattach in TMUX command and control mode, which is kind of a big problem. I wonder if there's a way I can get my cursor back.
 - purge redis statue on dead thopters (do the keys already expire automatically? this is done then)
@@ -60,7 +60,16 @@ Runloop platform wishlist:
 
 maybe list:
 - maybe: allow cascade of overrides of config, walk tree from current finding all .thopter.json and applying a cascade
-- MAYBE: session-start ntfy notification (notify when claude begins a new session)
+- I wonder if there's a way to completely wrap CC in a encapsulation wrapper that provides status updates, message in and out, etc., so that I could build a web UI like CC web. It doesn't have to be as detailed as CC Web, just something that works with basic messaging, slash commands, things like that.
+- Build a hub on Cloudflare or something that not only handles git proxy and keep alive, but also can spawn thopters based on hooks from integrations, provides a web UI to the thopters, and so on.
+- hooks integration for more coding agents like Codex, AMP, OpenCode, Gemini CLI, whatever.
+- session-start ntfy notification (notify when claude begins a new session)
+
+insights:
+- The difference between this and the other API based coding agent spawning platforms is that this allows you to set up and snapshot your own personal dev box and rig it as the heart of your worker, including your CC max plan authentication credentials.
+  - If you think about it that way, the architecture and user interface and developer experience starts to feel more clear and informed for what to build.
+  - For example, you want to have some kind of template for launching a task that takes instructions and communicates it to whatever coding agent you have, which would be different based on what your personal coding agent and dev box configuration. But you basically as a developer would need to implement a bridge function between what the dashboard would invoke and what gets your thopter up and actually working on a task. Then there'd be a standard interface for reporting on status, keep alives, and so on. there would be multiple integrations to different version control systems And, of course, you'd be able to just roll your own fairly easily.
+  - Go study the protocol and interface surface area of the tools like CodexWeb, CaudeCodeWeb, OpenHands, Cursor agents, warp agents, and this whole family of cloud-based coding agent tools.
 
 done list:
 - DONE Test this with a real developer implementation task round-tripping from Git
