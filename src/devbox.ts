@@ -303,9 +303,11 @@ export async function createDevbox(opts: {
       contents: `export THOPTER_NAME="${opts.name}"\nexport THOPTER_ID="${devbox.id}"\n`,
     });
     // REDIS_URL must be captured inside the devbox (we don't have it operator-side).
+    // GH_TOKEN is the env var the gh CLI expects for authentication — we derive it
+    // from our GITHUB_PAT secret so both git and gh work without extra config.
     // Also ensure .bashrc sources the env file (idempotent — skips if already present).
     await client.devboxes.executeAsync(devbox.id, {
-      command: `echo "export REDIS_URL=\\"$REDIS_URL\\"" >> ~/.thopter-env && grep -q 'source.*thopter-env' ~/.bashrc || echo '. ~/.thopter-env' >> ~/.bashrc`,
+      command: `echo "export REDIS_URL=\\"$REDIS_URL\\"" >> ~/.thopter-env && echo "export GH_TOKEN=\\"$GITHUB_PAT\\"" >> ~/.thopter-env && grep -q 'source.*thopter-env' ~/.bashrc || echo '. ~/.thopter-env' >> ~/.bashrc`,
     });
 
     // Upload and install thopter-status scripts + cron
