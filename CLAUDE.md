@@ -49,6 +49,5 @@ setup-steps.md Setup instructions
 
 ## Configuration
 
-- `.env.local` at project root: `RUNLOOP_API_KEY` and a pre-authenticated `REDIS_URL`
+- `~/.thopter.json` on developer laptop: `runloopApiKey`, `redisUrl`, `ntfyChannel`, `defaultSnapshotId`
 - Secrets in Runloop platform (managed via `./thopter secrets` or `./thopter setup`)
-- Default snapshot stored in `~/.runloop-thopters/config.json`
