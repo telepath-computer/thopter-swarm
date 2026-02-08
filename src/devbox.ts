@@ -459,7 +459,7 @@ export async function attachDevbox(nameOrId: string): Promise<void> {
   const { id } = await resolveDevbox(nameOrId);
 
   console.log(`Attaching to tmux on ${id} via rli...`);
-  rliSsh(id, "tmux -CC attach || tmux -CC");
+  rliSsh(id, "tmux -CC attach \\; refresh-client || tmux -CC");
 }
 
 function rliSsh(devboxId: string, command?: string): void {
@@ -472,18 +472,43 @@ function rliSsh(devboxId: string, command?: string): void {
     process.exit(1);
   }
 
-  const args = ["devbox", "ssh", devboxId];
+  // rli devbox ssh doesn't support passing remote commands, so when a command
+  // is needed we extract the SSH config from rli and call ssh directly.
   if (command) {
-    args.push("--", "bash", "-c", command);
+    const configOutput = execSync(`rli devbox ssh --config-only ${devboxId}`, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const hostname = configOutput.match(/Hostname\s+(.+)/)?.[1]?.trim();
+    const identityFile = configOutput.match(/IdentityFile\s+(.+)/)?.[1]?.trim();
+    const proxyCommand = configOutput.match(/ProxyCommand\s+(.+)/)?.[1]?.trim();
+
+    if (!hostname || !identityFile || !proxyCommand) {
+      console.error("ERROR: Failed to parse SSH config from rli.");
+      process.exit(1);
+    }
+
+    const args = [
+      "-tt",
+      "-o", "StrictHostKeyChecking=no",
+      "-o", `ProxyCommand=${proxyCommand}`,
+      "-i", identityFile,
+      `user@${hostname}`,
+      command,
+    ];
+
+    const child = spawn("ssh", args, { stdio: "inherit" });
+    child.on("exit", (code) => {
+      process.exit(code ?? 0);
+    });
+  } else {
+    const child = spawn("rli", ["devbox", "ssh", devboxId], {
+      stdio: "inherit",
+    });
+    child.on("exit", (code) => {
+      process.exit(code ?? 0);
+    });
   }
-
-  const child = spawn("rli", args, {
-    stdio: "inherit",
-  });
-
-  child.on("exit", (code) => {
-    process.exit(code ?? 0);
-  });
 }
 
 export async function execDevbox(
