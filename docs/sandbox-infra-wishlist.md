@@ -12,6 +12,8 @@ layer for almost everything.
 8. Port forwarding / TCP proxy — tunnel a remote port to localhost for dev servers, databases, gotty, etc.
 9. Reasonable storage — at least 20GB persistent. A cloned repo + node_modules + build artifacts + Claude session data adds up.
 
+10. Shutdown/destroy suspended VMs — need to be able to delete a suspended devbox without resuming it first. If secrets have changed since the devbox was created, resume fails (Runloop re-injects secrets on resume, and missing/renamed secrets cause errors). This leaves the devbox stuck: can't resume, can't destroy. Must be able to force-destroy regardless of state.
+
 Strongly Want
 
 10. Per-sandbox metadata (assignable description or k/v metadata)

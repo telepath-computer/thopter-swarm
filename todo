@@ -41,6 +41,10 @@
   Usage: ./thopter create --profile my-project
 
 Runloop platform wishlist:
+- Destroy suspended devboxes: need to be able to delete a suspended devbox
+  without resuming it first. If secrets have changed since the devbox was
+  created, resume fails — leaving the devbox stuck (can't resume, can't
+  destroy). Must be able to force-destroy regardless of state.
 - Scoped API tokens: ability for a devbox to keep itself alive without having
   the full API key. Ideally a per-devbox token that can only call keep_alive
   on its own devbox ID. This removes the need for external keepalive proxies
