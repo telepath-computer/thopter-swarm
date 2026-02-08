@@ -18,40 +18,36 @@ Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentia
 ```bash
 npm install
 
-# Configure API keys (stored in ~/.thopter.json)
-./thopter config set runloopApiKey <your-runloop-api-key>
-./thopter config set redisUrl <your-redis-url>
+# Install the 'thopter' command globally
+npm link
 
-# Interactive setup — configures secrets in Runloop platform
-# you will need:
-# - a Github PAT for the thopters to use for pulling/pushing code
-# - any other secrets you want deployed as env vars to thopters
-./thopter setup
+# Interactive setup — walks you through API keys, secrets, notifications
+thopter setup
 ```
 
 ### Basic Workflow
 
 ```bash
 # Create a devbox (fresh, with full init)
-./thopter create my-thopter
+thopter create my-thopter
 
 # Or create from a snapshot (fast, pre-configured)
-./thopter create my-thopter --snapshot golden
+thopter create my-thopter --snapshot golden
 
 # SSH in
-./thopter ssh my-thopter
+thopter ssh my-thopter
 
 # Check status from Redis
-./thopter status
+thopter status
 
 # Suspend when done (preserves disk, stops billing)
-./thopter suspend my-thopter
+thopter suspend my-thopter
 
 # Resume later
-./thopter resume my-thopter
+thopter resume my-thopter
 
 # Done for good
-./thopter destroy my-thopter
+thopter destroy my-thopter
 ```
 
 ### Snapshot Workflow
@@ -59,17 +55,17 @@ npm install
 Set up a devbox once, snapshot it, and use that as the base for all future thopters:
 
 ```bash
-./thopter create golden-setup
-./thopter ssh golden-setup
+thopter create golden-setup
+thopter ssh golden-setup
 # ... configure everything how you want it ...
 
-./thopter snapshot create golden-setup golden
+thopter snapshot create golden-setup golden
 # sets your preferred snapshot in your homedir thopter config
-./thopter snapshot default golden
+thopter snapshot default golden
 
 # Now all new creates use the golden snapshot automatically
-./thopter create worker-1
-./thopter create worker-2
+thopter create worker-1
+thopter create worker-2
 ```
 
 ## CLI Reference
@@ -78,47 +74,47 @@ Set up a devbox once, snapshot it, and use that as the base for all future thopt
 
 | Command | Description |
 |---------|-------------|
-| `./thopter create [name]` | Create a devbox (auto-names if omitted) |
-| `./thopter create --snapshot <id>` | Create from a snapshot |
-| `./thopter create -a` | Create and immediately SSH in |
-| `./thopter list` | List managed devboxes |
-| `./thopter suspend <name>` | Suspend a devbox (preserves disk) |
-| `./thopter resume <name>` | Resume a suspended devbox |
-| `./thopter destroy <name>` | Permanently shut down a devbox |
+| `thopter create [name]` | Create a devbox (auto-names if omitted) |
+| `thopter create --snapshot <id>` | Create from a snapshot |
+| `thopter create -a` | Create and immediately SSH in |
+| `thopter list` | List managed devboxes |
+| `thopter suspend <name>` | Suspend a devbox (preserves disk) |
+| `thopter resume <name>` | Resume a suspended devbox |
+| `thopter destroy <name>` | Permanently shut down a devbox |
 
 ### Connecting
 
 | Command | Description |
 |---------|-------------|
-| `./thopter ssh <name>` | SSH into a devbox (via `rli`) |
-| `./thopter exec <name> <cmd...>` | Run a command and print output |
+| `thopter ssh <name>` | SSH into a devbox (via `rli`) |
+| `thopter exec <name> <cmd...>` | Run a command and print output |
 
 ### Status
 
 | Command | Description |
 |---------|-------------|
-| `./thopter status` | Overview of all thopters from Redis |
-| `./thopter status <name>` | Detailed status + logs for one thopter |
+| `thopter status` | Overview of all thopters from Redis |
+| `thopter status <name>` | Detailed status + logs for one thopter |
 
 ### Snapshots
 
 | Command | Description |
 |---------|-------------|
-| `./thopter snapshot list` | List all snapshots |
-| `./thopter snapshot create <devbox> [name]` | Snapshot a devbox |
-| `./thopter snapshot replace <devbox> <name>` | Replace an existing snapshot |
-| `./thopter snapshot destroy <name>` | Delete a snapshot |
-| `./thopter snapshot default [name]` | View or set default snapshot |
-| `./thopter snapshot default --clear` | Clear default snapshot |
+| `thopter snapshot list` | List all snapshots |
+| `thopter snapshot create <devbox> [name]` | Snapshot a devbox |
+| `thopter snapshot replace <devbox> <name>` | Replace an existing snapshot |
+| `thopter snapshot destroy <name>` | Delete a snapshot |
+| `thopter snapshot default [name]` | View or set default snapshot |
+| `thopter snapshot default --clear` | Clear default snapshot |
 
 ### Secrets
 
 | Command | Description |
 |---------|-------------|
-| `./thopter setup` | Interactive first-time setup |
-| `./thopter secrets list` | List configured secrets |
-| `./thopter secrets set <name>` | Create or update a secret |
-| `./thopter secrets delete <name>` | Delete a secret |
+| `thopter setup` | Interactive first-time setup |
+| `thopter secrets list` | List configured secrets |
+| `thopter secrets set <name>` | Create or update a secret |
+| `thopter secrets delete <name>` | Delete a secret |
 
 ## Architecture
 
@@ -132,7 +128,7 @@ Set up a devbox once, snapshot it, and use that as the base for all future thopt
 
 ### How It Works
 
-1. `./thopter create` provisions a Runloop devbox with metadata tags (`managed_by=runloop-thopters`, `thopter_name=<name>`)
+1. `thopter create` provisions a Runloop devbox with metadata tags (`managed_by=runloop-thopters`, `thopter_name=<name>`)
 2. On fresh creates (no snapshot), an init script installs Claude Code, neovim, starship, tmux, and configures git credentials from Runloop secrets
 3. After the devbox is running, thopter scripts are uploaded: heartbeat reporter, Claude Code hooks, status updater
 4. Claude Code hooks fire on session events (start, stop, notification, prompt) and report to Redis via `thopter-status`
@@ -171,7 +167,7 @@ Each thopter devbox gets:
 
 ### Runloop Secrets
 
-All secrets in your Runloop account are auto-injected as environment variables into every devbox. The secret name = the env var name. Manage them with `./thopter secrets set <NAME>`.
+All secrets in your Runloop account are auto-injected as environment variables into every devbox. The secret name = the env var name. Manage them with `thopter secrets set <NAME>`.
 
 The devbox init script specifically checks for `GITHUB_PAT` to configure git credentials. Other common secrets you might add:
 
@@ -183,7 +179,7 @@ The devbox init script specifically checks for `GITHUB_PAT` to configure git cre
 
 ### Local Config
 
-`~/.thopter.json` stores local settings. Managed via `./thopter config` and `./thopter snapshot default`.
+`~/.thopter.json` stores local settings. Managed via `thopter config` and `thopter snapshot default`.
 
 | Key | Description |
 |-----|-------------|
@@ -201,7 +197,7 @@ Thopters can push notifications to your phone or desktop via [ntfy.sh](https://n
 3. Configure the channel:
 
 ```bash
-./thopter config set ntfyChannel my-thopters-abc123
+thopter config set ntfyChannel my-thopters-abc123
 ```
 
 New thopters created after this will send notifications. Existing thopters need to be re-created or have `THOPTER_NTFY_CHANNEL` added to their `~/.thopter-env` manually.

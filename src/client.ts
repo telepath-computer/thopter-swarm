@@ -12,7 +12,7 @@ export function getClient(): Runloop {
   const apiKey = process.env.RUNLOOP_API_KEY;
   if (!apiKey) {
     console.error("ERROR: Runloop API key not configured.");
-    console.error("  Set it with: ./thopter config set runloopApiKey <your-key>");
+    console.error("  Set it with: thopter config set runloopApiKey <your-key>");
     process.exit(1);
   }
 

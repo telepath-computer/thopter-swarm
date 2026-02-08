@@ -266,7 +266,7 @@ export async function createDevbox(opts: {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(
-          `${msg}\nThis is the default snapshot. To clear it: ./thopter snapshot default --clear`,
+          `${msg}\nThis is the default snapshot. To clear it: thopter snapshot default --clear`,
         );
       }
     }
@@ -421,7 +421,7 @@ export async function suspendDevbox(nameOrId: string): Promise<void> {
   console.log(`Suspending devbox ${id}...`);
   const client = getClient();
   await client.devboxes.suspend(id);
-  console.log("Suspended. Resume with: ./thopter resume " + (nameOrId));
+  console.log("Suspended. Resume with: thopter resume " + (nameOrId));
 }
 
 export async function resumeDevbox(nameOrId: string): Promise<void> {
@@ -435,7 +435,7 @@ export async function resumeDevbox(nameOrId: string): Promise<void> {
     console.log("Devbox is running.");
   } catch {
     console.log("WARNING: Timed out waiting for devbox to reach running state.");
-    console.log("  Check status with: ./thopter list");
+    console.log("  Check status with: thopter list");
   }
 }
 

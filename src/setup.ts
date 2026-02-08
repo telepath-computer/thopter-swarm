@@ -178,7 +178,7 @@ export async function runSetup(): Promise<void> {
       setNtfyChannel(ntfy);
       console.log(`  Saved. Subscribe at: https://ntfy.sh/${ntfy}`);
     } else {
-      console.log("  Skipped. Set later with: ./thopter config set ntfyChannel <channel>");
+      console.log("  Skipped. Set later with: thopter config set ntfyChannel <channel>");
     }
   }
   console.log();
@@ -207,30 +207,30 @@ export async function runSetup(): Promise<void> {
   console.log();
   console.log("Next steps:");
   console.log("");
-  console.log("  1. Create a devbox:        ./thopter create jw/hello --fresh");
+  console.log("  1. Create a devbox:        thopter create jw/hello --fresh");
   console.log("     (note that thopter names are up to you or can be left blank and");
   console.log("     a random one is assigned. But using $initials/$purpose is good");
   console.log("     convention when working in a team)");
   console.log("");
-  console.log("  2. SSH in:                 ./thopter ssh jw/hello");
+  console.log("  2. SSH in:                 thopter ssh jw/hello");
   console.log("");
   console.log("  3. Authenticate claude & codex, clone common repos, run npm installs,");
   console.log("     and generally set up your 'golden' environment. You can always do");
   console.log("     more of this later and recreate an updated snapshot.");
   console.log("");
-  console.log("  4. Snapshot it:            ./thopter snapshot create jw/hello jw/golden");
+  console.log("  4. Snapshot it:            thopter snapshot create jw/hello jw/golden");
   console.log("");
-  console.log("  5. Set as default:         ./thopter snapshot default jw/golden");
+  console.log("  5. Set as default:         thopter snapshot default jw/golden");
   console.log("");
-  console.log("  6. Stamp out a worker:     ./thopter create jw/featureXYZ");
+  console.log("  6. Stamp out a worker:     thopter create jw/featureXYZ");
   console.log("     (without --fresh, create uses your default snapshot for fast boot)");
   console.log("");
   console.log("  7. SSH in and yolo! (built-in `yolo-claude` alias for `claude --dangerously-skip-permissions`)");
   console.log("");
   console.log("A couple things to keep in mind:");
   console.log("  - Thopters suspend after 12 hours from launch or the most recent keepalive event:");
-  console.log("    ./thopter keepalive <name> ");
-  console.log("    A suspended thopter can be resumed with: ./thopter resume <name>");
+  console.log("    thopter keepalive <name> ");
+  console.log("    A suspended thopter can be resumed with: thopter resume <name>");
   console.log("  - Thopter github credentials can only modify branches starting with");
   console.log("    'thopter/' and can create, but not merge, PRs to other branches.");
   console.log("");

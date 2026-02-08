@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CLI entrypoint for runloop-thopters.
+ * CLI entrypoint for thopter.
  */
 
 import { Command } from "commander";
@@ -13,7 +13,7 @@ loadConfigIntoEnv();
 const program = new Command();
 
 program
-  .name("runloop-thopters")
+  .name("thopter")
   .description("Manage Runloop devboxes for Claude Code development.")
   .addHelpText(
     "after",
@@ -24,24 +24,24 @@ lifecycle:
                         create --snapshot → ssh/exec → ...
 
 examples:
-  runloop-thopters setup                          First-time auth & secret config
-  runloop-thopters create dev                     Create a devbox
-  runloop-thopters create --snapshot golden        Create from a snapshot
-  runloop-thopters ssh dev                        SSH into the devbox
-  runloop-thopters exec dev -- uname -a           Run a one-off command
-  runloop-thopters snapshot create dev golden      Snapshot a devbox
-  runloop-thopters snapshot list                  List snapshots
-  runloop-thopters snapshot destroy golden         Delete a snapshot
-  runloop-thopters snapshot default golden         Set default snapshot
-  runloop-thopters snapshot default               View default snapshot
-  runloop-thopters snapshot default --clear        Clear default snapshot
-  runloop-thopters list                           Show running devboxes
-  runloop-thopters status                         Overview of all thopters from redis
-  runloop-thopters status dev                     Detailed status + logs for a thopter
-  runloop-thopters keepalive dev                   Reset idle timer for a devbox
-  runloop-thopters suspend dev                    Suspend a devbox
-  runloop-thopters resume dev                     Resume a suspended devbox
-  runloop-thopters destroy dev                    Shut down a devbox`,
+  thopter setup                          First-time auth & secret config
+  thopter create dev                     Create a devbox
+  thopter create --snapshot golden        Create from a snapshot
+  thopter ssh dev                        SSH into the devbox
+  thopter exec dev -- uname -a           Run a one-off command
+  thopter snapshot create dev golden      Snapshot a devbox
+  thopter snapshot list                  List snapshots
+  thopter snapshot destroy golden         Delete a snapshot
+  thopter snapshot default golden         Set default snapshot
+  thopter snapshot default               View default snapshot
+  thopter snapshot default --clear        Clear default snapshot
+  thopter list                           Show running devboxes
+  thopter status                         Overview of all thopters from redis
+  thopter status dev                     Detailed status + logs for a thopter
+  thopter keepalive dev                   Reset idle timer for a devbox
+  thopter suspend dev                    Suspend a devbox
+  thopter resume dev                     Resume a suspended devbox
+  thopter destroy dev                    Shut down a devbox`,
   );
 
 // --- setup ---
@@ -232,7 +232,7 @@ snapshotCmd
         console.log(`Default snapshot: ${current}`);
       } else {
         console.log("No default snapshot set.");
-        console.log("  Set one with: runloop-thopters snapshot default <name-or-id>");
+        console.log("  Set one with: thopter snapshot default <name-or-id>");
       }
     }
   });
