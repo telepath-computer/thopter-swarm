@@ -30,6 +30,13 @@ const THOPTER_HOOKS = {
       ],
     },
   ],
+  PostToolUse: [
+    {
+      hooks: [
+        { type: "command", command: join(HOOKS_DIR, "on-tool-use.sh") },
+      ],
+    },
+  ],
   Stop: [
     {
       hooks: [{ type: "command", command: join(HOOKS_DIR, "on-stop.sh") }],

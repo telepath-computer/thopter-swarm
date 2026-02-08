@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/cli.ts",
   "bin": {
-    "runloop-thopters": "./rt"
+    "thopter": "./thopter"
   },
   "scripts": {
     "start": "tsx src/cli.ts",

@@ -62,7 +62,7 @@ curl -sS https://starship.rs/install.sh | sh -s -- -y
 # Ensure ~/.local/bin is on PATH and set aliases
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'alias yolo-claude="claude --dangerously-skip-permissions"' >> ~/.bashrc
-echo 'alias tt="tmux -CC attach || tmux -CC"' >> ~/.bashrc
+echo 'alias attach-or-launch-tmux-cc="tmux -CC attach || tmux -CC"' >> ~/.bashrc
 
 # Activate starship prompt
 echo 'eval "$(starship init bash)"' >> ~/.bashrc
@@ -132,6 +132,7 @@ async function installThopterScripts(
     "claude-hook-notification.sh": "on-notification.sh",
     "claude-hook-session-start.sh": "on-session-start.sh",
     "claude-hook-session-end.sh": "on-session-end.sh",
+    "claude-hook-tool-use.sh": "on-tool-use.sh",
   };
   for (const [src, dest] of Object.entries(hookFiles)) {
     await client.devboxes.writeFileContents(devboxId, {
@@ -246,7 +247,7 @@ export async function createDevbox(opts: {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(
-          `${msg}\nThis is the default snapshot. To clear it: ./rt snapshot default --clear`,
+          `${msg}\nThis is the default snapshot. To clear it: ./thopter snapshot default --clear`,
         );
       }
     }
@@ -386,7 +387,7 @@ export async function suspendDevbox(nameOrId: string): Promise<void> {
   console.log(`Suspending devbox ${id}...`);
   const client = getClient();
   await client.devboxes.suspend(id);
-  console.log("Suspended. Resume with: ./rt resume " + (nameOrId));
+  console.log("Suspended. Resume with: ./thopter resume " + (nameOrId));
 }
 
 export async function resumeDevbox(nameOrId: string): Promise<void> {
@@ -400,7 +401,7 @@ export async function resumeDevbox(nameOrId: string): Promise<void> {
     console.log("Devbox is running.");
   } catch {
     console.log("WARNING: Timed out waiting for devbox to reach running state.");
-    console.log("  Check status with: ./rt list");
+    console.log("  Check status with: ./thopter list");
   }
 }
 

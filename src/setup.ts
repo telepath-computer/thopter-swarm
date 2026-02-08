@@ -54,9 +54,9 @@ export async function runSetup(): Promise<void> {
     console.log("\nNo secrets configured yet.");
   }
 
-  console.log("\nAdd secrets with:  ./rt secrets set <NAME>");
-  console.log("List secrets:      ./rt secrets list");
-  console.log("Delete secrets:    ./rt secrets delete <NAME>");
+  console.log("\nAdd secrets with:  ./thopter secrets set <NAME>");
+  console.log("List secrets:      ./thopter secrets list");
+  console.log("Delete secrets:    ./thopter secrets delete <NAME>");
   console.log(`
 Common secrets you might want to add:
   GITHUB_PAT          GitHub personal access token (used by init script for git)

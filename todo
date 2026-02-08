@@ -15,6 +15,11 @@
   - set default snapshot
   - use yolo claude
 - Put API keys and such in team 1Password.
+- Secrets brittleness: currently all platform secrets are injected into every devbox.
+  Deleting or renaming a secret breaks resume for any suspended devbox provisioned
+  with it (adding secrets and changing values is fine). Profiles (see below) should
+  fix this — each profile whitelists specific secrets, so the devbox's secret set
+  is explicit and stable. Until then, destroy affected devboxes before deleting secrets.
 - review the auto suspend logic make sure it's sane and that it works
 - claude statuses per claude PID instead of per thopter
 - Try building a task system in Redis
@@ -29,7 +34,7 @@
   - Git identity (bot user, email)
   Profile name gets tagged as metadata on the devbox.
   Stored in local config (~/.runloop-thopters/profiles/).
-  Usage: ./rt create --profile my-project
+  Usage: ./thopter create --profile my-project
 
 - DONE Test this with a real developer implementation task round-tripping from Git
 - DONE test heartbeat survives suspend/resume cycle

@@ -5,6 +5,17 @@
 
 . "$HOME/.bashrc" 2>/dev/null
 
+# Runloop keepalive: if Claude was active in the last 10 minutes, reset the
+# idle timer so the devbox doesn't auto-suspend. Runs once per cron cycle
+# (every minute) — cheap compared to the 2-hour idle timeout.
+if [ -n "${THOPTER_ID:-}" ] && [ -n "${RUNLOOP_API_KEY:-}" ] && [ -f /tmp/thopter-active ]; then
+    if [ "$(find /tmp/thopter-active -mmin -10 2>/dev/null)" ]; then
+        curl -sf -X POST "https://api.runloop.ai/v1/devboxes/${THOPTER_ID}/keep_alive" \
+            -H "Authorization: Bearer ${RUNLOOP_API_KEY}" \
+            >/dev/null 2>&1 || true
+    fi
+fi
+
 for i in 1 2 3 4 5 6; do
     /usr/local/bin/thopter-status heartbeat >/dev/null 2>&1
 

@@ -10,7 +10,7 @@ into context. You MUST NOT do work without this ENTIRE FILE fully in context.
 
 ## What This Is
 
-Thopter Swarm is a CLI tool (`./rt`) for managing Runloop.ai devboxes as
+Thopter Swarm is a CLI tool (`./thopter`) for managing Runloop.ai devboxes as
 autonomous Claude Code development environments. It creates cloud VMs
 pre-configured with Claude Code, git credentials, monitoring hooks, and
 developer tools.
@@ -19,8 +19,8 @@ developer tools.
 
 - `npm install` to install dependencies
 - `npm run build` to compile TypeScript (always run before considering work done)
-- `./rt --help` to see CLI commands
-- `./rt` is a thin shell wrapper that runs `src/cli.ts` via `tsx`
+- `./thopter --help` to see CLI commands
+- `./thopter` is a thin shell wrapper that runs `src/cli.ts` via `tsx`
 
 ## Project Structure
 
@@ -30,7 +30,7 @@ scripts/       Devbox provisioning scripts (Claude hooks, heartbeat, starship, t
 docs/          Design docs and wishlists (not authoritative specs)
 package.json   Dependencies: @runloop/api-client, commander, ioredis
 tsconfig.json  TypeScript config (ES2022, NodeNext modules)
-rt             CLI wrapper script
+thopter        CLI wrapper script
 todo           Current task list
 setup-steps.md Setup instructions
 ```
@@ -50,5 +50,5 @@ setup-steps.md Setup instructions
 ## Configuration
 
 - `.env.local` at project root: `RUNLOOP_API_KEY` and a pre-authenticated `REDIS_URL`
-- Secrets in Runloop platform (managed via `./rt secrets` or `./rt setup`)
+- Secrets in Runloop platform (managed via `./thopter secrets` or `./thopter setup`)
 - Default snapshot stored in `~/.runloop-thopters/config.json`
