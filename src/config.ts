@@ -21,22 +21,15 @@ export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
 /** Default idle timeout: 1 hour. Suspends on idle (preserves disk). */
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 60 * 60;
 
-/** Secrets to configure during setup, and their env var mappings for devboxes. */
-export const SECRETS: Array<{
-  runloopName: string;
-  envVar: string;
-  description: string;
-}> = [
-  { runloopName: "thopter_anthropic_api_key", envVar: "ANTHROPIC_API_KEY", description: "Anthropic API key (for Claude Code)" },
-  { runloopName: "thopter_github_pat", envVar: "GITHUB_PAT", description: "GitHub personal access token (repo read/write)" },
-  { runloopName: "thopter_openai_api_key", envVar: "OPENAI_API_KEY", description: "OpenAI API key" },
-  { runloopName: "thopter_redis_url", envVar: "REDIS_URL", description: "Upstash Redis URL (redis://default:...@host:port)" },
-];
-
-/** Secret mappings to pass to devbox create (env var name → Runloop secret name). */
-export const SECRET_MAPPINGS: Record<string, string> = Object.fromEntries(
-  SECRETS.map((s) => [s.envVar, s.runloopName]),
-);
+/**
+ * Build secret mappings dynamically from all Runloop secrets.
+ * Convention: secret name in Runloop = env var name in devbox.
+ */
+export async function getSecretMappings(): Promise<Record<string, string>> {
+  const { listSecrets } = await import("./secrets.js");
+  const secrets = await listSecrets();
+  return Object.fromEntries(secrets.map((s) => [s.name, s.name]));
+}
 
 // --- Local config (default snapshot only) ---
 

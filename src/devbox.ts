@@ -14,7 +14,7 @@ import {
   NAME_KEY,
   DEFAULT_RESOURCE_SIZE,
   DEFAULT_IDLE_TIMEOUT_SECONDS,
-  SECRET_MAPPINGS,
+  getSecretMappings,
   getDefaultSnapshot,
 } from "./config.js";
 
@@ -36,7 +36,7 @@ else
 fi
 
 # Install essential tools
-sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron > /dev/null
+sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 > /dev/null
 sudo /usr/sbin/cron 2>/dev/null || true
 
 # Install Neovim (latest stable, NvChad requires 0.10+)
@@ -253,11 +253,13 @@ export async function createDevbox(opts: {
     metadata.task = opts.task;
   }
 
+  const secrets = await getSecretMappings();
+
   const createParams = {
     name: opts.name,
     snapshot_id: snapshotId,
     metadata,
-    secrets: SECRET_MAPPINGS,
+    secrets,
     launch_parameters: {
       resource_size_request: DEFAULT_RESOURCE_SIZE,
       after_idle: {

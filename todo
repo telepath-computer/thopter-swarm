@@ -15,6 +15,18 @@
   - enable "copy to clipboard on selection"
   - enable "mirror tmux paste buffer to clipoard"
 - Try building a task system in Redis
+- Profiles: named configuration bundles for different projects/workflows.
+  A profile would control:
+  - Which secrets get injected (subset of Runloop secrets)
+  - Custom init script / dependency installation per profile
+  - Default snapshot (per-profile golden image instead of one global default)
+  - Resource size (not everything needs LARGE)
+  - Idle timeout
+  - Repo URL + branch to clone
+  - Git identity (bot user, email)
+  Profile name gets tagged as metadata on the devbox.
+  Stored in local config (~/.runloop-thopters/profiles/).
+  Usage: ./rt create --profile my-project
 
 - DONE setup starship.
 - DONE Implement hooks to update status for when a thopter is waiting on input or is done and install them in new thopters
