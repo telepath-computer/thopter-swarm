@@ -1,6 +1,14 @@
-- purge redis statue on dead thopters (does it expire automatically?)
+- i think the correct time to send a notif is on the notification hook the stop hook will be irritating when you're doing conversation because it's going to notify you every time which is not what you want. Really what you want is a notification when you don't have focus. I don't know if that's possible. I assume Claude does not send the actual notification hook if the user has focus. I'm not sure, but that hook is definitely better in this regard. It's just unfortunately that it takes a full minute to fire.
+- Fix the dashboard status. It's wonky in a number of ways. First of all, inactive seems to be showing even when Claude is active. Also, a bunch of dead Thopters are showing up as having Claude active, so that's bad. I mean, they're not heart beating, but it just happened to be the last state that they had was Claude was active, so they still show up that way in the dashboard. It should also really just only show the running Thopters and then maybe recently dead Thopters as a separate section but not the invalid status bits.
+- I think I want to move the OpenAI and Enthropic keys into the developer config file instead of having them be secrets at the platform level so we can each set our own.
+- Claude loses it's cursor when I reattach in TMUX command and control mode, which is kind of a big problem. I wonder if there's a way I can get my cursor back.
+- purge redis statue on dead thopters (do the keys already expire automatically? this is done then)
 - replace the api keys with team keys
 - Write better docs.
+  - Readme needs work.
+  - need a detailed description of the GitHub personal access token and branch rules issue while also making it easy to skim.
+    - This is contingent on whether or not I do the Cloudflare worker GitHub proxy.
+    - Might make sense to do that because I also want the cloud flare worker keep alive proxy as well.
   - in particular write the developer guide for my coworkers.
     - i've setup the runloop workspace already. secrets etc
     - they need to npm install
@@ -21,7 +29,8 @@
   Thopters would get KEEPALIVE_URL + KEEPALIVE_TOKEN instead of the full API key.
   This would let thopters self-keepalive without keys to the kingdom.
 - claude statuses per claude PID instead of per thopter
-- Try building a task system in Redis
+- Try building a distributed task system in Redis since we have it now. add
+  claude skills based on it. maybe message send/receive across thopters.
 - Profiles: named configuration bundles for different projects/workflows.
   A profile would control:
   - Which secrets get injected (subset of Runloop secrets)
@@ -34,6 +43,10 @@
   Profile name gets tagged as metadata on the devbox.
   Stored in local config (~/.runloop-thopters/profiles/).
   Usage: ./thopter create --profile my-project
+  ... Yeah, I think profiles could just be groups in the Ethopter.json and you could have a default one and then you could have other ones. 
+  ... It would make sense to have team profiles,
+  ... it might make sense to have secrets in the run loop platform that can be renamed into environment variables on a profile basis
+  ... 
 
 Runloop platform wishlist:
 - Destroy suspended devboxes: need to be able to delete a suspended devbox
