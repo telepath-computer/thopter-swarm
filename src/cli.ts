@@ -261,7 +261,7 @@ snapshotCmd
 // --- config ---
 const configCmd = program
   .command("config")
-  .description("Manage local configuration (~/.runloop-thopters/config.json)");
+  .description("Manage local configuration (~/.thopter.json)");
 
 configCmd
   .command("set")

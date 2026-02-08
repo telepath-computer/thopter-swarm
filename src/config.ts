@@ -1,14 +1,13 @@
 /**
  * Constants and local configuration for runloop-thopters.
- * Local config (~/.runloop-thopters/config.json) stores the default snapshot ID.
+ * Local config (~/.thopter.json) stores developer settings.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-const CONFIG_DIR = join(homedir(), ".runloop-thopters");
-const CONFIG_FILE = join(CONFIG_DIR, "config.json");
+const CONFIG_FILE = join(homedir(), ".thopter.json");
 
 /** Metadata key used to tag devboxes we manage. */
 export const MANAGED_BY_KEY = "managed_by";
@@ -49,7 +48,6 @@ function loadLocalConfig(): LocalConfig {
 }
 
 function saveLocalConfig(config: LocalConfig): void {
-  mkdirSync(CONFIG_DIR, { recursive: true });
   writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n");
 }
 

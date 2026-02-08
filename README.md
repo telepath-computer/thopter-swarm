@@ -190,7 +190,7 @@ The devbox init script specifically checks for `GITHUB_PAT` to configure git cre
 
 ### Local Config
 
-`~/.runloop-thopters/config.json` stores local settings. Managed via `./thopter config` and `./thopter snapshot default`.
+`~/.thopter.json` stores local settings. Managed via `./thopter config` and `./thopter snapshot default`.
 
 | Key | Description |
 |-----|-------------|
