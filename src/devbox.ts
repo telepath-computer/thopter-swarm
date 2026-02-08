@@ -230,6 +230,7 @@ async function resolveDevbox(
 export async function createDevbox(opts: {
   name: string;
   snapshotId?: string;
+  fresh?: boolean;
   idleTimeout?: number;
 }): Promise<string> {
   const client = getClient();
@@ -238,7 +239,7 @@ export async function createDevbox(opts: {
   let snapshotId = opts.snapshotId
     ? await resolveSnapshotId(opts.snapshotId)
     : undefined;
-  if (!snapshotId) {
+  if (!snapshotId && !opts.fresh) {
     const defaultSnap = getDefaultSnapshot();
     if (defaultSnap) {
       try {
