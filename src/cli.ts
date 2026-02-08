@@ -28,6 +28,7 @@ examples:
   thopter create dev                     Create a devbox
   thopter create --snapshot golden        Create from a snapshot
   thopter ssh dev                        SSH into the devbox
+  thopter attach dev                     Attach to tmux (iTerm2 -CC mode)
   thopter exec dev -- uname -a           Run a one-off command
   thopter snapshot create dev golden      Snapshot a devbox
   thopter snapshot list                  List snapshots
@@ -151,6 +152,16 @@ program
   .action(async (devbox: string) => {
     const { sshDevbox } = await import("./devbox.js");
     await sshDevbox(devbox);
+  });
+
+// --- attach ---
+program
+  .command("attach")
+  .description("SSH into a devbox and attach to tmux in control mode (-CC)")
+  .argument("<devbox>", "Devbox name or ID")
+  .action(async (devbox: string) => {
+    const { attachDevbox } = await import("./devbox.js");
+    await attachDevbox(devbox);
   });
 
 // --- exec ---

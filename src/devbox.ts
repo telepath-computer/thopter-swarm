@@ -452,7 +452,17 @@ export async function sshDevbox(nameOrId: string): Promise<void> {
   const { id } = await resolveDevbox(nameOrId);
 
   console.log(`Connecting to ${id} via rli...`);
+  rliSsh(id);
+}
 
+export async function attachDevbox(nameOrId: string): Promise<void> {
+  const { id } = await resolveDevbox(nameOrId);
+
+  console.log(`Attaching to tmux on ${id} via rli...`);
+  rliSsh(id, "tmux -CC attach || tmux -CC");
+}
+
+function rliSsh(devboxId: string, command?: string): void {
   // Check rli is available
   try {
     execSync("which rli", { stdio: "ignore" });
@@ -462,7 +472,12 @@ export async function sshDevbox(nameOrId: string): Promise<void> {
     process.exit(1);
   }
 
-  const child = spawn("rli", ["devbox", "ssh", id], {
+  const args = ["devbox", "ssh", devboxId];
+  if (command) {
+    args.push("--", "bash", "-c", command);
+  }
+
+  const child = spawn("rli", args, {
     stdio: "inherit",
   });
 
