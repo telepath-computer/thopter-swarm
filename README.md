@@ -18,13 +18,13 @@ Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentia
 ```bash
 npm install
 
-# Configure API keys
-cp .env.local.example .env.local   # or create manually
-# Add RUNLOOP_API_KEY and REDIS_URL to .env.local
+# Configure API keys (stored in ~/.thopter.json)
+./thopter config set runloopApiKey <your-runloop-api-key>
+./thopter config set redisUrl <your-redis-url>
 
 # Interactive setup — configures secrets in Runloop platform
 # you will need:
-# - a Github PAT for the thopters to use for pulling/pushing code 
+# - a Github PAT for the thopters to use for pulling/pushing code
 # - any other secrets you want deployed as env vars to thopters
 ./thopter setup
 ```
@@ -169,13 +169,6 @@ Each thopter devbox gets:
 
 ## Configuration
 
-### Environment Variables (`.env.local`)
-
-| Variable | Description |
-|----------|-------------|
-| `RUNLOOP_API_KEY` | Runloop API key (required) |
-| `REDIS_URL` | Upstash Redis URL for status reporting (required for `status` command) |
-
 ### Runloop Secrets
 
 All secrets in your Runloop account are auto-injected as environment variables into every devbox. The secret name = the env var name. Manage them with `./thopter secrets set <NAME>`.
@@ -194,6 +187,8 @@ The devbox init script specifically checks for `GITHUB_PAT` to configure git cre
 
 | Key | Description |
 |-----|-------------|
+| `runloopApiKey` | Runloop API key (required) |
+| `redisUrl` | Upstash Redis URL for status reporting (required) |
 | `defaultSnapshotId` | Default snapshot for `create` (set via `snapshot default`) |
 | `ntfyChannel` | ntfy.sh channel for push notifications (set via `config set`) |
 

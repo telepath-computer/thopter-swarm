@@ -4,32 +4,11 @@
  * CLI entrypoint for runloop-thopters.
  */
 
-import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { Command } from "commander";
+import { loadConfigIntoEnv } from "./config.js";
 
-// Load .env.local from package root (won't override existing env vars)
-{
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const envPath = resolve(__dirname, "..", ".env.local");
-  try {
-    const contents = readFileSync(envPath, "utf-8");
-    for (const line of contents.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eq = trimmed.indexOf("=");
-      if (eq === -1) continue;
-      const key = trimmed.slice(0, eq).trim();
-      const value = trimmed.slice(eq + 1).trim();
-      if (!process.env[key]) {
-        process.env[key] = value;
-      }
-    }
-  } catch {
-    // No .env.local, that's fine
-  }
-}
+// Load API keys from ~/.thopter.json into process.env (won't override existing env vars)
+loadConfigIntoEnv();
 
 const program = new Command();
 
@@ -266,11 +245,19 @@ const configCmd = program
 configCmd
   .command("set")
   .description("Set a config value")
-  .argument("<key>", "Config key (ntfyChannel)")
+  .argument("<key>", "Config key")
   .argument("<value>", "Config value")
   .action(async (key: string, value: string) => {
-    const { setNtfyChannel, setDefaultSnapshot } = await import("./config.js");
+    const { setRunloopApiKey, setRedisUrl, setNtfyChannel, setDefaultSnapshot } = await import("./config.js");
     switch (key) {
+      case "runloopApiKey":
+        setRunloopApiKey(value);
+        console.log("Set runloopApiKey.");
+        break;
+      case "redisUrl":
+        setRedisUrl(value);
+        console.log("Set redisUrl.");
+        break;
       case "ntfyChannel":
         setNtfyChannel(value);
         console.log(`Set ntfyChannel to: ${value}`);
@@ -282,7 +269,7 @@ configCmd
         break;
       default:
         console.error(`Unknown config key: ${key}`);
-        console.error("Available keys: ntfyChannel, defaultSnapshotId");
+        console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId");
         process.exit(1);
     }
   });
@@ -292,12 +279,20 @@ configCmd
   .description("Get a config value")
   .argument("[key]", "Config key (omit to show all)")
   .action(async (key?: string) => {
-    const { getNtfyChannel, getDefaultSnapshot } = await import("./config.js");
+    const { getRunloopApiKey, getRedisUrl, getNtfyChannel, getDefaultSnapshot } = await import("./config.js");
     if (!key) {
+      console.log(`runloopApiKey:     ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
+      console.log(`redisUrl:          ${getRedisUrl() ? "(set)" : "(not set)"}`);
       console.log(`ntfyChannel:       ${getNtfyChannel() ?? "(not set)"}`);
       console.log(`defaultSnapshotId: ${getDefaultSnapshot() ?? "(not set)"}`);
     } else {
       switch (key) {
+        case "runloopApiKey":
+          console.log(getRunloopApiKey() ? "(set)" : "(not set)");
+          break;
+        case "redisUrl":
+          console.log(getRedisUrl() ? "(set)" : "(not set)");
+          break;
         case "ntfyChannel":
           console.log(getNtfyChannel() ?? "(not set)");
           break;
@@ -306,7 +301,7 @@ configCmd
           break;
         default:
           console.error(`Unknown config key: ${key}`);
-          console.error("Available keys: ntfyChannel, defaultSnapshotId");
+          console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId");
           process.exit(1);
       }
     }

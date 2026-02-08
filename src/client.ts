@@ -11,9 +11,8 @@ export function getClient(): Runloop {
 
   const apiKey = process.env.RUNLOOP_API_KEY;
   if (!apiKey) {
-    console.error("ERROR: RUNLOOP_API_KEY environment variable is not set.");
-    console.error("  Set it with: export RUNLOOP_API_KEY=your-key");
-    console.error("  Or run: runloop-thopters setup");
+    console.error("ERROR: Runloop API key not configured.");
+    console.error("  Set it with: ./thopter config set runloopApiKey <your-key>");
     process.exit(1);
   }
 

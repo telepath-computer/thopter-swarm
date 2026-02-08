@@ -34,6 +34,8 @@ export async function getSecretMappings(): Promise<Record<string, string>> {
 // --- Local config (default snapshot only) ---
 
 interface LocalConfig {
+  runloopApiKey?: string;
+  redisUrl?: string;
   defaultSnapshotId?: string;
   ntfyChannel?: string;
 }
@@ -75,4 +77,38 @@ export function setNtfyChannel(channel: string): void {
   const config = loadLocalConfig();
   config.ntfyChannel = channel;
   saveLocalConfig(config);
+}
+
+export function getRunloopApiKey(): string | undefined {
+  return loadLocalConfig().runloopApiKey;
+}
+
+export function setRunloopApiKey(key: string): void {
+  const config = loadLocalConfig();
+  config.runloopApiKey = key;
+  saveLocalConfig(config);
+}
+
+export function getRedisUrl(): string | undefined {
+  return loadLocalConfig().redisUrl;
+}
+
+export function setRedisUrl(url: string): void {
+  const config = loadLocalConfig();
+  config.redisUrl = url;
+  saveLocalConfig(config);
+}
+
+/**
+ * Load config values into process.env so downstream code (client.ts, status.ts)
+ * can read them without changes. Config values don't override existing env vars.
+ */
+export function loadConfigIntoEnv(): void {
+  const config = loadLocalConfig();
+  if (config.runloopApiKey && !process.env.RUNLOOP_API_KEY) {
+    process.env.RUNLOOP_API_KEY = config.runloopApiKey;
+  }
+  if (config.redisUrl && !process.env.REDIS_URL) {
+    process.env.REDIS_URL = config.redisUrl;
+  }
 }

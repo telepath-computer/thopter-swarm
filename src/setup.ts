@@ -4,14 +4,15 @@
 
 import { getClient } from "./client.js";
 import { listSecrets } from "./secrets.js";
-import { getNtfyChannel } from "./config.js";
+import { getRunloopApiKey, getRedisUrl, getNtfyChannel } from "./config.js";
 
 async function checkAuth(): Promise<boolean> {
   console.log("Checking Runloop authentication...");
 
-  if (!process.env.RUNLOOP_API_KEY) {
-    console.log("  ERROR: RUNLOOP_API_KEY environment variable is not set.");
-    console.log("  Get your API key from the Runloop dashboard and set it in .env.local");
+  if (!getRunloopApiKey() && !process.env.RUNLOOP_API_KEY) {
+    console.log("  ERROR: Runloop API key not configured.");
+    console.log("  Get your API key from the Runloop dashboard and run:");
+    console.log("    ./thopter config set runloopApiKey <your-key>");
     return false;
   }
 
@@ -23,11 +24,11 @@ async function checkAuth(): Promise<boolean> {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("401") || msg.includes("auth") || msg.includes("Unauthorized")) {
-      console.log("  ERROR: Authentication failed. Check your RUNLOOP_API_KEY.");
+      console.log("  ERROR: Authentication failed. Check your runloopApiKey.");
       return false;
     }
     console.log(`  WARNING: Unexpected error checking auth: ${msg}`);
-    console.log("  Proceeding anyway — if things fail, check your RUNLOOP_API_KEY.");
+    console.log("  Proceeding anyway — if things fail, check your runloopApiKey.");
     return true;
   }
 }
@@ -38,7 +39,20 @@ export async function runSetup(): Promise<void> {
   console.log("=".repeat(60));
   console.log();
 
+  // Show config status
+  console.log("--- Local Config (~/.thopter.json) ---");
+  console.log(`  runloopApiKey: ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
+  console.log(`  redisUrl:      ${getRedisUrl() ? "(set)" : "(not set)"}`);
+  console.log(`  ntfyChannel:   ${getNtfyChannel() ?? "(not set)"}`);
+  console.log();
+
   if (!(await checkAuth())) {
+    process.exit(1);
+  }
+
+  if (!getRedisUrl() && !process.env.REDIS_URL) {
+    console.log("\n  ERROR: Redis URL not configured.");
+    console.log("  Set it with: ./thopter config set redisUrl <url>");
     process.exit(1);
   }
 

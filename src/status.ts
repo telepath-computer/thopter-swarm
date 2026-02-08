@@ -1,6 +1,6 @@
 /**
  * Read thopter status from Redis.
- * Connects using REDIS_URL from environment / .env.local.
+ * Connects using REDIS_URL from ~/.thopter.json config.
  */
 
 import { Redis } from "ioredis";
@@ -10,7 +10,7 @@ function getRedis(): Redis {
   const url = process.env.REDIS_URL;
   if (!url) {
     throw new Error(
-      "REDIS_URL not set. Add it to .env.local or set it in your environment.",
+      "Redis URL not configured. Set it with: ./thopter config set redisUrl <url>",
     );
   }
   const parsed = new URL(url);
