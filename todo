@@ -1,6 +1,30 @@
+- config, secrets, and env vars refactor:
+  - move the OpenAI and Anthropic API keys, into the developer config file, under an env vars section, instead of having them be secrets at the platform level, so we can each set our own.
+  - document that `thopter secrets` is for global secrets you want to admin at the team level, whereas devs can their own secrets in their ~.thopter.json env vars which are also injected into shell state, and take precedence over global secrets.
+  - allow thopter.json to specify which global secrets to include, or just let it refer to global secrets with a syntax.
+  - have our template include GITHUB_PAT global secret -- NOTE think more about this. should github tokens be developer configured or part of the core? should version control be a module/plugin?
+  - Creating a Thopter is a combination of pulling this config together into a create command that sets up the environment variables as desired from the two possible sources.
+  - make it clear that assigning secrets from the global secret store to a thopter makes that thopter contingent on those secrets existing and this applies when resuming it from suspended state. So if you put a secret in there and then remove it from the global secret store, you will not be able to resume that thopter after suspension. Also, once a thopter is spawned, these values exist for its lifetime even after suspend and resume, so they don't pick up new values.
+  - note that eventually, we'll set up a Team Anthropic runloop key and a Team OpenAI key, but for now, ask devs to put their own keys in.
+  - group settings, env vars, and default snapshots, into profiles.
+    - A profile is essentially a config container. There is always one by called base.
+    - There is also a top level default profile value.
+    - profiles inherit values from base in a cascade.
+    - thopter.json files cascade, so a repository can define environment variables that would be set up inside thopters. thopter cli walks up the tree to find .thopter.json files to use in the cascade. and produces a mini report on how it assembled state during 'create' operation.
+  - support metadata k/v pairs in config block that are set as metadata on the runloop devboxes.
+  - enable configurable notifications for claude stop and notify hooks (ntfy.sh title, priority, channel, content template that has access to $THOPTER_NAME $CLAUDE_NOTIF_CONTENT and $MOST_RECENT_AGENT_MSG). this configuration overrides defaults that are used when unspecified
+  - default should be that the 'stop' notification is off by default (noisy) and the notification notification to be on and highest priority.
+  - config block should also allow override of the source content (a local filename) for ~/CLAUDE.md and also must not touch that file in a snapshot-based create operation or in resume operations.
+  - config should allow copying local files to remote on create, e.g. `{"upload":{"/path/to/local":"/path/on/remote"}}`
+  - config should allow post-fresh-create and post-snapshot-create payloads that are run in bash after create where the user can run things like installing deps, updating thopter config files etc. the create operation should render it's stdout/stderr to console and have a --silent mode that hides that, showing only an error message if it exits nonzero.
+  - separate the stuff i'm doing in setup that's particular to me and our repos into a ~/thoper.json starter versus core internal must-haves
+  - update setup wizard to reflect these changes
+  - sanity check: is thopter an onion system with a core and a developer-configured layer, or is it "just" some shell scripts. the value prop of an open, consistent devex protocol for cloud agent sandboxes makes sense to me, but am i really building that? or am i just automating devboxes for us telepath guys?
+  - try claude teams for this? one agent represents the user and cares only about devex, another for architecture, another for implementation, another for review
+    - maybe try a team like that just to write a spec first?
+
 - i think the correct time to send a notif is on the notification hook the stop hook will be irritating when you're doing conversation because it's going to notify you every time which is not what you want. Really what you want is a notification when you don't have focus. I don't know if that's possible. I assume Claude does not send the actual notification hook if the user has focus. I'm not sure, but that hook is definitely better in this regard. It's just unfortunately that it takes a full minute to fire.
 - Fix the dashboard status. It's wonky in a number of ways. First of all, inactive seems to be showing even when Claude is active. Also, a bunch of dead Thopters are showing up as having Claude active, so that's bad. I mean, they're not heart beating, but it just happened to be the last state that they had was Claude was active, so they still show up that way in the dashboard. It should also really just only show the running Thopters and then maybe recently dead Thopters as a separate section but not the invalid status bits. ALSO: merge "list" and "status" these should be the same combined thing.
-- I think I want to move the OpenAI and Enthropic keys into the developer config file instead of having them be secrets at the platform level so we can each set our own.
 - Claude loses it's cursor when I reattach in TMUX command and control mode, which is kind of a big problem. I wonder if there's a way I can get my cursor back.
 - purge redis statue on dead thopters (do the keys already expire automatically? this is done then)
 - replace the api keys with team keys
