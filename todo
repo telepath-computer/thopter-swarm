@@ -1,17 +1,22 @@
-- test heartbeat survives suspend/resume cycle via tini. (looks like not yet?)
-- install a ~/.claude/CLAUDE.md for host level instructions about thopter context as a runloop devbox, it's a headless kvm context, using and pushing only to thopter/* git branches for workspace. the main thing is that it needs to know to use thopter/* pattern branches for any pushes to remote git. it should be told about the github pat and how git config is setup to use that.
-- Test this with a real developer implementation task round-tripping from Git
-- Teach Claude how to update it's task status, give it a skill maybe
-- Set up some common slash commands
+- DONE install into new thopters a ~/.claude/CLAUDE.md for host level instructions about thopter context as a runloop devbox, it's a headless kvm context, using and pushing only to thopter/* git branches for workspace, and the task setting ability which it should keep up to date with the high level goal of the session. the main thing is that it needs to know to use thopter/* pattern branches for any pushes to remote git. it should be told about the github pat and how git config is setup to use that. 
 - Have developer names and associate them with thopters.
+- purge redis statue on dead thopters (does it expire automatically?)
+- use 'thopter' for the command and have it install somewhere global.  move runloop api key and redis url to homedir config file, not .env.local 
+- replace the api keys with team keys
+- add read access to github issues to the PAT
 - Write better docs.
+- in particular write the developer guide for my coworkers.
+  - i've setup the runloop workspace already. secrets etc
+  - they need to npm install
+  - setup their thopter config w/ api key and redis url
+  - create a new instance of their own
+  - auth claude w/ max, codex if desired
+  - snapshot it
+  - set default snapshot
+  - use yolo claude
 - Put API keys and such in team 1Password.
 - review the auto suspend logic make sure it's sane and that it works
 - claude statuses per claude PID instead of per thopter
-- document recommended iterm2 changes:
-  - enable "Applications in terminal may access Clipboard."
-  - enable "copy to clipboard on selection"
-  - enable "mirror tmux paste buffer to clipoard"
 - Try building a task system in Redis
 - Profiles: named configuration bundles for different projects/workflows.
   A profile would control:
@@ -26,10 +31,16 @@
   Stored in local config (~/.runloop-thopters/profiles/).
   Usage: ./rt create --profile my-project
 
+- DONE Test this with a real developer implementation task round-tripping from Git
+- DONE test heartbeat survives suspend/resume cycle
 - DONE Upgrade Runloop account to enable suspend/resume
 - DONE Sign up for a paid run loop account.
 - DONE completely replace this repo with the run loop implementation.
 - DONE setup starship.
 - DONE Implement hooks to update status for when a thopter is waiting on input or is done and install them in new thopters
+- DONE document recommended iterm2 changes:
+  - enable "Applications in terminal may access Clipboard."
+  - enable "copy to clipboard on selection"
+  - enable "mirror tmux paste buffer to clipoard"
 
 

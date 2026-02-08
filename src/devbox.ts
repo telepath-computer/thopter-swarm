@@ -53,6 +53,9 @@ curl -fsSL https://claude.ai/install.sh | bash
 # Install OpenAI Codex
 npm i -g @openai/codex
 
+# Install Runloop CLI (for rli devbox ssh from inside devboxes)
+npm i -g @runloop/rl-cli
+
 # Install starship prompt (non-interactive)
 curl -sS https://starship.rs/install.sh | sh -s -- -y
 
@@ -114,6 +117,12 @@ async function installThopterScripts(
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/home/user/.tmux.conf",
     contents: readScript("tmux.conf"),
+  });
+
+  // CLAUDE.md — instructions for Claude Code running inside the devbox
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/home/user/.claude/CLAUDE.md",
+    contents: readScript("thopter-claude-md.md"),
   });
 
   // Claude Code hooks for redis status updates
@@ -220,7 +229,6 @@ async function resolveDevbox(
 export async function createDevbox(opts: {
   name: string;
   snapshotId?: string;
-  task?: string;
   idleTimeout?: number;
 }): Promise<string> {
   const client = getClient();
@@ -249,9 +257,6 @@ export async function createDevbox(opts: {
     [MANAGED_BY_KEY]: MANAGED_BY_VALUE,
     [NAME_KEY]: opts.name,
   };
-  if (opts.task) {
-    metadata.task = opts.task;
-  }
 
   const secrets = await getSecretMappings();
 
@@ -326,15 +331,14 @@ export async function listDevboxes(): Promise<void> {
       const meta = db.metadata ?? {};
       if (meta[MANAGED_BY_KEY] !== MANAGED_BY_VALUE) continue;
       const name = meta[NAME_KEY] ?? "";
-      const task = meta.task ?? "";
       const created = db.create_time_ms
         ? new Date(db.create_time_ms).toLocaleString()
         : "";
-      rows.push([name, db.id, db.status, task, created]);
+      rows.push([name, db.id, db.status, created]);
     }
   }
 
-  printTable(["NAME", "ID", "STATUS", "TASK", "CREATED"], rows);
+  printTable(["NAME", "ID", "STATUS", "CREATED"], rows);
 }
 
 export async function listSnapshotsCmd(): Promise<void> {

@@ -80,7 +80,6 @@ Set up a devbox once, snapshot it, and use that as the base for all future thopt
 |---------|-------------|
 | `./rt create [name]` | Create a devbox (auto-names if omitted) |
 | `./rt create --snapshot <id>` | Create from a snapshot |
-| `./rt create --task "description"` | Create with a task description in metadata |
 | `./rt create -a` | Create and immediately SSH in |
 | `./rt list` | List managed devboxes |
 | `./rt suspend <name>` | Suspend a devbox (preserves disk) |
@@ -158,6 +157,7 @@ Each thopter devbox gets:
 | Script | Purpose |
 |--------|---------|
 | `thopter-status.sh` | Reports key/value status updates to Redis |
+| `thopter-claude-md.md` | CLAUDE.md deployed to devboxes (environment + branch conventions) |
 | `thopter-heartbeat.sh` | Heartbeat loop (runs via cron, reports alive + Claude process status) |
 | `thopter-cron-install.sh` | Installs the heartbeat cron job |
 | `thopter-last-message.mjs` | Extracts last assistant message from Claude transcript |

@@ -27,6 +27,7 @@ interface ThopterInfo {
   name: string;
   id: string | null;
   status: string | null;
+  task: string | null;
   heartbeat: string | null;
   alive: boolean;
   claudeRunning: string | null;
@@ -48,9 +49,10 @@ async function scanThopters(redis: Redis): Promise<ThopterInfo[]> {
     const name = key.replace(/^thopter:/, "").replace(/:heartbeat$/, "");
     const prefix = `thopter:${name}`;
 
-    const [id, status, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
+    const [id, status, task, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
       `${prefix}:id`,
       `${prefix}:status`,
+      `${prefix}:task`,
       `${prefix}:heartbeat`,
       `${prefix}:alive`,
       `${prefix}:claude_running`,
@@ -61,6 +63,7 @@ async function scanThopters(redis: Redis): Promise<ThopterInfo[]> {
       name,
       id,
       status,
+      task,
       heartbeat,
       alive: alive === "1",
       claudeRunning,
@@ -88,10 +91,28 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export async function showAllStatus(): Promise<void> {
+export async function showAllStatus(opts: { all?: boolean } = {}): Promise<void> {
   const redis = getRedis();
   try {
-    const thopters = await scanThopters(redis);
+    let thopters = await scanThopters(redis);
+
+    // Unless --all, hide dead thopters with heartbeats older than 1 hour
+    if (!opts.all) {
+      const oneHourMs = 60 * 60 * 1000;
+      const hidden = thopters.filter((t) => {
+        if (t.alive) return false;
+        if (!t.heartbeat) return true;
+        return Date.now() - new Date(t.heartbeat).getTime() > oneHourMs;
+      }).length;
+      thopters = thopters.filter((t) => {
+        if (t.alive) return true;
+        if (!t.heartbeat) return false;
+        return Date.now() - new Date(t.heartbeat).getTime() <= oneHourMs;
+      });
+      if (hidden > 0) {
+        console.log(`(${hidden} stale thopter${hidden === 1 ? "" : "s"} hidden — use --all to show)\n`);
+      }
+    }
 
     if (thopters.length === 0) {
       console.log("No thopters reporting to redis.");
@@ -99,8 +120,11 @@ export async function showAllStatus(): Promise<void> {
     }
 
     printTable(
-      ["NAME", "STATUS", "ALIVE", "CLAUDE", "HEARTBEAT", "LAST MESSAGE"],
+      ["NAME", "STATUS", "TASK", "ALIVE", "CLAUDE", "HEARTBEAT", "LAST MESSAGE"],
       thopters.map((t) => {
+        // Truncate task for table display: max 40 chars
+        let task = t.task ?? "-";
+        if (task.length > 40) task = task.slice(0, 37) + "...";
         // Truncate last message for table display: first line, max 60 chars
         let msg = t.lastMessage ?? "-";
         const nl = msg.indexOf("\n");
@@ -109,6 +133,7 @@ export async function showAllStatus(): Promise<void> {
         return [
           t.name,
           t.status ?? "-",
+          task,
           t.alive ? "yes" : "no",
           t.claudeRunning === "1" ? "yes" : t.claudeRunning === "0" ? "no" : "-",
           t.heartbeat ? relativeTime(t.heartbeat) : "-",
@@ -126,9 +151,10 @@ export async function showThopterStatus(name: string): Promise<void> {
   try {
     const prefix = `thopter:${name}`;
 
-    const [id, status, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
+    const [id, status, task, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
       `${prefix}:id`,
       `${prefix}:status`,
+      `${prefix}:task`,
       `${prefix}:heartbeat`,
       `${prefix}:alive`,
       `${prefix}:claude_running`,
@@ -143,6 +169,7 @@ export async function showThopterStatus(name: string): Promise<void> {
     console.log(`=== ${name} ===`);
     console.log(`ID:             ${id ?? "-"}`);
     console.log(`Status:         ${status ?? "-"}`);
+    console.log(`Task:           ${task ?? "-"}`);
     console.log(`Alive:          ${alive === "1" ? "yes" : "no"}`);
     console.log(`Claude running: ${claudeRunning === "1" ? "yes" : claudeRunning === "0" ? "no" : "-"}`);
     console.log(`Heartbeat:      ${heartbeat ? `${heartbeat} (${relativeTime(heartbeat)})` : "-"}`);

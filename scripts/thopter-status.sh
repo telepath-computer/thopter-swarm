@@ -78,10 +78,17 @@ cmd_message() {
     printf '%s' "$msg" | rcli -x SETEX "$PREFIX:last_message" 86400 > /dev/null
 }
 
+cmd_task() {
+    local desc="$*"
+    rcli SET "$PREFIX:task" "$desc" EX 86400 > /dev/null
+    echo "Task: $desc"
+}
+
 cmd_show() {
     echo "=== thopter-status: ${THOPTER_NAME} ==="
     echo "ID:             $(rcli GET "$PREFIX:id")"
     echo "Status:         $(rcli GET "$PREFIX:status")"
+    echo "Task:           $(rcli GET "$PREFIX:task")"
     echo "Heartbeat:      $(rcli GET "$PREFIX:heartbeat")"
     echo "Alive:          $(rcli GET "$PREFIX:alive")"
     echo "Claude running: $(rcli GET "$PREFIX:claude_running")"
@@ -97,17 +104,19 @@ case "${1:-}" in
     waiting)   shift; cmd_waiting "$@" ;;
     done)      shift; cmd_done "$@" ;;
     running)   cmd_running ;;
+    task)      shift; cmd_task "$@" ;;
     message)   cmd_message ;;
     heartbeat) cmd_heartbeat ;;
     show)      cmd_show ;;
     *)
-        echo "Usage: thopter-status {log|waiting|done|running|heartbeat|message|show} [args...]"
+        echo "Usage: thopter-status {log|waiting|done|running|task|heartbeat|message|show} [args...]"
         echo ""
         echo "Commands:"
         echo "  log <message>        Add a timestamped log entry"
         echo "  waiting [message]    Set status to waiting (optionally log why)"
         echo "  done [message]       Set status to done (optionally log why)"
         echo "  running              Set status to running"
+        echo "  task <description>   Set the current task description"
         echo "  message              Set last message (reads from stdin)"
         echo "  heartbeat            Update heartbeat + check claude process (cron)"
         echo "  show                 Show current status from redis"

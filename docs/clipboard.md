@@ -78,6 +78,10 @@ In iTerm2 preferences:
 This must be **enabled**. It is off by default. Without it, iTerm2 ignores
 incoming OSC 52 sequences as a security measure.
 
+Also recommended:
+- enable "copy to clipboard on selection"
+- enable "mirror tmux paste buffer to clipoard"
+
 ## Troubleshooting
 
 If yank isn't reaching your clipboard:

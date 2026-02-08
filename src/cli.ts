@@ -79,17 +79,15 @@ program
   .description("Create a new devbox")
   .argument("[name]", "Name for the devbox (auto-generated if omitted)")
   .option("--snapshot <id>", "Snapshot ID or label to restore from")
-  .option("--task <description>", "Task description (stored in metadata)")
   .option("--idle-timeout <minutes>", "Idle timeout in minutes before auto-suspend (default: 60)", parseInt)
   .option("-a, --attach", "SSH into the devbox after creation")
-  .action(async (name: string | undefined, opts: { snapshot?: string; task?: string; idleTimeout?: number; attach?: boolean }) => {
+  .action(async (name: string | undefined, opts: { snapshot?: string; idleTimeout?: number; attach?: boolean }) => {
     const { createDevbox, sshDevbox } = await import("./devbox.js");
     const { generateName } = await import("./names.js");
     const resolvedName = name ?? generateName();
     await createDevbox({
       name: resolvedName,
       snapshotId: opts.snapshot,
-      task: opts.task,
       idleTimeout: opts.idleTimeout ? opts.idleTimeout * 60 : undefined,
     });
     if (opts.attach) {
@@ -112,12 +110,13 @@ program
   .command("status")
   .description("Show thopter status from redis")
   .argument("[name]", "Thopter name (omit for overview of all)")
-  .action(async (name?: string) => {
+  .option("-a, --all", "Show all thopters including stale ones")
+  .action(async (name: string | undefined, opts: { all?: boolean }) => {
     const { showAllStatus, showThopterStatus } = await import("./status.js");
     if (name) {
       await showThopterStatus(name);
     } else {
-      await showAllStatus();
+      await showAllStatus({ all: opts.all });
     }
   });
 
