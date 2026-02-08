@@ -5,14 +5,16 @@
 
 . "$HOME/.bashrc" 2>/dev/null
 
-# Runloop keepalive: if Claude was active in the last 10 minutes, reset the
-# idle timer so the devbox doesn't auto-suspend. Runs once per cron cycle
-# (every minute) — cheap compared to the 2-hour idle timeout.
-if [ -n "${THOPTER_ID:-}" ] && [ -n "${RUNLOOP_API_KEY:-}" ] && [ -f /tmp/thopter-active ]; then
-    if [ "$(find /tmp/thopter-active -mmin -10 2>/dev/null)" ]; then
-        curl -sf -X POST "https://api.runloop.ai/v1/devboxes/${THOPTER_ID}/keep_alive" \
-            -H "Authorization: Bearer ${RUNLOOP_API_KEY}" \
-            >/dev/null 2>&1 || true
+# Activity-based status: check the touch file that Claude hooks update.
+# If active within the last minute, status is "running".
+# If stale and status was "running", flip to "inactive" (Claude likely died
+# or was killed without a clean stop/done signal).
+if [ -f /tmp/thopter-active ] && [ "$(find /tmp/thopter-active -mmin -1 2>/dev/null)" ]; then
+    /usr/local/bin/thopter-status running >/dev/null 2>&1 || true
+else
+    CURRENT_STATUS=$(redis-cli --tls -u "$REDIS_URL" GET "thopter:${THOPTER_NAME}:status" 2>/dev/null || true)
+    if [ "$CURRENT_STATUS" = "running" ]; then
+        /usr/local/bin/thopter-status inactive >/dev/null 2>&1 || true
     fi
 fi
 

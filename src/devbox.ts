@@ -405,6 +405,15 @@ export async function resumeDevbox(nameOrId: string): Promise<void> {
   }
 }
 
+export async function keepaliveDevbox(nameOrId: string): Promise<void> {
+  const { id } = await resolveDevbox(nameOrId);
+  const client = getClient();
+
+  console.log(`Sending keepalive for ${nameOrId} (${id})...`);
+  await client.devboxes.keepAlive(id);
+  console.log("Done. Idle timer reset.");
+}
+
 export async function sshDevbox(nameOrId: string): Promise<void> {
   const { id } = await resolveDevbox(nameOrId);
 

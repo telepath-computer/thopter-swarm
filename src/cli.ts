@@ -59,6 +59,7 @@ examples:
   runloop-thopters list                           Show running devboxes
   runloop-thopters status                         Overview of all thopters from redis
   runloop-thopters status dev                     Detailed status + logs for a thopter
+  runloop-thopters keepalive dev                   Reset idle timer for a devbox
   runloop-thopters suspend dev                    Suspend a devbox
   runloop-thopters resume dev                     Resume a suspended devbox
   runloop-thopters destroy dev                    Shut down a devbox`,
@@ -79,7 +80,7 @@ program
   .description("Create a new devbox")
   .argument("[name]", "Name for the devbox (auto-generated if omitted)")
   .option("--snapshot <id>", "Snapshot ID or label to restore from")
-  .option("--idle-timeout <minutes>", "Idle timeout in minutes before auto-suspend (default: 60)", parseInt)
+  .option("--idle-timeout <minutes>", "Idle timeout in minutes before auto-suspend (default: 720)", parseInt)
   .option("-a, --attach", "SSH into the devbox after creation")
   .action(async (name: string | undefined, opts: { snapshot?: string; idleTimeout?: number; attach?: boolean }) => {
     const { createDevbox, sshDevbox } = await import("./devbox.js");
@@ -149,6 +150,16 @@ program
   .action(async (devbox: string) => {
     const { resumeDevbox } = await import("./devbox.js");
     await resumeDevbox(devbox);
+  });
+
+// --- keepalive ---
+program
+  .command("keepalive")
+  .description("Send a keepalive to reset a devbox's idle timer")
+  .argument("<devbox>", "Devbox name or ID")
+  .action(async (devbox: string) => {
+    const { keepaliveDevbox } = await import("./devbox.js");
+    await keepaliveDevbox(devbox);
   });
 
 // --- ssh ---

@@ -7,7 +7,8 @@ TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 # Persist transcript path for heartbeat to read
 [ -n "$TRANSCRIPT" ] && echo "$TRANSCRIPT" > /tmp/thopter-transcript-path
 
-thopter-status running 2>/dev/null || true
+# Signal activity — heartbeat will set status to "running"
+touch /tmp/thopter-active
 thopter-status log "session started" 2>/dev/null || true
 
 if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then

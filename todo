@@ -1,26 +1,30 @@
-- DONE install into new thopters a ~/.claude/CLAUDE.md for host level instructions about thopter context as a runloop devbox, it's a headless kvm context, using and pushing only to thopter/* git branches for workspace, and the task setting ability which it should keep up to date with the high level goal of the session. the main thing is that it needs to know to use thopter/* pattern branches for any pushes to remote git. it should be told about the github pat and how git config is setup to use that. 
 - Have developer names and associate them with thopters.
 - purge redis statue on dead thopters (does it expire automatically?)
-- use 'thopter' for the command and have it install somewhere global.  move runloop api key and redis url to homedir config file, not .env.local 
+- use 'thopter' for the command
+- have thopter cmd install somewhere global.
+- move runloop api key and redis url to homedir config file, not .env.local 
 - replace the api keys with team keys
-- add read access to github issues to the PAT
+- add read access to github issues to the PAT, tell claude md it can read the repo, read issues, but only push on thopter branches, no other privs. (can it create PRs? i should have it be able to do that)
 - Write better docs.
-- in particular write the developer guide for my coworkers.
-  - i've setup the runloop workspace already. secrets etc
-  - they need to npm install
-  - setup their thopter config w/ api key and redis url
-  - create a new instance of their own
-  - auth claude w/ max, codex if desired
-  - snapshot it
-  - set default snapshot
-  - use yolo claude
+  - in particular write the developer guide for my coworkers.
+    - i've setup the runloop workspace already. secrets etc
+    - they need to npm install
+    - setup their thopter config w/ api key and redis url
+    - create a new instance of their own
+    - auth claude w/ max, codex if desired
+    - snapshot it
+    - set default snapshot
+    - use yolo claude
 - Put API keys and such in team 1Password.
 - Secrets brittleness: currently all platform secrets are injected into every devbox.
   Deleting or renaming a secret breaks resume for any suspended devbox provisioned
   with it (adding secrets and changing values is fine). Profiles (see below) should
   fix this — each profile whitelists specific secrets, so the devbox's secret set
   is explicit and stable. Until then, destroy affected devboxes before deleting secrets.
-- review the auto suspend logic make sure it's sane and that it works
+- Cloudflare Worker keepalive proxy: a ~20-line worker that holds the Runloop API key
+  and exposes a simple authenticated endpoint for devboxes to call keepalive on themselves.
+  Thopters would get KEEPALIVE_URL + KEEPALIVE_TOKEN instead of the full API key.
+  This would let thopters self-keepalive without keys to the kingdom.
 - claude statuses per claude PID instead of per thopter
 - Try building a task system in Redis
 - Profiles: named configuration bundles for different projects/workflows.
@@ -36,6 +40,12 @@
   Stored in local config (~/.runloop-thopters/profiles/).
   Usage: ./thopter create --profile my-project
 
+Runloop platform wishlist:
+- Scoped API tokens: ability for a devbox to keep itself alive without having
+  the full API key. Ideally a per-devbox token that can only call keep_alive
+  on its own devbox ID. This removes the need for external keepalive proxies
+  or operator-side watchers.
+
 - DONE Test this with a real developer implementation task round-tripping from Git
 - DONE test heartbeat survives suspend/resume cycle
 - DONE Upgrade Runloop account to enable suspend/resume
@@ -47,5 +57,12 @@
   - enable "Applications in terminal may access Clipboard."
   - enable "copy to clipboard on selection"
   - enable "mirror tmux paste buffer to clipoard"
+- DONE install into new thopters a ~/.claude/CLAUDE.md for host level instructions about thopter context as a runloop devbox, it's a headless kvm context, using and pushing only to thopter/* git branches for workspace, and the task setting ability which it should keep up to date with the high level goal of the session. the main thing is that it needs to know to use thopter/* pattern branches for any pushes to remote git. it should be told about the github pat and how git config is setup to use that. 
+- DONE review the auto suspend logic make sure it's sane and that it works
+  - Removed Runloop API keepalive from heartbeat cron (was requiring RUNLOOP_API_KEY on devboxes)
+  - Bumped default idle timeout to 12 hours
+  - Added ./thopter keepalive <name> for operator-side idle timer reset
+  - Heartbeat now uses touch file mtime to set "running" (< 1 min) or "inactive" (stale)
+  - Hooks (SessionStart, Prompt, ToolUse) touch the activity file; only heartbeat sets "running"
 
 

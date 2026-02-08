@@ -18,8 +18,8 @@ export const NAME_KEY = "thopter_name";
 /** Default devbox resource size. */
 export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
 
-/** Default idle timeout: 2 hours. Suspends on idle (preserves disk). */
-export const DEFAULT_IDLE_TIMEOUT_SECONDS = 2 * 60 * 60;
+/** Default idle timeout: 12 hours. Suspends on idle (preserves disk). */
+export const DEFAULT_IDLE_TIMEOUT_SECONDS = 12 * 60 * 60;
 
 /**
  * Build secret mappings dynamically from all Runloop secrets.

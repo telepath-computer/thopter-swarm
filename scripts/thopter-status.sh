@@ -48,6 +48,11 @@ cmd_running() {
     echo "Status: running"
 }
 
+cmd_inactive() {
+    rcli SET "$PREFIX:status" "inactive" EX 86400 > /dev/null
+    echo "Status: inactive"
+}
+
 cmd_heartbeat() {
     rcli SET "$PREFIX:heartbeat" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" EX 86400 > /dev/null
     rcli SET "$PREFIX:alive" "1" EX 30 > /dev/null
@@ -60,11 +65,11 @@ cmd_heartbeat() {
     else
         rcli SET "$PREFIX:claude_running" "0" EX 86400 > /dev/null
     fi
-    # Ensure status is set (default to running if not already set)
+    # Ensure status is set (default to inactive if not already set)
     local current_status
     current_status=$(rcli GET "$PREFIX:status" 2>/dev/null || true)
     if [ -z "$current_status" ] || [ "$current_status" = "(nil)" ]; then
-        rcli SET "$PREFIX:status" "running" EX 86400 > /dev/null
+        rcli SET "$PREFIX:status" "inactive" EX 86400 > /dev/null
     fi
 }
 
@@ -104,6 +109,7 @@ case "${1:-}" in
     waiting)   shift; cmd_waiting "$@" ;;
     done)      shift; cmd_done "$@" ;;
     running)   cmd_running ;;
+    inactive)  cmd_inactive ;;
     task)      shift; cmd_task "$@" ;;
     message)   cmd_message ;;
     heartbeat) cmd_heartbeat ;;
@@ -116,6 +122,7 @@ case "${1:-}" in
         echo "  waiting [message]    Set status to waiting (optionally log why)"
         echo "  done [message]       Set status to done (optionally log why)"
         echo "  running              Set status to running"
+        echo "  inactive             Set status to inactive"
         echo "  task <description>   Set the current task description"
         echo "  message              Set last message (reads from stdin)"
         echo "  heartbeat            Update heartbeat + check claude process (cron)"
