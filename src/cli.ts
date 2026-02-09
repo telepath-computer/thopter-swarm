@@ -36,6 +36,7 @@ examples:
   thopter snapshot default golden         Set default snapshot
   thopter snapshot default               View default snapshot
   thopter snapshot default --clear        Clear default snapshot
+  thopter run --repo owner/repo "prompt"  Launch Claude with a task
   thopter status                         Unified view of all thopters
   thopter status dev                     Detailed status + logs for a thopter
   thopter keepalive dev                   Reset idle timer for a devbox
@@ -92,6 +93,21 @@ program
       const { listDevboxes } = await import("./devbox.js");
       await listDevboxes();
     }
+  });
+
+// --- run ---
+program
+  .command("run")
+  .description("Create a thopter and run Claude with a prompt")
+  .argument("<prompt>", "The task/prompt to give Claude")
+  .option("--repo <owner/repo>", "GitHub repository to clone")
+  .option("--branch <name>", "Git branch to start from")
+  .option("--name <name>", "Thopter name (auto-generated if omitted)")
+  .option("--snapshot <id>", "Snapshot to use")
+  .option("--idle-timeout <minutes>", "Idle timeout in minutes", parseInt)
+  .action(async (prompt: string, opts: { repo?: string; branch?: string; name?: string; snapshot?: string; idleTimeout?: number }) => {
+    const { runThopter } = await import("./run.js");
+    await runThopter({ prompt, ...opts });
   });
 
 // --- destroy ---
