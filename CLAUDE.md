@@ -41,13 +41,13 @@ setup-steps.md Setup instructions
   metadata and a `thopter_name` for human-friendly naming
 - **Snapshots** save devbox disk state; the "golden snapshot" pattern lets you
   configure once and stamp out ready-to-use devboxes
-- **Secrets** are stored in Runloop's platform; all secrets are auto-injected
-  into devboxes as env vars (secret name = env var name)
+- **Environment variables** are configured in `~/.thopter.json` under `envVars`
+  and written to `~/.thopter-env` on each devbox at create time
 - **Status reporting** uses Upstash Redis: heartbeats, Claude hook events, last
   assistant messages
 - **SSH** is via the `rli` CLI (`@runloop/rl-cli`)
 
 ## Configuration
 
-- `~/.thopter.json` on developer laptop: `runloopApiKey`, `redisUrl`, `ntfyChannel`, `defaultSnapshotId`
-- Secrets in Runloop platform (managed via `./thopter secrets` or `./thopter setup`)
+- `~/.thopter.json` on developer laptop: `runloopApiKey`, `redisUrl`, `ntfyChannel`, `defaultSnapshotId`, `envVars`
+- Devbox env vars managed via `./thopter env` or `./thopter setup`

@@ -23,8 +23,8 @@ fi
 # Stream transcript entries to Redis for thopter tail
 [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" 2>/dev/null || true
 
-# Send ntfy notification
-if [ -n "${THOPTER_NTFY_CHANNEL:-}" ]; then
+# Send ntfy notification (only when explicitly enabled via stopNotifications config)
+if [ -n "${THOPTER_NTFY_CHANNEL:-}" ] && [ "${THOPTER_STOP_NOTIFY:-}" = "1" ]; then
     NTFY_MSG="Waiting for input"
     [ -n "$LAST_MSG" ] && NTFY_MSG=$(printf '%s' "$LAST_MSG" | head -c 500)
     curl -s -H "Title: ${THOPTER_NAME}" -d "$NTFY_MSG" "ntfy.sh/$THOPTER_NTFY_CHANNEL" &

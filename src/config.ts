@@ -21,23 +21,22 @@ export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
 /** Default idle timeout: 12 hours. Suspends on idle (preserves disk). */
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 12 * 60 * 60;
 
-/**
- * Build secret mappings dynamically from all Runloop secrets.
- * Convention: secret name in Runloop = env var name in devbox.
- */
-export async function getSecretMappings(): Promise<Record<string, string>> {
-  const { listSecrets } = await import("./secrets.js");
-  const secrets = await listSecrets();
-  return Object.fromEntries(secrets.map((s) => [s.name, s.name]));
-}
+// --- Local config ---
 
-// --- Local config (default snapshot only) ---
+export interface UploadEntry {
+  local: string;
+  remote: string;
+}
 
 interface LocalConfig {
   runloopApiKey?: string;
   redisUrl?: string;
   defaultSnapshotId?: string;
   ntfyChannel?: string;
+  claudeMdPath?: string;
+  uploads?: UploadEntry[];
+  stopNotifications?: boolean;
+  envVars?: Record<string, string>;
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -79,6 +78,16 @@ export function setNtfyChannel(channel: string): void {
   saveLocalConfig(config);
 }
 
+export function getStopNotifications(): boolean {
+  return loadLocalConfig().stopNotifications ?? false;
+}
+
+export function setStopNotifications(enabled: boolean): void {
+  const config = loadLocalConfig();
+  config.stopNotifications = enabled;
+  saveLocalConfig(config);
+}
+
 export function getRunloopApiKey(): string | undefined {
   return loadLocalConfig().runloopApiKey;
 }
@@ -97,6 +106,53 @@ export function setRedisUrl(url: string): void {
   const config = loadLocalConfig();
   config.redisUrl = url;
   saveLocalConfig(config);
+}
+
+// --- Devbox env vars ---
+
+const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export function validateEnvKey(key: string): void {
+  if (!ENV_KEY_RE.test(key)) {
+    throw new Error(
+      `Invalid env var name '${key}'. Must match [A-Za-z_][A-Za-z0-9_]*.`,
+    );
+  }
+}
+
+/** Escape a value for safe inclusion in a shell `export KEY="VALUE"` line. */
+export function escapeEnvValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
+}
+
+export function getEnvVars(): Record<string, string> {
+  return loadLocalConfig().envVars ?? {};
+}
+
+export function setEnvVar(key: string, value: string): void {
+  validateEnvKey(key);
+  const config = loadLocalConfig();
+  if (!config.envVars) config.envVars = {};
+  config.envVars[key] = value;
+  saveLocalConfig(config);
+}
+
+export function deleteEnvVar(key: string): void {
+  const config = loadLocalConfig();
+  if (config.envVars) {
+    delete config.envVars[key];
+    saveLocalConfig(config);
+  }
+}
+
+// --- Custom CLAUDE.md and file uploads ---
+
+export function getClaudeMdPath(): string | undefined {
+  return loadLocalConfig().claudeMdPath;
+}
+
+export function getUploads(): UploadEntry[] {
+  return loadLocalConfig().uploads ?? [];
 }
 
 /**
