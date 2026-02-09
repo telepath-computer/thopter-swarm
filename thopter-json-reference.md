@@ -8,7 +8,7 @@
 | `defaultSnapshotId` | string | no | Snapshot used by `thopter create` when `--snapshot` isn't passed. Set via `thopter snapshot default`. |
 | `defaultRepo` | string | no | Default repository (`owner/repo`) for `thopter run` when `--repo` isn't passed. Set via `thopter config set defaultRepo owner/repo`. |
 | `defaultBranch` | string | no | Default branch for `thopter run` when `--branch` isn't passed. Set via `thopter config set defaultBranch main`. |
-| `stopNotifications` | boolean | no | Send ntfy.sh notification when Claude finishes a response. Default `false`. Best for unattended thopters — noisy in interactive sessions. |
+| `stopNotifications` | boolean | no | Send ntfy.sh notification when Claude finishes a response. Default `true`. Notifications are suppressed during the quiet period after a user message (see `stopNotificationQuietPeriod`). Set to `false` to disable. |
 | `stopNotificationQuietPeriod` | number | no | Seconds after a user message during which stop notifications are suppressed (user is likely still engaged). Default `30`. Set to `0` to always send. |
 | `claudeMdPath` | string | no | Path to a custom CLAUDE.md deployed to `~/.claude/CLAUDE.md` on every new devbox. Omit to use the built-in default. |
 | `uploads` | array | no | Files to copy to new devboxes at create time. Each entry: `{"local": "/path/on/laptop", "remote": "/path/on/devbox"}`. Runs after all other provisioning. |
@@ -42,7 +42,6 @@ Add any other env vars your devboxes need — they're all passed through, e.g. `
   "defaultSnapshotId": "jsw-golden",
   "defaultRepo": "telepath-computer/my-project",
   "defaultBranch": "main",
-  "stopNotifications": true,
   "stopNotificationQuietPeriod": 30,
   "claudeMdPath": "/Users/jw/projects/my-claude-instructions.md",
   "uploads": [

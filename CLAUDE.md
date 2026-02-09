@@ -48,5 +48,5 @@ todo           Current task list
 
 ## Configuration
 
-- `~/.thopter.json` on developer laptop: `runloopApiKey`, `defaultSnapshotId`, `stopNotifications`, `claudeMdPath`, `uploads`, `envVars`
+- `~/.thopter.json` on developer laptop: `runloopApiKey`, `defaultSnapshotId`, `claudeMdPath`, `uploads`, `envVars`
 - Devbox env vars managed via `./thopter env` or `./thopter setup`
