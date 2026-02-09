@@ -24,6 +24,8 @@ npm link    # installs the 'thopter' command globally
 
 ### First-time Setup
 
+**Telepath team: see "~/.thopter.json starter" in our 1password vault, put that in your homedir that first and then you can run setup.**
+
 ```bash
 thopter setup
 ```
@@ -40,16 +42,16 @@ All config is saved to `~/.thopter.json`.
 
 ```bash
 # Create a fresh devbox (installs Claude, neovim, tmux, etc.)
-thopter create my-first --fresh
+thopter create --fresh
 
-# SSH in, look around, authenticate Claude, set things up
-thopter ssh my-first
+# The thopter got a random name, grab that and SSH in, look around, authenticate Claude, set things up
+thopter ssh random-name-here
 
-# Once you're happy, snapshot it as your golden image
-thopter snapshot create my-first golden
-thopter snapshot default golden
+# Once you're happy, snapshot it as your golden image with your initials
+thopter snapshot create random-name-here myinitials-golden
+thopter snapshot default myinitials-golden
 
-# Now all future creates use your golden snapshot (fast boot)
+# Now all future creates use your golden snapshot (fast boot, ready to go)
 thopter create worker-1
 thopter create worker-2
 ```
@@ -70,6 +72,8 @@ thopter tail worker-1 -f    # follow Claude's transcript in real time
 thopter attach worker-1     # attach to tmux (iTerm2 -CC mode)
 thopter ssh worker-1        # SSH in to poke around
 ```
+
+**Highly recommended: use iterm2 for your terminal to enable a nice tmux experience for detachable thopter sessions.** `thopter attach` expects that. you can also just use `thopter ssh` and your own terminal, your own terminal multiplexer, or not, as you like. it's just a linux VM.
 
 ### Day-to-day Workflow
 
@@ -166,16 +170,7 @@ Env vars are stored in `~/.thopter.json` and written to `~/.thopter-env` inside 
 
 All configuration lives in this file. Managed via `thopter setup`, `thopter config`, `thopter env`, and `thopter snapshot default`. See [`thopter-json-reference.md`](thopter-json-reference.md) for a complete reference of all keys.
 
-| Key | Description |
-|-----|-------------|
-| `runloopApiKey` | Runloop API key (required) |
-| `defaultSnapshotId` | Default snapshot for `create` (set via `snapshot default`) |
-| `stopNotifications` | Enable notifications on Claude stop events (`true`/`false`) |
-| `claudeMdPath` | Path to a custom CLAUDE.md to deploy to devboxes |
-| `uploads` | Array of `{local, remote}` file upload entries (see below) |
-| `envVars` | Key-value map of env vars injected into devboxes (see below) |
-
-### Devbox Environment Variables
+### Important Devbox Environment Variables
 
 Env vars in the `envVars` section are written to `~/.thopter-env` inside each devbox at create time.
 
@@ -191,11 +186,9 @@ Env vars in the `envVars` section are written to `~/.thopter-env` inside each de
 
 Add any other env vars your devboxes need (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) with `thopter env set`.
 
-**Tip:** Use `thopter env set GH_TOKEN` (without the value) to enter it interactively, keeping it out of shell history.
-
 ### GitHub Token and Branch Rules
 
-Thopter devboxes use a GitHub personal access token (`GH_TOKEN`) for all git operations. The git user is **ThopterBot**.
+Thopter devboxes use a GitHub personal access token (`GH_TOKEN`) for all git operations. The git user is **ThopterBot**. (TODO: full github setup howto)
 
 Thopters are configured to only push to branches prefixed with `thopter/` (e.g. `thopter/fix-login-bug`). They can create pull requests but cannot merge them or push to `main`/`master` directly. This is enforced by convention in the devbox CLAUDE.md, and can be enforced at the GitHub level with branch protection rules.
 
