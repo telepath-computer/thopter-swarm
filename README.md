@@ -93,247 +93,26 @@ thopter destroy my-thopter  # done for good
 
 ## CLI Reference
 
-### Dispatching Work
+The CLI has commands for dispatching work (`run`), managing lifecycle (`create`, `suspend`, `resume`, `destroy`), connecting (`ssh`, `attach`, `exec`), monitoring (`status`, `tail`), snapshots, env vars, and configuration.
 
-| Command | Description |
-|---------|-------------|
-| `thopter run "<prompt>"` | Create a thopter and run Claude with a task |
-| `thopter run --repo owner/repo "<prompt>"` | Clone a repo first, then run Claude |
-| `thopter run --branch feature "<prompt>"` | Specify a branch to work on |
-| `thopter run --name my-worker "<prompt>"` | Name the thopter (auto-generated otherwise) |
-
-### Lifecycle
-
-| Command | Description |
-|---------|-------------|
-| `thopter create [name]` | Create a devbox (auto-names if omitted) |
-| `thopter create --snapshot <id>` | Create from a specific snapshot |
-| `thopter create --fresh` | Create without using default snapshot |
-| `thopter create -a` | Create and immediately SSH in |
-| `thopter create --keep-alive <min>` | Set keep-alive time in minutes (default: 720) |
-| `thopter suspend <name>` | Suspend (preserves disk, can resume later) |
-| `thopter resume <name>` | Resume a suspended devbox |
-| `thopter keepalive <name>` | Reset the keep-alive timer |
-| `thopter destroy <name>` | Permanently shut down a devbox |
-
-### Connecting
-
-| Command | Description |
-|---------|-------------|
-| `thopter ssh <name>` | SSH into a devbox (via `rli`) |
-| `thopter attach <name>` | Attach to tmux in iTerm2 control mode (`-CC`) |
-| `thopter exec <name> -- <cmd...>` | Run a command and print output |
-
-### Monitoring
-
-| Command | Description |
-|---------|-------------|
-| `thopter status` | Unified view of all thopters (Runloop + Redis) |
-| `thopter status <name>` | Detailed status + logs for one thopter |
-| `thopter tail <name>` | Show last 20 transcript entries |
-| `thopter tail <name> -f` | Follow transcript in real time |
-| `thopter tail <name> -n 50` | Show last 50 entries |
-
-`thopter status` (aliased as `thopter list` / `thopter ls`) shows a combined view with devbox state from Runloop and agent state from Redis: task description, whether Claude is running, last heartbeat time.
-
-`thopter tail` streams Claude's transcript from Redis, showing a condensed view of each conversation turn (user messages, assistant responses, tool calls). Use `-f` to follow in real time — like `tail -f` for your thopter's Claude session.
-
-### Snapshots
-
-| Command | Description |
-|---------|-------------|
-| `thopter snapshot list` | List all snapshots |
-| `thopter snapshot create <devbox> [name]` | Snapshot a devbox |
-| `thopter snapshot replace <devbox> <name>` | Replace an existing snapshot |
-| `thopter snapshot destroy <name>` | Delete a snapshot |
-| `thopter snapshot default [name]` | View or set default snapshot |
-| `thopter snapshot default --clear` | Clear default snapshot |
-
-### Environment Variables
-
-| Command | Description |
-|---------|-------------|
-| `thopter env list` | List configured env vars (values masked) |
-| `thopter env set <KEY> [VALUE]` | Set a devbox env var (prompts if value omitted) |
-| `thopter env delete <KEY>` | Remove a devbox env var |
-
-Env vars are stored in `~/.thopter.json` and written to `~/.thopter-env` inside each devbox at create time.
-
-### Configuration
-
-| Command | Description |
-|---------|-------------|
-| `thopter setup` | Interactive first-time setup wizard |
-| `thopter config get [key]` | View config (omit key to show all) |
-| `thopter config set <key> <value>` | Set a config value |
+See [docs/cli-reference.md](docs/cli-reference.md) for the full command reference.
 
 ## Configuration
 
-### `~/.thopter.json`
+All config lives in `~/.thopter.json`, managed via `thopter setup`, `thopter config`, and `thopter env`. The key env vars are `GH_TOKEN` (GitHub access) and `THOPTER_REDIS_URL` (status monitoring). Optional: `THOPTER_NTFY_CHANNEL` for push notifications via ntfy.sh.
 
-All configuration lives in this file. Managed via `thopter setup`, `thopter config`, `thopter env`, and `thopter snapshot default`. See [`thopter-json-reference.md`](thopter-json-reference.md) for a complete reference of all keys.
-
-### Important Devbox Environment Variables
-
-Env vars in the `envVars` section are written to `~/.thopter-env` inside each devbox at create time.
-
-| Variable | Purpose |
-|----------|---------|
-| `GH_TOKEN` | GitHub token for git clone/push and `gh` CLI (required) |
-| `THOPTER_REDIS_URL` | Upstash Redis URL for status monitoring (required) |
-| `THOPTER_NTFY_CHANNEL` | ntfy.sh channel for push notifications (optional) |
-
-`THOPTER_REDIS_URL` is used both by the CLI (for `thopter status` and `thopter tail`) and on devboxes (for heartbeats and status reporting).
-
-`GH_TOKEN` is also used to configure git credentials (HTTPS credential store) after the devbox boots.
-
-Add any other env vars your devboxes need (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) with `thopter env set`.
-
-### GitHub Token and Branch Rules
-
-Thopter devboxes use a GitHub personal access token (`GH_TOKEN`) for all git operations. The git user is **ThopterBot**. (TODO: full github setup howto)
-
-Thopters are configured to only push to branches prefixed with `thopter/` (e.g. `thopter/fix-login-bug`). They can create pull requests but cannot merge them or push to `main`/`master` directly. This is enforced by convention in the devbox CLAUDE.md, and can be enforced at the GitHub level with branch protection rules.
-
-To create a fine-grained token:
-1. Go to GitHub Settings > Developer Settings > Fine-grained tokens
-2. Select the repositories you want thopters to access
-3. Grant: Contents (read/write), Pull requests (read/write), Issues (read)
-4. Set with: `thopter env set GH_TOKEN`
-
-### Notifications (ntfy.sh)
-
-Thopters push notifications to your phone or desktop via [ntfy.sh](https://ntfy.sh) when Claude sends a notification (permission requests, errors, etc.).
-
-1. Pick a unique channel name (e.g. `my-thopters-abc123`)
-2. Subscribe on your phone ([iOS](https://apps.apple.com/app/ntfy/id1625396347) / [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy)) or desktop
-3. Configure:
-
-```bash
-thopter env set THOPTER_NTFY_CHANNEL my-thopters-abc123
-```
-
-Stop notifications (when Claude finishes a response) are off by default since they're noisy during interactive sessions. Enable them with:
-
-```bash
-thopter config set stopNotifications true
-```
-
-New thopters created after configuring these will send notifications. Existing thopters need to be re-created or have `THOPTER_NTFY_CHANNEL` (and optionally `THOPTER_STOP_NOTIFY=1`) added to their `~/.thopter-env` manually.
-
-### Custom CLAUDE.md
-
-By default, thopters get a standard CLAUDE.md with devbox environment info and branch conventions. To deploy your own custom CLAUDE.md (e.g. with project-specific instructions), set the path in your config:
-
-```json
-{
-  "claudeMdPath": "/path/to/my-custom-claude.md"
-}
-```
-
-The file at that path will be deployed to `~/.claude/CLAUDE.md` on each new devbox, replacing the default.
-
-### File Uploads
-
-You can have files from your local machine automatically uploaded to new devboxes at create time:
-
-```json
-{
-  "uploads": [
-    { "local": "/path/to/local/file", "remote": "/home/user/destination" }
-  ]
-}
-```
-
-Each entry copies the local file to the specified remote path on the devbox. This runs after all other provisioning, so it can override default configs if needed.
+See [docs/configuration.md](docs/configuration.md) for detailed setup (GitHub tokens, notifications, custom CLAUDE.md, file uploads) and [thopter-json-reference.md](thopter-json-reference.md) for the complete config key reference.
 
 ## Architecture
 
-### Stack
+TypeScript CLI built on Commander.js, using the Runloop.ai SDK for devbox lifecycle and Upstash Redis for monitoring. Devboxes are KVM microVMs provisioned with Claude Code, developer tools, and hooks that report status back to Redis.
 
-- **CLI**: TypeScript + Commander.js, run via `tsx`
-- **Cloud provider**: [Runloop.ai](https://runloop.ai) devboxes (KVM microVMs)
-- **SDK**: `@runloop/api-client` for devbox lifecycle, exec, snapshots
-- **Monitoring**: Upstash Redis for heartbeats, status, and last messages
-- **SSH**: `rli` CLI (`@runloop/rl-cli`)
+See [docs/architecture.md](docs/architecture.md) for details on the stack, how provisioning works, devbox contents, and project structure.
 
-### How It Works
+## More
 
-1. `thopter create` provisions a Runloop devbox with metadata tags (`managed_by=runloop-thopters`, `thopter_name=<name>`, `thopter_owner=<git-user>`)
-2. On fresh creates (no snapshot), an init script installs Claude Code, Codex, neovim, starship, tmux, and developer tools
-3. After the devbox is running, env vars from `~/.thopter.json` are written to `~/.thopter-env`, git credentials are configured via the credential store, and thopter scripts (hooks, heartbeat, status) are uploaded
-4. Claude Code hooks fire on session events (start, stop, notification, prompt, tool use) and report to Redis via `thopter-status`
-5. A cron job runs a heartbeat every ~10 seconds, setting an `alive` key with 30s TTL as a dead-man's switch
-6. Devboxes shut down after 12 hours (configurable via `--keep-alive`); reset with `thopter keepalive`
-
-### Devbox Contents
-
-Each thopter devbox gets:
-
-- Claude Code (`claude` CLI)
-- OpenAI Codex (`codex` CLI)
-- Neovim + NvChad with OSC 52 clipboard support
-- Starship prompt showing thopter name
-- tmux with Ctrl-a prefix
-- Git configured with GH_TOKEN credentials from `~/.thopter-env`
-- Heartbeat cron reporting to Redis
-- Claude Code hooks for status reporting
-
-### Project Structure
-
-```
-src/           TypeScript source
-  cli.ts       CLI entrypoint (Commander.js commands)
-  devbox.ts    Devbox lifecycle (create, list, destroy, ssh, exec, snapshot)
-  run.ts       thopter run (create + clone + launch Claude)
-  tail.ts      thopter tail (stream transcript from Redis)
-  status.ts    Redis status queries
-  config.ts    Local config (~/.thopter.json) management
-  client.ts    Runloop SDK singleton
-  setup.ts     Interactive setup wizard
-  names.ts     Random name generator
-  output.ts    Table formatting helper
-
-scripts/       Devbox-side scripts (uploaded on create)
-  thopter-status.sh            Redis status reporter
-  thopter-heartbeat.sh         Heartbeat cron loop
-  thopter-cron-install.sh      Installs heartbeat cron job
-  thopter-last-message.mjs     Extracts last assistant message from transcript
-  thopter-transcript-push.mjs  Streams transcript entries to Redis (for thopter tail)
-  thopter-claude-md.md         CLAUDE.md deployed to devboxes
-  install-claude-hooks.mjs     Merges hook config into Claude settings.json
-  claude-hook-*.sh             Individual Claude Code event hooks
-  starship.toml                Starship prompt config
-  tmux.conf                    tmux config (Ctrl-a prefix)
-  nvim-options.lua             Neovim options (OSC 52 clipboard)
-
-docs/          Design docs and brainstorms (not authoritative)
-```
-
-### Naming Convention
-
-Thopter names are free-form strings. A useful team convention is `initials/purpose`:
-
-```bash
-thopter create jw/auth-fix
-thopter create jw/golden        # for your golden snapshot
-```
-
-If you omit the name, a random friendly name is generated (e.g. `curious-lighthouse`).
-
-## Clipboard (Neovim + tmux + iTerm2)
-
-Yanking text in Neovim on a remote thopter and pasting on your local Mac works via OSC 52 escape sequences. The chain is:
-
-```
-Neovim → tmux → SSH → iTerm2 → macOS clipboard
-```
-
-This is pre-configured on thopter devboxes. The one manual step on your Mac:
-
-**iTerm2 > Preferences > General > Selection > "Applications in terminal may access clipboard"** must be enabled.
-
-See `docs/clipboard.md` for troubleshooting.
+- [Clipboard setup](docs/clipboard.md) (Neovim + tmux + iTerm2 OSC 52)
+- [Design docs and ideas](docs/)
 
 ## Build
 
