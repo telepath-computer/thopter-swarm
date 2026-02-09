@@ -266,7 +266,7 @@ configCmd
   .argument("<key>", "Config key")
   .argument("<value>", "Config value")
   .action(async (key: string, value: string) => {
-    const { setRunloopApiKey, setRedisUrl, setNtfyChannel, setDefaultSnapshot } = await import("./config.js");
+    const { setRunloopApiKey, setRedisUrl, setNtfyChannel, setDefaultSnapshot, setStopNotifications } = await import("./config.js");
     switch (key) {
       case "runloopApiKey":
         setRunloopApiKey(value);
@@ -285,9 +285,13 @@ configCmd
         setDefaultSnapshot(value);
         console.log(`Set defaultSnapshotId to: ${value}`);
         break;
+      case "stopNotifications":
+        setStopNotifications(value === "true" || value === "1");
+        console.log(`Set stopNotifications to: ${value === "true" || value === "1"}`);
+        break;
       default:
         console.error(`Unknown config key: ${key}`);
-        console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId");
+        console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId, stopNotifications");
         process.exit(1);
     }
   });
@@ -297,12 +301,13 @@ configCmd
   .description("Get a config value")
   .argument("[key]", "Config key (omit to show all)")
   .action(async (key?: string) => {
-    const { getRunloopApiKey, getRedisUrl, getNtfyChannel, getDefaultSnapshot } = await import("./config.js");
+    const { getRunloopApiKey, getRedisUrl, getNtfyChannel, getDefaultSnapshot, getStopNotifications } = await import("./config.js");
     if (!key) {
-      console.log(`runloopApiKey:     ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
-      console.log(`redisUrl:          ${getRedisUrl() ? "(set)" : "(not set)"}`);
-      console.log(`ntfyChannel:       ${getNtfyChannel() ?? "(not set)"}`);
-      console.log(`defaultSnapshotId: ${getDefaultSnapshot() ?? "(not set)"}`);
+      console.log(`runloopApiKey:       ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
+      console.log(`redisUrl:            ${getRedisUrl() ? "(set)" : "(not set)"}`);
+      console.log(`ntfyChannel:         ${getNtfyChannel() ?? "(not set)"}`);
+      console.log(`defaultSnapshotId:   ${getDefaultSnapshot() ?? "(not set)"}`);
+      console.log(`stopNotifications:   ${getStopNotifications()}`);
     } else {
       switch (key) {
         case "runloopApiKey":
@@ -317,9 +322,12 @@ configCmd
         case "defaultSnapshotId":
           console.log(getDefaultSnapshot() ?? "(not set)");
           break;
+        case "stopNotifications":
+          console.log(getStopNotifications());
+          break;
         default:
           console.error(`Unknown config key: ${key}`);
-          console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId");
+          console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId, stopNotifications");
           process.exit(1);
       }
     }

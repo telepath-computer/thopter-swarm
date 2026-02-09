@@ -20,8 +20,8 @@ if [ -n "$LAST_MSG" ]; then
     printf '%s' "$LAST_MSG" | thopter-status message 2>/dev/null || true
 fi
 
-# Send ntfy notification
-if [ -n "${THOPTER_NTFY_CHANNEL:-}" ]; then
+# Send ntfy notification (only when explicitly enabled via stopNotifications config)
+if [ -n "${THOPTER_NTFY_CHANNEL:-}" ] && [ "${THOPTER_STOP_NOTIFY:-}" = "1" ]; then
     NTFY_MSG="Waiting for input"
     [ -n "$LAST_MSG" ] && NTFY_MSG=$(printf '%s' "$LAST_MSG" | head -c 500)
     curl -s -H "Title: ${THOPTER_NAME}" -d "$NTFY_MSG" "ntfy.sh/$THOPTER_NTFY_CHANNEL" &
