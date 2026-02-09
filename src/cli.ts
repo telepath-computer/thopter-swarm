@@ -39,6 +39,9 @@ examples:
   thopter list                           Show running devboxes
   thopter status                         Overview of all thopters from redis
   thopter status dev                     Detailed status + logs for a thopter
+  thopter tail dev                       Show last 20 transcript entries
+  thopter tail dev -f                    Follow transcript in real time
+  thopter tail dev -n 50                 Show last 50 entries
   thopter keepalive dev                   Reset idle timer for a devbox
   thopter suspend dev                    Suspend a devbox
   thopter resume dev                     Resume a suspended devbox
@@ -101,6 +104,18 @@ program
     } else {
       await showAllStatus({ all: opts.all });
     }
+  });
+
+// --- tail ---
+program
+  .command("tail")
+  .description("Tail a thopter's Claude transcript from Redis")
+  .argument("<name>", "Thopter name")
+  .option("-f, --follow", "Continuously poll for new entries")
+  .option("-n, --lines <count>", "Number of entries to show (default: 20)", parseInt)
+  .action(async (name: string, opts: { follow?: boolean; lines?: number }) => {
+    const { tailTranscript } = await import("./tail.js");
+    await tailTranscript(name, { follow: opts.follow, lines: opts.lines });
   });
 
 // --- destroy ---

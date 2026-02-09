@@ -20,6 +20,9 @@ if [ -n "$LAST_MSG" ]; then
     printf '%s' "$LAST_MSG" | thopter-status message 2>/dev/null || true
 fi
 
+# Stream transcript entries to Redis for thopter tail
+[ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" 2>/dev/null || true
+
 # Send ntfy notification
 if [ -n "${THOPTER_NTFY_CHANNEL:-}" ]; then
     NTFY_MSG="Waiting for input"
