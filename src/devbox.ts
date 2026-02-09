@@ -297,10 +297,15 @@ export async function createDevbox(opts: {
     metadata,
     launch_parameters: {
       resource_size_request: DEFAULT_RESOURCE_SIZE,
-      after_idle: {
-        idle_time_seconds: opts.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_SECONDS,
-        on_idle: "suspend" as const,
-      },
+      // i am still trying to figure out how idle and keepalive actually work on runloop.
+      // trying keep alive for now. idle detection seems to not work or be
+      // misconfigured, it will just suspend right in the middle of an active
+      // ssh session running claude code...
+      keep_alive_time_seconds: opts.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_SECONDS,
+      // after_idle: {
+      //   idle_time_seconds: opts.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_SECONDS,
+      //   on_idle: "suspend" as const,
+      // },
       launch_commands: snapshotId ? undefined : [INIT_SCRIPT],
     },
   };
