@@ -339,17 +339,6 @@ export async function createDevbox(opts: {
       contents: envLines.join("\n") + "\n",
     });
 
-    // Upload custom files from config (early, so later steps can build on them)
-    if (uploads.length > 0) {
-      console.log(`Uploading ${uploads.length} custom file${uploads.length === 1 ? "" : "s"}...`);
-      for (const entry of uploads) {
-        await client.devboxes.writeFileContents(devbox.id, {
-          file_path: entry.remote,
-          contents: readFileSync(entry.local, "utf-8"),
-        });
-      }
-    }
-
     // Configure git credentials using GH_TOKEN (post-boot, after env file is written)
     if (envVars.GH_TOKEN) {
       console.log("Configuring git credentials...");
@@ -361,6 +350,17 @@ export async function createDevbox(opts: {
     // Upload and install thopter-status scripts + cron
     console.log("Installing thopter scripts...");
     await installThopterScripts(devbox.id, opts.name);
+
+    // Upload custom files from config (last, so user files override defaults)
+    if (uploads.length > 0) {
+      console.log(`Uploading ${uploads.length} custom file${uploads.length === 1 ? "" : "s"}...`);
+      for (const entry of uploads) {
+        await client.devboxes.writeFileContents(devbox.id, {
+          file_path: entry.remote,
+          contents: readFileSync(entry.local, "utf-8"),
+        });
+      }
+    }
 
     return devbox.id;
   } catch (e) {
