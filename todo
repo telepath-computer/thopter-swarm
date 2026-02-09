@@ -1,0 +1,126 @@
+- config, secrets, and env vars refactor:
+  - move the OpenAI and Anthropic API keys, into the developer config file, under an env vars section, instead of having them be secrets at the platform level, so we can each set our own.
+  - document that `thopter secrets` is for global secrets you want to admin at the team level, whereas devs can their own secrets in their ~.thopter.json env vars which are also injected into shell state, and take precedence over global secrets.
+  - allow thopter.json to specify which global secrets to include, or just let it refer to global secrets with a syntax.
+  - have our template include GITHUB_PAT global secret -- NOTE think more about this. should github tokens be developer configured or part of the core? should version control be a module/plugin?
+  - Creating a Thopter is a combination of pulling this config together into a create command that sets up the environment variables as desired from the two possible sources.
+  - make it clear that assigning secrets from the global secret store to a thopter makes that thopter contingent on those secrets existing and this applies when resuming it from suspended state. So if you put a secret in there and then remove it from the global secret store, you will not be able to resume that thopter after suspension. Also, once a thopter is spawned, these values exist for its lifetime even after suspend and resume, so they don't pick up new values.
+  - note that eventually, we'll set up a Team Anthropic runloop key and a Team OpenAI key, but for now, ask devs to put their own keys in.
+  - group settings, env vars, and default snapshots, into profiles.
+    - A profile is essentially a config container. There is always one by called base.
+    - There is also a top level default profile value.
+    - profiles inherit values from base in a cascade.
+    - thopter.json files cascade, so a repository can define environment variables that would be set up inside thopters. thopter cli walks up the tree to find .thopter.json files to use in the cascade. and produces a mini report on how it assembled state during 'create' operation.
+  - support metadata k/v pairs in config block that are set as metadata on the runloop devboxes.
+  - enable configurable notifications for claude stop and notify hooks (ntfy.sh title, priority, channel, content template that has access to $THOPTER_NAME $CLAUDE_NOTIF_CONTENT and $MOST_RECENT_AGENT_MSG). this configuration overrides defaults that are used when unspecified
+  - default should be that the 'stop' notification is off by default (noisy) and the notification notification to be on and highest priority.
+  - config block should also allow override of the source content (a local filename) for ~/CLAUDE.md and also must not touch that file in a snapshot-based create operation or in resume operations.
+  - config should allow copying local files to remote on create, e.g. `{"upload":{"/path/to/local":"/path/on/remote"}}`
+  - config should allow post-fresh-create and post-snapshot-create payloads that are run in bash after create where the user can run things like installing deps, updating thopter config files etc. the create operation should render it's stdout/stderr to console and have a --silent mode that hides that, showing only an error message if it exits nonzero.
+  - separate the stuff i'm doing in setup that's particular to me and our repos into a ~/thoper.json starter versus core internal must-haves
+  - update setup wizard to reflect these changes
+  - sanity check: is thopter an onion system with a core and a developer-configured layer, or is it "just" some shell scripts. the value prop of an open, consistent devex protocol for cloud agent sandboxes makes sense to me, but am i really building that? or am i just automating devboxes for us telepath guys?
+  - try claude teams for this? one agent represents the user and cares only about devex, another for architecture, another for implementation, another for review
+    - maybe try a team like that just to write a spec first?
+
+- i think the correct time to send a notif is on the notification hook the stop hook will be irritating when you're doing conversation because it's going to notify you every time which is not what you want. Really what you want is a notification when you don't have focus. I don't know if that's possible. I assume Claude does not send the actual notification hook if the user has focus. I'm not sure, but that hook is definitely better in this regard. It's just unfortunately that it takes a full minute to fire.
+- Fix the dashboard status. It's wonky in a number of ways. First of all, inactive seems to be showing even when Claude is active. Also, a bunch of dead Thopters are showing up as having Claude active, so that's bad. I mean, they're not heart beating, but it just happened to be the last state that they had was Claude was active, so they still show up that way in the dashboard. It should also really just only show the running Thopters and then maybe recently dead Thopters as a separate section but not the invalid status bits. ALSO: merge "list" and "status" these should be the same combined thing.
+- Claude loses it's cursor when I reattach in TMUX command and control mode, which is kind of a big problem. I wonder if there's a way I can get my cursor back.
+- purge redis statue on dead thopters (do the keys already expire automatically? this is done then)
+- replace the api keys with team keys
+- Write better docs.
+  - Readme needs work.
+  - need a detailed description of the GitHub personal access token and branch rules issue while also making it easy to skim.
+    - This is contingent on whether or not I do the Cloudflare worker GitHub proxy.
+    - Might make sense to do that because I also want the cloud flare worker keep alive proxy as well.
+  - in particular write the developer guide for my coworkers.
+    - i've setup the runloop workspace already. secrets etc
+    - they need to npm install
+    - setup their thopter config w/ api key and redis url
+    - create a new instance of their own
+    - auth claude w/ max, codex if desired
+    - snapshot it
+    - set default snapshot
+    - use yolo claude
+- Put API keys and such in team 1Password.
+- Secrets brittleness: currently all platform secrets are injected into every devbox.
+  Deleting or renaming a secret breaks resume for any suspended devbox provisioned
+  with it (adding secrets and changing values is fine). Profiles (see below) should
+  fix this — each profile whitelists specific secrets, so the devbox's secret set
+  is explicit and stable. Until then, destroy affected devboxes before deleting secrets.
+- Cloudflare Worker keepalive proxy: a ~20-line worker that holds the Runloop API key
+  and exposes a simple authenticated endpoint for devboxes to call keepalive on themselves.
+  Thopters would get KEEPALIVE_URL + KEEPALIVE_TOKEN instead of the full API key.
+  This would let thopters self-keepalive without keys to the kingdom.
+- claude statuses per claude PID instead of per thopter
+- Try building a distributed task system in Redis since we have it now. add
+  claude skills based on it. maybe message send/receive across thopters.
+- Profiles: named configuration bundles for different projects/workflows.
+  A profile would control:
+  - Which secrets get injected (subset of Runloop secrets)
+  - Custom init script / dependency installation per profile
+  - Default snapshot (per-profile golden image instead of one global default)
+  - Resource size (not everything needs LARGE)
+  - Idle timeout
+  - Repo URL + branch to clone
+  - Git identity (bot user, email)
+  Profile name gets tagged as metadata on the devbox.
+  Stored in local config (~/.runloop-thopters/profiles/).
+  Usage: ./thopter create --profile my-project
+  ... Yeah, I think profiles could just be groups in the Ethopter.json and you could have a default one and then you could have other ones. 
+  ... It would make sense to have team profiles,
+  ... it might make sense to have secrets in the run loop platform that can be renamed into environment variables on a profile basis
+  ... 
+
+Runloop platform wishlist:
+- Destroy suspended devboxes: need to be able to delete a suspended devbox
+  without resuming it first. If secrets have changed since the devbox was
+  created, resume fails — leaving the devbox stuck (can't resume, can't
+  destroy). Must be able to force-destroy regardless of state.
+- Scoped API tokens: ability for a devbox to keep itself alive without having
+  the full API key. Ideally a per-devbox token that can only call keep_alive
+  on its own devbox ID. This removes the need for external keepalive proxies
+  or operator-side watchers.
+
+maybe list:
+- maybe: allow cascade of overrides of config, walk tree from current finding all .thopter.json and applying a cascade
+- I wonder if there's a way to completely wrap CC in a encapsulation wrapper that provides status updates, message in and out, etc., so that I could build a web UI like CC web. It doesn't have to be as detailed as CC Web, just something that works with basic messaging, slash commands, things like that.
+- Build a hub on Cloudflare or something that not only handles git proxy and keep alive, but also can spawn thopters based on hooks from integrations, provides a web UI to the thopters, and so on.
+- hooks integration for more coding agents like Codex, AMP, OpenCode, Gemini CLI, whatever.
+- session-start ntfy notification (notify when claude begins a new session)
+
+insights:
+- The difference between this and the other API based coding agent spawning platforms is that this allows you to set up and snapshot your own personal dev box and rig it as the heart of your worker, including your CC max plan authentication credentials.
+  - If you think about it that way, the architecture and user interface and developer experience starts to feel more clear and informed for what to build.
+  - For example, you want to have some kind of template for launching a task that takes instructions and communicates it to whatever coding agent you have, which would be different based on what your personal coding agent and dev box configuration. But you basically as a developer would need to implement a bridge function between what the dashboard would invoke and what gets your thopter up and actually working on a task. Then there'd be a standard interface for reporting on status, keep alives, and so on. there would be multiple integrations to different version control systems And, of course, you'd be able to just roll your own fairly easily.
+  - Go study the protocol and interface surface area of the tools like CodexWeb, CaudeCodeWeb, OpenHands, Cursor agents, warp agents, and this whole family of cloud-based coding agent tools.
+
+done list:
+- DONE Test this with a real developer implementation task round-tripping from Git
+- DONE test heartbeat survives suspend/resume cycle
+- DONE Upgrade Runloop account to enable suspend/resume
+- DONE Sign up for a paid run loop account.
+- DONE completely replace this repo with the run loop implementation.
+- DONE setup starship.
+- DONE Implement hooks to update status for when a thopter is waiting on input or is done and install them in new thopters
+- DONE document recommended iterm2 changes:
+  - enable "Applications in terminal may access Clipboard."
+  - enable "copy to clipboard on selection"
+  - enable "mirror tmux paste buffer to clipoard"
+- DONE install into new thopters a ~/.claude/CLAUDE.md for host level instructions about thopter context as a runloop devbox, it's a headless kvm context, using and pushing only to thopter/* git branches for workspace, and the task setting ability which it should keep up to date with the high level goal of the session. the main thing is that it needs to know to use thopter/* pattern branches for any pushes to remote git. it should be told about the github pat and how git config is setup to use that. 
+- DONE review the auto suspend logic make sure it's sane and that it works
+  - Removed Runloop API keepalive from heartbeat cron (was requiring RUNLOOP_API_KEY on devboxes)
+  - Bumped default idle timeout to 12 hours
+  - Added ./thopter keepalive <name> for operator-side idle timer reset
+  - Heartbeat now uses touch file mtime to set "running" (< 1 min) or "inactive" (stale)
+  - Hooks (SessionStart, Prompt, ToolUse) touch the activity file; only heartbeat sets "running"
+- DONE setup ntfy.sh integration - when claude hooks for done/waiting/notify fire, publish to ntfy. the channel name should be decided by the dev in their homedir thopter config which then sets up THOPTER_NTFY_CHANEL in the env of the thopter. readme should instruct how to do that. setup cli mode should walk them thru it.
+- DONE Have developer names associated with thopters. use github name. tag them owner:name in runloop, give an environment var THOPTER_OWNER, and include owner in redis status bits.
+- DONE use 'thopter' for the command
+- DONE add read access to github issues to the PAT, tell claude md it can read the repo, read issues, but only push on thopter branches, no other privs. (can it create PRs? i should have it be able to do that)
+- DONE make sure ntfy channel is optional and setup, hooks/heartbeats, etc dont fail w/o it
+- DONE config file should be ~/.thopter.json
+- DONE last message in redis doesn't seem to be the actual last message? shouldn't each heartbeat update that.
+- DONE have thopter cmd install somewhere global.
+- DONE move runloop api key and redis url to .thopter.json not .env.local 
+

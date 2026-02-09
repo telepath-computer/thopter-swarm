@@ -8,23 +8,46 @@ start of any working session. It explains this project overall. Also, after a
 conversation is compacted, do not rely on a summary: RE-READ THE ENTIRE FILE
 into context. You MUST NOT do work without this ENTIRE FILE fully in context.
 
-In addition to that, Claude should be mindful of where its local shell is
-running and expect a different set of available local operations:
+## What This Is
 
-- Locally on a developer laptop? In this case, most likely the current shell
-  has access to fly cli commands (`fly machines list --json` and such) and you
-  can use those commands via the bash tool to inspect state on remote machines.
-  You can also run the deployment management scripts in fly/* and the
-  developer's laptop can be expected to be connected to the wireguard network.
+Thopter Swarm is a CLI tool (`./thopter`) for managing Runloop.ai devboxes as
+autonomous Claude Code development environments. It creates cloud VMs
+pre-configured with Claude Code, git credentials, monitoring hooks, and
+developer tools.
 
-- Inside a Thopter in Thopter Swarm? In this case, Claude does NOT have an
-  authenticated fly client, and can really only manage files in its local repo,
-  and do git operations. Outbound network access except for git, anthropic, and
-  common packaging repos is blocked by an egress firewall.
+## Build and Run
 
-In either case, the actual code for the hub server and the thopter machine
-scripts are not currently runnable in a development environment. It's intended
-to run only inside a properly provisioned fly machine. However, generally `npm
-run build` does work and is critical to check for initial typescript issue or
-other easily preventable code bugs before considering your work complete.
+- `npm install` to install dependencies
+- `npm run build` to compile TypeScript (always run before considering work done)
+- `./thopter --help` to see CLI commands
+- `./thopter` is a thin shell wrapper that runs `src/cli.ts` via `tsx`
 
+## Project Structure
+
+```
+src/           TypeScript source (CLI commands, Runloop SDK client, Redis status)
+scripts/       Devbox provisioning scripts (Claude hooks, heartbeat, starship, tmux)
+docs/          Design docs and wishlists (not authoritative specs)
+package.json   Dependencies: @runloop/api-client, commander, ioredis
+tsconfig.json  TypeScript config (ES2022, NodeNext modules)
+thopter        CLI wrapper script
+todo           Current task list
+setup-steps.md Setup instructions
+```
+
+## Key Concepts
+
+- **Devboxes** are Runloop.ai microVMs tagged with `managed_by=runloop-thopters`
+  metadata and a `thopter_name` for human-friendly naming
+- **Snapshots** save devbox disk state; the "golden snapshot" pattern lets you
+  configure once and stamp out ready-to-use devboxes
+- **Secrets** are stored in Runloop's platform; all secrets are auto-injected
+  into devboxes as env vars (secret name = env var name)
+- **Status reporting** uses Upstash Redis: heartbeats, Claude hook events, last
+  assistant messages
+- **SSH** is via the `rli` CLI (`@runloop/rl-cli`)
+
+## Configuration
+
+- `~/.thopter.json` on developer laptop: `runloopApiKey`, `redisUrl`, `ntfyChannel`, `defaultSnapshotId`
+- Secrets in Runloop platform (managed via `./thopter secrets` or `./thopter setup`)

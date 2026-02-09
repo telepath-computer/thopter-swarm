@@ -1,25 +1,25 @@
+# Environment and secrets
 .env
-.env.thopters
+.env.local
 .env*.local
-fly.toml
-post-checkout.sh
 
-.claude/settings.local.json
-
-*.pem
-
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 *.tsbuildinfo
 
+# Claude Code
+.claude/settings.local.json
+
+# Keys
+*.pem
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
