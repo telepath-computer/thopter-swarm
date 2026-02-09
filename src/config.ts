@@ -37,10 +37,23 @@ interface LocalConfig {
   envVars?: Record<string, string>;
 }
 
+/**
+ * Parse JSONC (JSON with // line comments and trailing commas).
+ * Only strips lines whose first non-whitespace is "//".
+ */
+function parseJsonc(text: string): unknown {
+  const stripped = text
+    .split("\n")
+    .map((line) => (line.trimStart().startsWith("//") ? "" : line))
+    .join("\n");
+  const clean = stripped.replace(/,(\s*[}\]])/g, "$1");
+  return JSON.parse(clean);
+}
+
 function loadLocalConfig(): LocalConfig {
   if (!existsSync(CONFIG_FILE)) return {};
   try {
-    return JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
+    return parseJsonc(readFileSync(CONFIG_FILE, "utf-8")) as LocalConfig;
   } catch {
     return {};
   }

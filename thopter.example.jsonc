@@ -1,0 +1,48 @@
+{
+  // Runloop API key (required). Get yours from the Runloop dashboard.
+  "runloopApiKey": "",
+
+  // Default snapshot used by `thopter create` (set via `thopter snapshot default`).
+  // Omit to always create fresh devboxes unless --snapshot is passed.
+  // "defaultSnapshotId": "snp_abc123",
+
+  // Send ntfy.sh push notifications when Claude stops a response.
+  // Noisy during interactive sessions — best for unattended thopters.
+  "stopNotifications": true,
+
+  // Deploy a custom CLAUDE.md to every new devbox (replaces the default).
+  // Useful for project-specific instructions, coding conventions, etc.
+  // "claudeMdPath": "/path/to/my-custom-claude.md",
+
+  // Upload local files to new devboxes at create time.
+  // Runs after all other provisioning, so can override defaults.
+  // "uploads": [
+  //   { "local": "/path/to/local/file", "remote": "/home/user/destination" }
+  // ],
+
+  // Environment variables injected into every new devbox via ~/.thopter-env.
+  // These are the single source of truth for all secrets and config values
+  // that devboxes need. Manage with `thopter env set/delete` or edit here.
+  "envVars": {
+    // GitHub token for git clone/push and gh CLI (required).
+    // Used to configure HTTPS credential store on devboxes.
+    // Create a fine-grained token with Contents (r/w) and Pull Requests (r/w).
+    "GH_TOKEN": "",
+
+    // Upstash Redis URL for status monitoring (required).
+    // Used by the CLI (thopter status, thopter tail) and on devboxes
+    // (heartbeats, Claude hook status reporting).
+    "THOPTER_REDIS_URL": "",
+
+    // ntfy.sh channel for push notifications (optional).
+    // Subscribe at https://ntfy.sh/<your-channel> on phone or desktop.
+    // "THOPTER_NTFY_CHANNEL": "my-thopters-abc123",
+
+    // API keys for AI tools on devboxes (optional).
+    // "ANTHROPIC_API_KEY": "",
+    // "OPENAI_API_KEY": "",
+
+    // Add any other env vars your devboxes need:
+    // "MY_CUSTOM_VAR": "value"
+  }
+}
