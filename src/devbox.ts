@@ -356,7 +356,7 @@ export async function createDevbox(opts: {
 
 export async function listDevboxes(): Promise<void> {
   const client = getClient();
-  const { getThopterRedisInfo, relativeTime } = await import("./status.js");
+  const { getRedisInfoForNames, relativeTime } = await import("./status.js");
 
   const devboxes: { name: string; owner: string; id: string; status: string }[] = [];
   const liveStatuses = ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const;
@@ -378,13 +378,11 @@ export async function listDevboxes(): Promise<void> {
     return;
   }
 
-  // Fetch Redis annotations for each devbox in parallel
-  const redisResults = await Promise.all(
-    devboxes.map((db) => getThopterRedisInfo(db.name).catch(() => null)),
-  );
+  // Fetch Redis annotations for all devboxes using a single connection
+  const redisMap = await getRedisInfoForNames(devboxes.map((db) => db.name));
 
-  const rows: string[][] = devboxes.map((db, i) => {
-    const redis = redisResults[i];
+  const rows: string[][] = devboxes.map((db) => {
+    const redis = redisMap.get(db.name);
     let task = redis?.task ?? "-";
     if (task.length > 40) task = task.slice(0, 37) + "...";
     const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
