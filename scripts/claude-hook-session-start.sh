@@ -9,6 +9,9 @@ TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
 thopter-status log "session started" 2>/dev/null || true
 
+# Reset transcript cursor and push session marker for thopter tail
+[ -n "$TRANSCRIPT" ] && node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" --reset 2>/dev/null || true
+
 if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
     node /usr/local/bin/thopter-last-message "$TRANSCRIPT" | thopter-status message 2>/dev/null || true
 fi
