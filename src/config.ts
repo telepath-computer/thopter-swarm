@@ -21,23 +21,14 @@ export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
 /** Default idle timeout: 12 hours. Suspends on idle (preserves disk). */
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 12 * 60 * 60;
 
-/**
- * Build secret mappings dynamically from all Runloop secrets.
- * Convention: secret name in Runloop = env var name in devbox.
- */
-export async function getSecretMappings(): Promise<Record<string, string>> {
-  const { listSecrets } = await import("./secrets.js");
-  const secrets = await listSecrets();
-  return Object.fromEntries(secrets.map((s) => [s.name, s.name]));
-}
-
-// --- Local config (default snapshot only) ---
+// --- Local config ---
 
 interface LocalConfig {
   runloopApiKey?: string;
   redisUrl?: string;
   defaultSnapshotId?: string;
   ntfyChannel?: string;
+  envVars?: Record<string, string>;
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -97,6 +88,27 @@ export function setRedisUrl(url: string): void {
   const config = loadLocalConfig();
   config.redisUrl = url;
   saveLocalConfig(config);
+}
+
+// --- Devbox env vars ---
+
+export function getEnvVars(): Record<string, string> {
+  return loadLocalConfig().envVars ?? {};
+}
+
+export function setEnvVar(key: string, value: string): void {
+  const config = loadLocalConfig();
+  if (!config.envVars) config.envVars = {};
+  config.envVars[key] = value;
+  saveLocalConfig(config);
+}
+
+export function deleteEnvVar(key: string): void {
+  const config = loadLocalConfig();
+  if (config.envVars) {
+    delete config.envVars[key];
+    saveLocalConfig(config);
+  }
 }
 
 /**

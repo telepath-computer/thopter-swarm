@@ -24,7 +24,7 @@ lifecycle:
                         create --snapshot → ssh/exec → ...
 
 examples:
-  thopter setup                          First-time auth & secret config
+  thopter setup                          First-time auth & env var config
   thopter create dev                     Create a devbox
   thopter create --snapshot golden        Create from a snapshot
   thopter ssh dev                        SSH into the devbox
@@ -48,7 +48,7 @@ examples:
 // --- setup ---
 program
   .command("setup")
-  .description("Check Runloop auth and interactively configure secrets")
+  .description("Interactive first-time setup (API keys, env vars, notifications)")
   .action(async () => {
     const { runSetup } = await import("./setup.js");
     await runSetup();
@@ -318,65 +318,52 @@ configCmd
     }
   });
 
-// --- secrets ---
-const secretsCmd = program
-  .command("secrets")
-  .description("Manage Runloop secrets");
+// --- env ---
+const envCmd = program
+  .command("env")
+  .description("Manage devbox environment variables (stored in ~/.thopter.json)");
 
-secretsCmd
+envCmd
   .command("list")
   .alias("ls")
-  .description("List Runloop secrets")
+  .description("List configured env vars (values masked)")
   .action(async () => {
-    const { listSecrets } = await import("./secrets.js");
+    const { getEnvVars } = await import("./config.js");
     const { printTable } = await import("./output.js");
-    const secrets = await listSecrets();
-    console.log("Secrets:");
+    const envVars = getEnvVars();
+    const entries = Object.entries(envVars);
+    if (entries.length === 0) {
+      console.log("No env vars configured.");
+      console.log("  Set one with: thopter env set <KEY> <VALUE>");
+      return;
+    }
+    console.log("Devbox environment variables:");
     printTable(
-      ["NAME", "ID"],
-      secrets.map((s) => [s.name, s.id]),
+      ["NAME", "VALUE"],
+      entries.map(([k, v]) => [k, v.length > 4 ? v.slice(0, 4) + "..." : "***"]),
     );
   });
 
-secretsCmd
+envCmd
   .command("set")
-  .description("Create or update a secret (prompts for value)")
-  .argument("<name>", "Secret name")
-  .action(async (name: string) => {
-    const { createInterface } = await import("node:readline");
-    const rl = createInterface({
-      input: process.stdin,
-      terminal: true,
-    });
-
-    process.stdout.write(`Value for ${name}: `);
-    const value = await new Promise<string>((resolve) => {
-      rl.question("", (answer) => {
-        rl.close();
-        process.stdout.write("\n");
-        resolve(answer.trim());
-      });
-    });
-
-    if (!value) {
-      console.log("No value provided. Aborting.");
-      return;
-    }
-
-    const { createOrUpdateSecret } = await import("./secrets.js");
-    await createOrUpdateSecret(name, value);
-    console.log(`Secret '${name}' saved.`);
+  .description("Set a devbox environment variable")
+  .argument("<key>", "Variable name (e.g. GH_TOKEN)")
+  .argument("<value>", "Variable value")
+  .action(async (key: string, value: string) => {
+    const { setEnvVar } = await import("./config.js");
+    setEnvVar(key, value);
+    console.log(`Set ${key}.`);
   });
 
-secretsCmd
+envCmd
   .command("delete")
   .alias("rm")
-  .description("Delete a secret")
-  .argument("<name>", "Secret name")
-  .action(async (name: string) => {
-    const { deleteSecret } = await import("./secrets.js");
-    await deleteSecret(name);
-    console.log(`Secret '${name}' deleted.`);
+  .description("Remove a devbox environment variable")
+  .argument("<key>", "Variable name")
+  .action(async (key: string) => {
+    const { deleteEnvVar } = await import("./config.js");
+    deleteEnvVar(key);
+    console.log(`Deleted ${key}.`);
   });
 
 // Parse and run
