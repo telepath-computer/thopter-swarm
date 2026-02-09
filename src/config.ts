@@ -35,6 +35,7 @@ interface LocalConfig {
   ntfyChannel?: string;
   claudeMdPath?: string;
   uploads?: UploadEntry[];
+  stopNotifications?: boolean;
   envVars?: Record<string, string>;
 }
 
@@ -74,6 +75,16 @@ export function getNtfyChannel(): string | undefined {
 export function setNtfyChannel(channel: string): void {
   const config = loadLocalConfig();
   config.ntfyChannel = channel;
+  saveLocalConfig(config);
+}
+
+export function getStopNotifications(): boolean {
+  return loadLocalConfig().stopNotifications ?? false;
+}
+
+export function setStopNotifications(enabled: boolean): void {
+  const config = loadLocalConfig();
+  config.stopNotifications = enabled;
   saveLocalConfig(config);
 }
 
