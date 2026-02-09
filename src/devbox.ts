@@ -356,24 +356,51 @@ export async function createDevbox(opts: {
 
 export async function listDevboxes(): Promise<void> {
   const client = getClient();
+  const { getThopterRedisInfo, relativeTime } = await import("./status.js");
 
-  console.log("Devboxes:");
-  const rows: string[][] = [];
-  const liveStatuses = ["provisioning", "initializing", "running", "suspending", "suspended", "resuming"] as const;
+  const devboxes: { name: string; owner: string; id: string; status: string }[] = [];
+  const liveStatuses = ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const;
   for (const status of liveStatuses) {
     for await (const db of client.devboxes.list({ status, limit: 100 })) {
       const meta = db.metadata ?? {};
       if (meta[MANAGED_BY_KEY] !== MANAGED_BY_VALUE) continue;
-      const name = meta[NAME_KEY] ?? "";
-      const owner = meta[OWNER_KEY] ?? "";
-      const created = db.create_time_ms
-        ? new Date(db.create_time_ms).toLocaleString()
-        : "";
-      rows.push([name, owner, db.id, db.status, created]);
+      devboxes.push({
+        name: meta[NAME_KEY] ?? "",
+        owner: meta[OWNER_KEY] ?? "",
+        id: db.id,
+        status: db.status,
+      });
     }
   }
 
-  printTable(["NAME", "OWNER", "ID", "STATUS", "CREATED"], rows);
+  if (devboxes.length === 0) {
+    console.log("No managed devboxes found.");
+    return;
+  }
+
+  // Fetch Redis annotations for each devbox in parallel
+  const redisResults = await Promise.all(
+    devboxes.map((db) => getThopterRedisInfo(db.name).catch(() => null)),
+  );
+
+  const rows: string[][] = devboxes.map((db, i) => {
+    const redis = redisResults[i];
+    let task = redis?.task ?? "-";
+    if (task.length > 40) task = task.slice(0, 37) + "...";
+    const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
+    const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat) : "-";
+    return [
+      db.name,
+      db.owner,
+      db.status,
+      redis?.status ?? "-",
+      task,
+      claude,
+      heartbeat,
+    ];
+  });
+
+  printTable(["NAME", "OWNER", "DEVBOX", "AGENT", "TASK", "CLAUDE", "HEARTBEAT"], rows);
 }
 
 export async function listSnapshotsCmd(): Promise<void> {

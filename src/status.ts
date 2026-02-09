@@ -23,7 +23,7 @@ function getRedis(): Redis {
   });
 }
 
-interface ThopterInfo {
+export interface ThopterInfo {
   name: string;
   owner: string | null;
   id: string | null;
@@ -83,7 +83,43 @@ async function scanThopters(redis: Redis): Promise<ThopterInfo[]> {
   return thopters;
 }
 
-function relativeTime(iso: string): string {
+/**
+ * Fetch Redis info for a single thopter by name.
+ */
+export async function getThopterRedisInfo(name: string): Promise<ThopterInfo | null> {
+  const redis = getRedis();
+  try {
+    const prefix = `thopter:${name}`;
+    const [id, owner, status, task, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
+      `${prefix}:id`,
+      `${prefix}:owner`,
+      `${prefix}:status`,
+      `${prefix}:task`,
+      `${prefix}:heartbeat`,
+      `${prefix}:alive`,
+      `${prefix}:claude_running`,
+      `${prefix}:last_message`,
+    );
+
+    if (!heartbeat && !status && !id) return null;
+
+    return {
+      name,
+      owner,
+      id,
+      status,
+      task,
+      heartbeat,
+      alive: alive === "1",
+      claudeRunning,
+      lastMessage,
+    };
+  } finally {
+    redis.disconnect();
+  }
+}
+
+export function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const secs = Math.floor(diff / 1000);
   if (secs < 60) return `${secs}s ago`;
@@ -151,6 +187,26 @@ export async function showAllStatus(opts: { all?: boolean } = {}): Promise<void>
 }
 
 export async function showThopterStatus(name: string): Promise<void> {
+  // Fetch Runloop devbox info in parallel with Redis info
+  let devboxStatus = "-";
+  let devboxId = "-";
+  try {
+    const { getClient } = await import("./client.js");
+    const { MANAGED_BY_KEY, MANAGED_BY_VALUE, NAME_KEY } = await import("./config.js");
+    const client = getClient();
+    for (const s of ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const) {
+      for await (const db of client.devboxes.list({ status: s, limit: 100 })) {
+        const meta = db.metadata ?? {};
+        if (meta[MANAGED_BY_KEY] === MANAGED_BY_VALUE && meta[NAME_KEY] === name) {
+          devboxStatus = db.status;
+          devboxId = db.id;
+        }
+      }
+    }
+  } catch {
+    // Runloop API unavailable — continue with Redis-only info
+  }
+
   const redis = getRedis();
   try {
     const prefix = `thopter:${name}`;
@@ -166,15 +222,16 @@ export async function showThopterStatus(name: string): Promise<void> {
       `${prefix}:last_message`,
     );
 
-    if (!heartbeat && !status && !id) {
+    if (!heartbeat && !status && !id && devboxStatus === "-") {
       console.log(`No data found for thopter '${name}'.`);
       return;
     }
 
     console.log(`=== ${name} ===`);
-    console.log(`ID:             ${id ?? "-"}`);
+    console.log(`Devbox ID:      ${devboxId !== "-" ? devboxId : id ?? "-"}`);
+    console.log(`Devbox status:  ${devboxStatus}`);
     console.log(`Owner:          ${owner ?? "-"}`);
-    console.log(`Status:         ${status ?? "-"}`);
+    console.log(`Agent status:   ${status ?? "-"}`);
     console.log(`Task:           ${task ?? "-"}`);
     console.log(`Alive:          ${alive === "1" ? "yes" : "no"}`);
     console.log(`Claude running: ${claudeRunning === "1" ? "yes" : claudeRunning === "0" ? "no" : "-"}`);

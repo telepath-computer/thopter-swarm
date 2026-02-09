@@ -36,8 +36,7 @@ examples:
   thopter snapshot default golden         Set default snapshot
   thopter snapshot default               View default snapshot
   thopter snapshot default --clear        Clear default snapshot
-  thopter list                           Show running devboxes
-  thopter status                         Overview of all thopters from redis
+  thopter status                         Unified view of all thopters
   thopter status dev                     Detailed status + logs for a thopter
   thopter keepalive dev                   Reset idle timer for a devbox
   thopter suspend dev                    Suspend a devbox
@@ -78,28 +77,20 @@ program
     }
   });
 
-// --- list ---
-program
-  .command("list")
-  .alias("ls")
-  .description("List managed devboxes")
-  .action(async () => {
-    const { listDevboxes } = await import("./devbox.js");
-    await listDevboxes();
-  });
-
-// --- status ---
+// --- status (unified: Runloop API + Redis annotations) ---
 program
   .command("status")
-  .description("Show thopter status from redis")
+  .alias("list")
+  .alias("ls")
+  .description("Show thopter status (unified Runloop + Redis view)")
   .argument("[name]", "Thopter name (omit for overview of all)")
-  .option("-a, --all", "Show all thopters including stale ones")
-  .action(async (name: string | undefined, opts: { all?: boolean }) => {
-    const { showAllStatus, showThopterStatus } = await import("./status.js");
+  .action(async (name: string | undefined) => {
     if (name) {
+      const { showThopterStatus } = await import("./status.js");
       await showThopterStatus(name);
     } else {
-      await showAllStatus({ all: opts.all });
+      const { listDevboxes } = await import("./devbox.js");
+      await listDevboxes();
     }
   });
 
