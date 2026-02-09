@@ -20,10 +20,8 @@ All secrets and config values that devboxes need go here. Written to `~/.thopter
 | `GH_TOKEN` | yes | GitHub personal access token. Used for git clone/push and `gh` CLI. Also configures HTTPS credential store on devboxes. |
 | `THOPTER_REDIS_URL` | yes | Upstash Redis URL. Used by the CLI (`thopter status`, `thopter tail`) and on devboxes (heartbeats, status hooks). |
 | `THOPTER_NTFY_CHANNEL` | no | ntfy.sh channel name for push notifications. Subscribe at `https://ntfy.sh/<channel>`. |
-| `ANTHROPIC_API_KEY` | no | For Claude Code on devboxes. |
-| `OPENAI_API_KEY` | no | For Codex CLI on devboxes. |
 
-Add any other env vars your devboxes need — they're all passed through.
+Add any other env vars your devboxes need — they're all passed through, e.g. `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `FIRECRAWL_API_KEY`,
 
 ## Ignored keys
 
@@ -37,7 +35,7 @@ Add any other env vars your devboxes need — they're all passed through.
 {
   "docs": "See thopter-json-reference.md for all config options.",
   "runloopApiKey": "rl_api_abc123...",
-  "defaultSnapshotId": "jw/golden",
+  "defaultSnapshotId": "jsw-golden",
   "stopNotifications": true,
   "claudeMdPath": "/Users/jw/projects/my-claude-instructions.md",
   "uploads": [

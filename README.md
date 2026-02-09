@@ -4,14 +4,17 @@ CLI for managing Runloop.ai devboxes as autonomous Claude Code development envir
 
 Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentials, developer tools (neovim, starship, tmux), and monitoring hooks that report status to Redis. Create one, point it at a repo and a task, and let Claude work autonomously while you monitor from your laptop.
 
+This is an internal dev tool for Telepath, but we've made it open as it's probably useful to others, and welcome feedback and contributions. Message josh@telepath.computer to chat about it.
+
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
 - A [Runloop.ai](https://runloop.ai) account and API key
-- An [Upstash](https://upstash.com) Redis instance (for status monitoring)
+- A public Redis instance with a password-protected access URL, we recommend [Upstash](https://upstash.com) (for status monitoring and tailing activity on thopters)
 - The `rli` CLI: `npm install -g @runloop/rl-cli`
+- Iterm2 is the recommended terminal app for detachable tmux sessions on thopters (thanks to its support for tmux control mode)
 
 ### Install
 
@@ -24,7 +27,7 @@ npm link    # installs the 'thopter' command globally
 
 ### First-time Setup
 
-**Telepath team: see "~/.thopter.json starter" in our 1password vault, put that in your homedir that first and then you can run setup.**
+**Telepath team:** see our "~/.thopter.json starter" in our 1password vault, put that in your homedir that first and then you can run setup.
 
 ```bash
 thopter setup
