@@ -28,7 +28,7 @@ const INIT_SCRIPT = `
 set -e
 
 # Install essential tools
-sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 > /dev/null
+sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 xvfb xauth > /dev/null
 sudo /usr/sbin/cron 2>/dev/null || true
 
 # Install Neovim (latest stable, NvChad requires 0.10+)
