@@ -89,4 +89,5 @@ for (const [event, matchers] of Object.entries(THOPTER_HOOKS)) {
 mkdirSync(join(HOME, ".claude"), { recursive: true });
 writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n");
 
-console.log(`Claude hooks: ${installed} installed, ${skipped} already present`);
+const hookCount = Object.values(THOPTER_HOOKS).reduce((n, matchers) => n + matchers.length, 0);
+console.log(`Claude hooks: ${hookCount} installed`);
