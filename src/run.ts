@@ -27,6 +27,25 @@ Your task:
 ${opts.userPrompt}`;
 }
 
+const REPO_PATTERN = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+const BRANCH_PATTERN = /^[A-Za-z0-9/_.-]+$/;
+
+function validateRepo(repo: string): string {
+  const cleaned = repo.replace(/\.git$/, "");
+  if (!REPO_PATTERN.test(cleaned)) {
+    console.error(`Error: Invalid repository format '${repo}'. Expected: owner/repo`);
+    process.exit(1);
+  }
+  return cleaned;
+}
+
+function validateBranch(branch: string): void {
+  if (!BRANCH_PATTERN.test(branch)) {
+    console.error(`Error: Invalid branch name '${branch}'.`);
+    process.exit(1);
+  }
+}
+
 function ask(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
   return new Promise((resolve) => {
     rl.question(question, (answer) => resolve(answer.trim()));
@@ -68,8 +87,11 @@ export async function runThopter(opts: {
     rl.close();
   }
 
-  // Extract repo directory name from owner/repo (strip .git suffix if present)
-  const repoName = repo.split("/").pop()!.replace(/\.git$/, "");
+  // Validate repo and branch to prevent shell injection
+  repo = validateRepo(repo);
+  if (branch) validateBranch(branch);
+
+  const repoName = repo.split("/")[1];
   const thopterName = opts.name ?? generateName();
 
   // Step 1: Create devbox from snapshot
@@ -95,6 +117,12 @@ export async function runThopter(opts: {
   const cloneResult = await client.devboxes.executions.awaitCompleted(devboxId, cloneExec.execution_id);
   if (cloneResult.stdout) process.stdout.write(cloneResult.stdout);
   if (cloneResult.stderr) process.stderr.write(cloneResult.stderr);
+
+  if (cloneResult.exit_status && cloneResult.exit_status !== 0) {
+    console.error(`\nError: Repository setup failed (exit ${cloneResult.exit_status}).`);
+    console.error(`  The devbox '${thopterName}' is still running. Debug with: thopter ssh ${thopterName}`);
+    process.exit(1);
+  }
 
   // Step 3: Write prompt file and launch Claude in tmux
   const fullPrompt = buildRunPrompt({ repo, branch, userPrompt: opts.prompt });
