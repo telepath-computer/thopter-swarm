@@ -129,6 +129,8 @@ program
 program
   .command("destroy")
   .alias("rm")
+  .alias("kill")
+  .alias("shutdown")
   .description("Shut down a devbox")
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
