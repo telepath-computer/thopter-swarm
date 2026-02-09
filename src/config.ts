@@ -31,6 +31,8 @@ export interface UploadEntry {
 interface LocalConfig {
   runloopApiKey?: string;
   defaultSnapshotId?: string;
+  defaultRepo?: string;
+  defaultBranch?: string;
   claudeMdPath?: string;
   uploads?: UploadEntry[];
   stopNotifications?: boolean;
@@ -64,6 +66,26 @@ export function setDefaultSnapshot(snapshotId: string): void {
 export function clearDefaultSnapshot(): void {
   const config = loadLocalConfig();
   delete config.defaultSnapshotId;
+  saveLocalConfig(config);
+}
+
+export function getDefaultRepo(): string | undefined {
+  return loadLocalConfig().defaultRepo;
+}
+
+export function setDefaultRepo(repo: string): void {
+  const config = loadLocalConfig();
+  config.defaultRepo = repo;
+  saveLocalConfig(config);
+}
+
+export function getDefaultBranch(): string | undefined {
+  return loadLocalConfig().defaultBranch;
+}
+
+export function setDefaultBranch(branch: string): void {
+  const config = loadLocalConfig();
+  config.defaultBranch = branch;
   saveLocalConfig(config);
 }
 

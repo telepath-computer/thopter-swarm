@@ -6,6 +6,8 @@
 |-----|------|----------|-------------|
 | `runloopApiKey` | string | yes | Runloop API key. Get from the Runloop dashboard. |
 | `defaultSnapshotId` | string | no | Snapshot used by `thopter create` when `--snapshot` isn't passed. Set via `thopter snapshot default`. |
+| `defaultRepo` | string | no | Default repository (`owner/repo`) for `thopter run` when `--repo` isn't passed. Set via `thopter config set defaultRepo owner/repo`. |
+| `defaultBranch` | string | no | Default branch for `thopter run` when `--branch` isn't passed. Set via `thopter config set defaultBranch main`. |
 | `stopNotifications` | boolean | no | Send ntfy.sh notification when Claude finishes a response. Default `false`. Best for unattended thopters — noisy in interactive sessions. |
 | `stopNotificationQuietPeriod` | number | no | Seconds after a user message during which stop notifications are suppressed (user is likely still engaged). Default `30`. Set to `0` to always send. |
 | `claudeMdPath` | string | no | Path to a custom CLAUDE.md deployed to `~/.claude/CLAUDE.md` on every new devbox. Omit to use the built-in default. |
@@ -38,6 +40,8 @@ Add any other env vars your devboxes need — they're all passed through, e.g. `
   "docs": "See thopter-json-reference.md for all config options.",
   "runloopApiKey": "rl_api_abc123...",
   "defaultSnapshotId": "jsw-golden",
+  "defaultRepo": "telepath-computer/my-project",
+  "defaultBranch": "main",
   "stopNotifications": true,
   "stopNotificationQuietPeriod": 30,
   "claudeMdPath": "/Users/jw/projects/my-claude-instructions.md",

@@ -283,7 +283,7 @@ configCmd
   .argument("<key>", "Config key")
   .argument("<value>", "Config value")
   .action(async (key: string, value: string) => {
-    const { setRunloopApiKey, setDefaultSnapshot, setStopNotifications, setStopNotificationQuietPeriod } = await import("./config.js");
+    const { setRunloopApiKey, setDefaultSnapshot, setDefaultRepo, setDefaultBranch, setStopNotifications, setStopNotificationQuietPeriod } = await import("./config.js");
     switch (key) {
       case "runloopApiKey":
         setRunloopApiKey(value);
@@ -292,6 +292,14 @@ configCmd
       case "defaultSnapshotId":
         setDefaultSnapshot(value);
         console.log(`Set defaultSnapshotId to: ${value}`);
+        break;
+      case "defaultRepo":
+        setDefaultRepo(value);
+        console.log(`Set defaultRepo to: ${value}`);
+        break;
+      case "defaultBranch":
+        setDefaultBranch(value);
+        console.log(`Set defaultBranch to: ${value}`);
         break;
       case "stopNotifications":
         setStopNotifications(value === "true" || value === "1");
@@ -303,7 +311,7 @@ configCmd
         break;
       default:
         console.error(`Unknown config key: ${key}`);
-        console.error("Available keys: runloopApiKey, defaultSnapshotId, stopNotifications, stopNotificationQuietPeriod");
+        console.error("Available keys: runloopApiKey, defaultSnapshotId, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod");
         console.error("For env vars (THOPTER_REDIS_URL, THOPTER_NTFY_CHANNEL, etc.): thopter env set <KEY> <VALUE>");
         process.exit(1);
     }
@@ -314,10 +322,12 @@ configCmd
   .description("Get a config value")
   .argument("[key]", "Config key (omit to show all)")
   .action(async (key?: string) => {
-    const { getRunloopApiKey, getDefaultSnapshot, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars } = await import("./config.js");
+    const { getRunloopApiKey, getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars } = await import("./config.js");
     if (!key) {
       console.log(`runloopApiKey:                  ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
       console.log(`defaultSnapshotId:              ${getDefaultSnapshot() ?? "(not set)"}`);
+      console.log(`defaultRepo:                    ${getDefaultRepo() ?? "(not set)"}`);
+      console.log(`defaultBranch:                  ${getDefaultBranch() ?? "(not set)"}`);
       console.log(`stopNotifications:              ${getStopNotifications()}`);
       console.log(`stopNotificationQuietPeriod:    ${getStopNotificationQuietPeriod()}s`);
       const envVars = getEnvVars();
@@ -331,6 +341,12 @@ configCmd
         case "defaultSnapshotId":
           console.log(getDefaultSnapshot() ?? "(not set)");
           break;
+        case "defaultRepo":
+          console.log(getDefaultRepo() ?? "(not set)");
+          break;
+        case "defaultBranch":
+          console.log(getDefaultBranch() ?? "(not set)");
+          break;
         case "stopNotifications":
           console.log(getStopNotifications());
           break;
@@ -339,7 +355,7 @@ configCmd
           break;
         default:
           console.error(`Unknown config key: ${key}`);
-          console.error("Available keys: runloopApiKey, defaultSnapshotId, stopNotifications, stopNotificationQuietPeriod");
+          console.error("Available keys: runloopApiKey, defaultSnapshotId, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod");
           console.error("For env vars: thopter env list");
           process.exit(1);
       }
