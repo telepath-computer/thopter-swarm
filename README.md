@@ -15,6 +15,7 @@ This is an internal dev tool for Telepath, but we've made it open as it's probab
 - A public Redis instance with a password-protected access URL, we recommend [Upstash](https://upstash.com) (for status monitoring and tailing activity on thopters)
 - The `rli` CLI: `npm install -g @runloop/rl-cli`
 - Iterm2 is the recommended terminal app for detachable tmux sessions on thopters (thanks to its support for tmux control mode)
+- [ntfy.sh](https://ntfy.sh/) account and mac os desktop app. desktop app provides most reliable notifications. define a personal topic id (e.g. `randomstring_thopternotifss` or anything globally unique) and ensure you get pushes for it on your desktop (can also setup iOS)
 
 ### Install
 
@@ -37,7 +38,7 @@ This walks you through:
 1. Runloop API key
 2. Redis URL
 3. GitHub token (`GH_TOKEN`) and other env vars
-4. ntfy.sh push notifications (optional)
+4. ntfy.sh push notifications (optional but highly recommended)
 
 All config is saved to `~/.thopter.json`.
 
