@@ -23,11 +23,18 @@ export const DEFAULT_IDLE_TIMEOUT_SECONDS = 12 * 60 * 60;
 
 // --- Local config ---
 
+export interface UploadEntry {
+  local: string;
+  remote: string;
+}
+
 interface LocalConfig {
   runloopApiKey?: string;
   redisUrl?: string;
   defaultSnapshotId?: string;
   ntfyChannel?: string;
+  claudeMdPath?: string;
+  uploads?: UploadEntry[];
   stopNotifications?: boolean;
   envVars?: Record<string, string>;
 }
@@ -136,6 +143,16 @@ export function deleteEnvVar(key: string): void {
     delete config.envVars[key];
     saveLocalConfig(config);
   }
+}
+
+// --- Custom CLAUDE.md and file uploads ---
+
+export function getClaudeMdPath(): string | undefined {
+  return loadLocalConfig().claudeMdPath;
+}
+
+export function getUploads(): UploadEntry[] {
+  return loadLocalConfig().uploads ?? [];
 }
 
 /**

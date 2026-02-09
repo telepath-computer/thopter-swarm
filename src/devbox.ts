@@ -3,7 +3,7 @@
  */
 
 import { execSync, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getClient } from "./client.js";
@@ -19,6 +19,8 @@ import {
   escapeEnvValue,
   getDefaultSnapshot,
   getNtfyChannel,
+  getClaudeMdPath,
+  getUploads,
   getStopNotifications,
 } from "./config.js";
 
@@ -113,10 +115,14 @@ async function installThopterScripts(
     contents: readScript("tmux.conf"),
   });
 
-  // CLAUDE.md — instructions for Claude Code running inside the devbox
+  // CLAUDE.md — use custom path if configured, otherwise default
+  const claudeMdPath = getClaudeMdPath();
+  const claudeMdContents = claudeMdPath
+    ? readFileSync(claudeMdPath, "utf-8")
+    : readScript("thopter-claude-md.md");
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/home/user/.claude/CLAUDE.md",
-    contents: readScript("thopter-claude-md.md"),
+    contents: claudeMdContents,
   });
 
   // Claude Code hooks for redis status updates
@@ -242,6 +248,18 @@ export async function createDevbox(opts: {
     );
   }
 
+  // Validate local files exist before creating anything
+  const claudeMdPath = getClaudeMdPath();
+  if (claudeMdPath && !existsSync(claudeMdPath)) {
+    throw new Error(`Custom CLAUDE.md not found: ${claudeMdPath}`);
+  }
+  const uploads = getUploads();
+  for (const entry of uploads) {
+    if (!existsSync(entry.local)) {
+      throw new Error(`Upload file not found: ${entry.local}`);
+    }
+  }
+
   // Determine snapshot (resolve name → ID if needed)
   let snapshotId = opts.snapshotId
     ? await resolveSnapshotId(opts.snapshotId)
@@ -331,6 +349,17 @@ export async function createDevbox(opts: {
     // Upload and install thopter-status scripts + cron
     console.log("Installing thopter scripts...");
     await installThopterScripts(devbox.id, opts.name);
+
+    // Upload custom files from config
+    if (uploads.length > 0) {
+      console.log(`Uploading ${uploads.length} custom file${uploads.length === 1 ? "" : "s"}...`);
+      for (const entry of uploads) {
+        await client.devboxes.writeFileContents(devbox.id, {
+          file_path: entry.remote,
+          contents: readFileSync(entry.local, "utf-8"),
+        });
+      }
+    }
 
     return devbox.id;
   } catch (e) {
