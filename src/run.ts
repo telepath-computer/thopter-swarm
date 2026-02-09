@@ -58,7 +58,7 @@ export async function runThopter(opts: {
   branch?: string;
   name?: string;
   snapshot?: string;
-  idleTimeout?: number;
+  keepAlive?: number;
 }): Promise<void> {
   // Snapshot is required for run
   const snapshotId = opts.snapshot ?? getDefaultSnapshot();
@@ -121,7 +121,7 @@ export async function runThopter(opts: {
   const devboxId = await createDevbox({
     name: thopterName,
     snapshotId,
-    idleTimeout: opts.idleTimeout ? opts.idleTimeout * 60 : undefined,
+    keepAlive: opts.keepAlive ? opts.keepAlive * 60 : undefined,
   });
 
   const client = getClient();

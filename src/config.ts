@@ -18,8 +18,8 @@ export const OWNER_KEY = "thopter_owner";
 /** Default devbox resource size. */
 export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
 
-/** Default idle timeout: 12 hours. Suspends on idle (preserves disk). */
-export const DEFAULT_IDLE_TIMEOUT_SECONDS = 12 * 60 * 60;
+/** Default keep-alive time: 12 hours. Devbox shuts down after this period unless reset. */
+export const DEFAULT_KEEP_ALIVE_SECONDS = 12 * 60 * 60;
 
 // --- Local config ---
 

@@ -223,7 +223,7 @@ export async function runSetup(): Promise<void> {
   console.log("Manage env vars later with: thopter env {list,set,delete}");
   console.log("");
   console.log("A couple things to keep in mind:");
-  console.log("  - Thopters suspend after 12 hours from launch or the most recent keepalive event:");
+  console.log("  - Thopters shut down after 12 hours. Reset the timer with:");
   console.log("    thopter keepalive <name> ");
   console.log("    A suspended thopter can be resumed with: thopter resume <name>");
   console.log("  - Thopter github credentials can only modify branches starting with");

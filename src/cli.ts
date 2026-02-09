@@ -42,7 +42,7 @@ examples:
   thopter tail dev                       Show last 20 transcript entries
   thopter tail dev -f                    Follow transcript in real time
   thopter tail dev -n 50                 Show last 50 entries
-  thopter keepalive dev                   Reset idle timer for a devbox
+  thopter keepalive dev                   Reset keep-alive timer for a devbox
   thopter suspend dev                    Suspend a devbox
   thopter resume dev                     Resume a suspended devbox
   thopter destroy dev                    Shut down a devbox`,
@@ -64,9 +64,9 @@ program
   .argument("[name]", "Name for the devbox (auto-generated if omitted)")
   .option("--snapshot <id>", "Snapshot ID or label to restore from")
   .option("--fresh", "Create a fresh devbox, ignoring the default snapshot")
-  .option("--idle-timeout <minutes>", "Idle timeout in minutes before auto-suspend (default: 720)", parseInt)
+  .option("--keep-alive <minutes>", "Keep-alive time in minutes before shutdown (default: 720)", parseInt)
   .option("-a, --attach", "SSH into the devbox after creation")
-  .action(async (name: string | undefined, opts: { snapshot?: string; fresh?: boolean; idleTimeout?: number; attach?: boolean }) => {
+  .action(async (name: string | undefined, opts: { snapshot?: string; fresh?: boolean; keepAlive?: number; attach?: boolean }) => {
     const { createDevbox, sshDevbox } = await import("./devbox.js");
     const { generateName } = await import("./names.js");
     const resolvedName = name ?? generateName();
@@ -74,7 +74,7 @@ program
       name: resolvedName,
       snapshotId: opts.snapshot,
       fresh: opts.fresh,
-      idleTimeout: opts.idleTimeout ? opts.idleTimeout * 60 : undefined,
+      keepAlive: opts.keepAlive ? opts.keepAlive * 60 : undefined,
     });
     if (opts.attach) {
       await sshDevbox(resolvedName);
@@ -119,8 +119,8 @@ program
   .option("--branch <name>", "Git branch to start from")
   .option("--name <name>", "Thopter name (auto-generated if omitted)")
   .option("--snapshot <id>", "Snapshot to use")
-  .option("--idle-timeout <minutes>", "Idle timeout in minutes", parseInt)
-  .action(async (prompt: string, opts: { repo?: string; branch?: string; name?: string; snapshot?: string; idleTimeout?: number }) => {
+  .option("--keep-alive <minutes>", "Keep-alive time in minutes", parseInt)
+  .action(async (prompt: string, opts: { repo?: string; branch?: string; name?: string; snapshot?: string; keepAlive?: number }) => {
     const { runThopter } = await import("./run.js");
     await runThopter({ prompt, ...opts });
   });
@@ -161,7 +161,7 @@ program
 // --- keepalive ---
 program
   .command("keepalive")
-  .description("Send a keepalive to reset a devbox's idle timer")
+  .description("Reset a devbox's keep-alive timer")
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
     const { keepaliveDevbox } = await import("./devbox.js");

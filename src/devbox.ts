@@ -14,7 +14,7 @@ import {
   NAME_KEY,
   OWNER_KEY,
   DEFAULT_RESOURCE_SIZE,
-  DEFAULT_IDLE_TIMEOUT_SECONDS,
+  DEFAULT_KEEP_ALIVE_SECONDS,
   getEnvVars,
   escapeEnvValue,
   getDefaultSnapshot,
@@ -237,7 +237,7 @@ export async function createDevbox(opts: {
   name: string;
   snapshotId?: string;
   fresh?: boolean;
-  idleTimeout?: number;
+  keepAlive?: number;
 }): Promise<string> {
   const client = getClient();
 
@@ -298,15 +298,7 @@ export async function createDevbox(opts: {
     metadata,
     launch_parameters: {
       resource_size_request: DEFAULT_RESOURCE_SIZE,
-      // i am still trying to figure out how idle and keepalive actually work on runloop.
-      // trying keep alive for now. idle detection seems to not work or be
-      // misconfigured, it will just suspend right in the middle of an active
-      // ssh session running claude code...
-      keep_alive_time_seconds: opts.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_SECONDS,
-      // after_idle: {
-      //   idle_time_seconds: opts.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_SECONDS,
-      //   on_idle: "suspend" as const,
-      // },
+      keep_alive_time_seconds: opts.keepAlive ?? DEFAULT_KEEP_ALIVE_SECONDS,
       launch_commands: snapshotId ? undefined : [INIT_SCRIPT],
     },
   };
@@ -505,7 +497,7 @@ export async function keepaliveDevbox(nameOrId: string): Promise<void> {
 
   console.log(`Sending keepalive for ${nameOrId} (${id})...`);
   await client.devboxes.keepAlive(id);
-  console.log("Done. Idle timer reset.");
+  console.log("Done. Keep-alive timer reset.");
 }
 
 export async function sshDevbox(nameOrId: string): Promise<void> {
