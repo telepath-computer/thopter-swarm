@@ -346,11 +346,30 @@ envCmd
 
 envCmd
   .command("set")
-  .description("Set a devbox environment variable")
+  .description("Set a devbox environment variable (prompts for value if omitted)")
   .argument("<key>", "Variable name (e.g. GH_TOKEN)")
-  .argument("<value>", "Variable value")
-  .action(async (key: string, value: string) => {
+  .argument("[value]", "Variable value (omit to enter interactively)")
+  .action(async (key: string, value?: string) => {
     const { setEnvVar } = await import("./config.js");
+
+    if (!value) {
+      // Interactive prompt — keeps sensitive values out of shell history
+      const { createInterface } = await import("node:readline");
+      const rl = createInterface({ input: process.stdin, terminal: true });
+      process.stdout.write(`Value for ${key}: `);
+      value = await new Promise<string>((resolve) => {
+        rl.question("", (answer) => {
+          rl.close();
+          process.stdout.write("\n");
+          resolve(answer.trim());
+        });
+      });
+      if (!value) {
+        console.log("No value provided. Aborting.");
+        return;
+      }
+    }
+
     setEnvVar(key, value);
     console.log(`Set ${key}.`);
   });

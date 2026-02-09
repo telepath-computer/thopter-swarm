@@ -92,11 +92,27 @@ export function setRedisUrl(url: string): void {
 
 // --- Devbox env vars ---
 
+const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export function validateEnvKey(key: string): void {
+  if (!ENV_KEY_RE.test(key)) {
+    throw new Error(
+      `Invalid env var name '${key}'. Must match [A-Za-z_][A-Za-z0-9_]*.`,
+    );
+  }
+}
+
+/** Escape a value for safe inclusion in a shell `export KEY="VALUE"` line. */
+export function escapeEnvValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
+}
+
 export function getEnvVars(): Record<string, string> {
   return loadLocalConfig().envVars ?? {};
 }
 
 export function setEnvVar(key: string, value: string): void {
+  validateEnvKey(key);
   const config = loadLocalConfig();
   if (!config.envVars) config.envVars = {};
   config.envVars[key] = value;
