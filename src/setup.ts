@@ -5,7 +5,6 @@
 import { createInterface } from "node:readline";
 import { execSync } from "node:child_process";
 import { getClient } from "./client.js";
-import { listSecrets, createOrUpdateSecret } from "./secrets.js";
 import {
   getRunloopApiKey,
   setRunloopApiKey,
@@ -13,6 +12,8 @@ import {
   setRedisUrl,
   getNtfyChannel,
   setNtfyChannel,
+  getEnvVars,
+  setEnvVar,
   loadConfigIntoEnv,
 } from "./config.js";
 
@@ -69,7 +70,7 @@ export async function runSetup(): Promise<void> {
   console.log("  Verifying...");
   try {
     const client = getClient();
-    await client.secrets.list({ limit: 1 });
+    await client.devboxes.list({ limit: 1 });
     console.log("  Authenticated to Runloop.");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -85,77 +86,61 @@ export async function runSetup(): Promise<void> {
   console.log("  Upstash Redis URL for status reporting.");
   const redisUrl = await askWithDefault("  Redis URL:", getRedisUrl());
   setRedisUrl(redisUrl);
+  setEnvVar("REDIS_URL", redisUrl);
   loadConfigIntoEnv();
-  console.log("  Saved.");
-
-  // Ensure REDIS_URL is also in Runloop platform secrets (devboxes need it)
-  const secrets = await listSecrets();
-  const hasRedisSecret = secrets.some((s) => s.name === "REDIS_URL");
-  if (!hasRedisSecret) {
-    console.log("  Adding REDIS_URL to Runloop platform secrets (so devboxes get it)...");
-    await createOrUpdateSecret("REDIS_URL", redisUrl);
-    console.log("  Done.");
-  } else {
-    const update = await ask("  REDIS_URL already exists in Runloop secrets. Update it? [y/N] ");
-    if (update.toLowerCase() === "y") {
-      await createOrUpdateSecret("REDIS_URL", redisUrl);
-      console.log("  Updated.");
-    }
-  }
+  console.log("  Saved (config + devbox env vars).");
   console.log();
 
-  // --- Step 3: Platform secrets ---
-  console.log("Step 3: Devbox Secrets");
-  console.log("  These are injected as env vars into every devbox.");
-  console.log("  All secrets in the Runloop platform are shared across all devboxes.");
-  const refreshedSecrets = await listSecrets();
-  if (refreshedSecrets.length > 0) {
-    console.log("\n  Already configured in Runloop:");
-    for (const s of refreshedSecrets) {
-      console.log(`    - ${s.name}`);
+  // --- Step 3: Devbox environment variables ---
+  console.log("Step 3: Devbox Environment Variables");
+  console.log("  These are injected into every new devbox via ~/.thopter-env.");
+  console.log("  Stored locally in ~/.thopter.json (not in the Runloop platform).");
+  const currentEnv = getEnvVars();
+  const envKeys = Object.keys(currentEnv);
+  if (envKeys.length > 0) {
+    console.log("\n  Already configured:");
+    for (const k of envKeys) {
+      console.log(`    - ${k}`);
     }
     console.log();
   }
 
-  // GITHUB_PAT (required)
-  const hasGithub = refreshedSecrets.some((s) => s.name === "GITHUB_PAT");
-  if (!hasGithub) {
-    console.log("  GITHUB_PAT (required)");
-    console.log("  Used for git clone/push and as GH_TOKEN for the gh CLI.");
-    const pat = await askRequired("  GitHub personal access token: ");
-    await createOrUpdateSecret("GITHUB_PAT", pat);
+  // GH_TOKEN (required)
+  if (!currentEnv.GH_TOKEN) {
+    console.log("  GH_TOKEN (required)");
+    console.log("  Used for git clone/push and the gh CLI.");
+    const token = await askRequired("  GitHub token (ghp_... or fine-grained): ");
+    setEnvVar("GH_TOKEN", token);
     console.log("  Saved.");
   }
 
   // ANTHROPIC_API_KEY
-  const hasAnthropic = refreshedSecrets.some((s) => s.name === "ANTHROPIC_API_KEY");
-  if (!hasAnthropic) {
+  if (!currentEnv.ANTHROPIC_API_KEY) {
     console.log("\n  ANTHROPIC_API_KEY (optional — needed for Claude Code on devboxes)");
     const anthropicKey = await ask("  Anthropic API key (enter to skip): ");
     if (anthropicKey) {
-      await createOrUpdateSecret("ANTHROPIC_API_KEY", anthropicKey);
+      setEnvVar("ANTHROPIC_API_KEY", anthropicKey);
       console.log("  Saved.");
     }
   }
 
   // OPENAI_API_KEY
-  const hasOpenai = refreshedSecrets.some((s) => s.name === "OPENAI_API_KEY");
-  if (!hasOpenai) {
+  if (!currentEnv.OPENAI_API_KEY) {
     console.log("\n  OPENAI_API_KEY (optional — needed for Codex CLI on devboxes)");
     const openaiKey = await ask("  OpenAI API key (enter to skip): ");
     if (openaiKey) {
-      await createOrUpdateSecret("OPENAI_API_KEY", openaiKey);
+      setEnvVar("OPENAI_API_KEY", openaiKey);
       console.log("  Saved.");
     }
   }
 
-  // Additional secrets
+  // Additional env vars
   while (true) {
     console.log();
-    const name = await ask("  Add another secret? Enter name (or enter to skip): ");
+    const name = await ask("  Add another env var? Enter name (or enter to skip): ");
     if (!name) break;
     const value = await askRequired(`  Value for ${name}: `);
-    await createOrUpdateSecret(name, value);
+    setEnvVar(name, value);
     console.log(`  Saved ${name}.`);
   }
   console.log();
@@ -226,6 +211,8 @@ export async function runSetup(): Promise<void> {
   console.log("     (without --fresh, create uses your default snapshot for fast boot)");
   console.log("");
   console.log("  7. SSH in and yolo! (built-in `yolo-claude` alias for `claude --dangerously-skip-permissions`)");
+  console.log("");
+  console.log("Manage env vars later with: thopter env {list,set,delete}");
   console.log("");
   console.log("A couple things to keep in mind:");
   console.log("  - Thopters suspend after 12 hours from launch or the most recent keepalive event:");

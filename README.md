@@ -21,7 +21,7 @@ npm install
 # Install the 'thopter' command globally
 npm link
 
-# Interactive setup — walks you through API keys, secrets, notifications
+# Interactive setup — walks you through API keys, env vars, notifications
 thopter setup
 ```
 
@@ -107,14 +107,14 @@ thopter create worker-2
 | `thopter snapshot default [name]` | View or set default snapshot |
 | `thopter snapshot default --clear` | Clear default snapshot |
 
-### Secrets
+### Environment Variables
 
 | Command | Description |
 |---------|-------------|
 | `thopter setup` | Interactive first-time setup |
-| `thopter secrets list` | List configured secrets |
-| `thopter secrets set <name>` | Create or update a secret |
-| `thopter secrets delete <name>` | Delete a secret |
+| `thopter env list` | List configured env vars (values masked) |
+| `thopter env set <key> <value>` | Set a devbox env var |
+| `thopter env delete <key>` | Remove a devbox env var |
 
 ## Architecture
 
@@ -122,15 +122,15 @@ thopter create worker-2
 
 - **CLI**: TypeScript + Commander.js, run via `tsx`
 - **Cloud provider**: [Runloop.ai](https://runloop.ai) devboxes (KVM microVMs)
-- **SDK**: `@runloop/api-client` for devbox lifecycle, exec, snapshots, secrets
+- **SDK**: `@runloop/api-client` for devbox lifecycle, exec, snapshots
 - **Monitoring**: Upstash Redis for heartbeats, status, and last messages
 - **SSH**: `rli` CLI (`@runloop/rl-cli`)
 
 ### How It Works
 
 1. `thopter create` provisions a Runloop devbox with metadata tags (`managed_by=runloop-thopters`, `thopter_name=<name>`)
-2. On fresh creates (no snapshot), an init script installs Claude Code, neovim, starship, tmux, and configures git credentials from Runloop secrets
-3. After the devbox is running, thopter scripts are uploaded: heartbeat reporter, Claude Code hooks, status updater
+2. On fresh creates (no snapshot), an init script installs Claude Code, neovim, starship, tmux, and developer tools
+3. After the devbox is running, env vars from `~/.thopter.json` are written to `~/.thopter-env`, git credentials are configured, and thopter scripts are uploaded
 4. Claude Code hooks fire on session events (start, stop, notification, prompt) and report to Redis via `thopter-status`
 5. A cron job runs a heartbeat every ~10 seconds, setting an `alive` key with 30s TTL as a dead-man's switch
 6. Devboxes auto-suspend after 1 hour idle (configurable via `--idle-timeout`)
@@ -144,7 +144,7 @@ Each thopter devbox gets:
 - Neovim + NvChad with OSC 52 clipboard support
 - Starship prompt showing thopter name
 - tmux with Ctrl-a prefix
-- Git configured with PAT credentials from Runloop secrets
+- Git configured with GH_TOKEN credentials from `~/.thopter-env`
 - Heartbeat cron reporting to Redis
 - Claude Code hooks for status reporting
 
@@ -165,28 +165,30 @@ Each thopter devbox gets:
 
 ## Configuration
 
-### Runloop Secrets
+### Local Config (`~/.thopter.json`)
 
-All secrets in your Runloop account are auto-injected as environment variables into every devbox. The secret name = the env var name. Manage them with `thopter secrets set <NAME>`.
-
-The devbox init script specifically checks for `GITHUB_PAT` to configure git credentials. Other common secrets you might add:
-
-- `GITHUB_PAT` — Git repo access (used by init script)
-- `ANTHROPIC_API_KEY` — Claude Code authentication
-- `REDIS_URL` — Status reporting from inside devboxes
-
-**Important:** Runloop re-injects secrets on resume. If any secret that was present when a devbox was created has since been deleted from the platform, the resume will fail. Adding secrets or changing values is fine, but deleting or renaming a secret will break resume for any suspended devbox that was provisioned with it. Shut down those devboxes before deleting secrets.
-
-### Local Config
-
-`~/.thopter.json` stores local settings. Managed via `thopter config` and `thopter snapshot default`.
+All configuration lives in `~/.thopter.json`. Managed via `thopter config`, `thopter env`, and `thopter snapshot default`.
 
 | Key | Description |
 |-----|-------------|
 | `runloopApiKey` | Runloop API key (required) |
-| `redisUrl` | Upstash Redis URL for status reporting (required) |
+| `redisUrl` | Upstash Redis URL for operator-side status display (required) |
 | `defaultSnapshotId` | Default snapshot for `create` (set via `snapshot default`) |
 | `ntfyChannel` | ntfy.sh channel for push notifications (set via `config set`) |
+| `envVars` | Key-value map of env vars injected into devboxes |
+
+### Devbox Environment Variables
+
+Environment variables in the `envVars` section of `~/.thopter.json` are written to `~/.thopter-env` inside each devbox at create time. Manage them with `thopter env set <KEY> <VALUE>`.
+
+Common env vars:
+
+- `GH_TOKEN` — GitHub token for git clone/push and the `gh` CLI (required)
+- `ANTHROPIC_API_KEY` — Claude Code authentication
+- `OPENAI_API_KEY` — Codex CLI authentication
+- `REDIS_URL` — Status reporting from inside devboxes
+
+`GH_TOKEN` is used to configure git credentials (HTTPS credential store) after the devbox boots. The `thopter setup` wizard walks you through configuring these.
 
 ### Notifications (ntfy.sh)
 
