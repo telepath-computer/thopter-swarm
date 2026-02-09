@@ -221,8 +221,12 @@ function main() {
   const newEntries = [];
   let bytesConsumed = 0;
 
-  for (const rawLine of rawLines) {
-    const lineBytes = Buffer.byteLength(rawLine, "utf-8") + 1; // +1 for newline
+  for (let i = 0; i < rawLines.length; i++) {
+    const rawLine = rawLines[i];
+    // The last element from split("\n") has no trailing newline.
+    // All others do (+1 for the \n delimiter).
+    const isLast = i === rawLines.length - 1;
+    const lineBytes = Buffer.byteLength(rawLine, "utf-8") + (isLast ? 0 : 1);
     const trimmed = rawLine.trim();
     if (!trimmed) {
       // Empty line — safe to advance past
