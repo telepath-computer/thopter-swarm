@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# Short alias for runloop-thopters CLI
-exec "$(dirname "$0")/node_modules/.bin/tsx" "$(dirname "$0")/src/cli.ts" "$@"
