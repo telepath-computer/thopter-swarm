@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # thopter-status: report thopter status, logs, and health to redis.
-# Reads THOPTER_NAME, THOPTER_ID, REDIS_URL from environment.
+# Reads THOPTER_NAME, THOPTER_ID, THOPTER_REDIS_URL from environment.
 
 set -euo pipefail
 
-if [ -z "${REDIS_URL:-}" ]; then
-    echo "REDIS_URL not set" >&2
+if [ -z "${THOPTER_REDIS_URL:-}" ]; then
+    echo "THOPTER_REDIS_URL not set" >&2
     exit 1
 fi
 if [ -z "${THOPTER_NAME:-}" ]; then
@@ -16,7 +16,7 @@ fi
 PREFIX="thopter:${THOPTER_NAME}"
 
 rcli() {
-    redis-cli --tls -u "$REDIS_URL" "$@" 2>/dev/null
+    redis-cli --tls -u "$THOPTER_REDIS_URL" "$@" 2>/dev/null
 }
 
 cmd_log() {

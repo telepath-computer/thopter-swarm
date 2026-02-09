@@ -21,23 +21,20 @@ export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
 /** Default idle timeout: 12 hours. Suspends on idle (preserves disk). */
 export const DEFAULT_IDLE_TIMEOUT_SECONDS = 12 * 60 * 60;
 
-/**
- * Build secret mappings dynamically from all Runloop secrets.
- * Convention: secret name in Runloop = env var name in devbox.
- */
-export async function getSecretMappings(): Promise<Record<string, string>> {
-  const { listSecrets } = await import("./secrets.js");
-  const secrets = await listSecrets();
-  return Object.fromEntries(secrets.map((s) => [s.name, s.name]));
-}
+// --- Local config ---
 
-// --- Local config (default snapshot only) ---
+export interface UploadEntry {
+  local: string;
+  remote: string;
+}
 
 interface LocalConfig {
   runloopApiKey?: string;
-  redisUrl?: string;
   defaultSnapshotId?: string;
-  ntfyChannel?: string;
+  claudeMdPath?: string;
+  uploads?: UploadEntry[];
+  stopNotifications?: boolean;
+  envVars?: Record<string, string>;
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -69,13 +66,13 @@ export function clearDefaultSnapshot(): void {
   saveLocalConfig(config);
 }
 
-export function getNtfyChannel(): string | undefined {
-  return loadLocalConfig().ntfyChannel;
+export function getStopNotifications(): boolean {
+  return loadLocalConfig().stopNotifications ?? false;
 }
 
-export function setNtfyChannel(channel: string): void {
+export function setStopNotifications(enabled: boolean): void {
   const config = loadLocalConfig();
-  config.ntfyChannel = channel;
+  config.stopNotifications = enabled;
   saveLocalConfig(config);
 }
 
@@ -89,14 +86,51 @@ export function setRunloopApiKey(key: string): void {
   saveLocalConfig(config);
 }
 
-export function getRedisUrl(): string | undefined {
-  return loadLocalConfig().redisUrl;
+// --- Devbox env vars ---
+
+const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export function validateEnvKey(key: string): void {
+  if (!ENV_KEY_RE.test(key)) {
+    throw new Error(
+      `Invalid env var name '${key}'. Must match [A-Za-z_][A-Za-z0-9_]*.`,
+    );
+  }
 }
 
-export function setRedisUrl(url: string): void {
+/** Escape a value for safe inclusion in a shell `export KEY="VALUE"` line. */
+export function escapeEnvValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
+}
+
+export function getEnvVars(): Record<string, string> {
+  return loadLocalConfig().envVars ?? {};
+}
+
+export function setEnvVar(key: string, value: string): void {
+  validateEnvKey(key);
   const config = loadLocalConfig();
-  config.redisUrl = url;
+  if (!config.envVars) config.envVars = {};
+  config.envVars[key] = value;
   saveLocalConfig(config);
+}
+
+export function deleteEnvVar(key: string): void {
+  const config = loadLocalConfig();
+  if (config.envVars) {
+    delete config.envVars[key];
+    saveLocalConfig(config);
+  }
+}
+
+// --- Custom CLAUDE.md and file uploads ---
+
+export function getClaudeMdPath(): string | undefined {
+  return loadLocalConfig().claudeMdPath;
+}
+
+export function getUploads(): UploadEntry[] {
+  return loadLocalConfig().uploads ?? [];
 }
 
 /**
@@ -108,7 +142,8 @@ export function loadConfigIntoEnv(): void {
   if (config.runloopApiKey && !process.env.RUNLOOP_API_KEY) {
     process.env.RUNLOOP_API_KEY = config.runloopApiKey;
   }
-  if (config.redisUrl && !process.env.REDIS_URL) {
-    process.env.REDIS_URL = config.redisUrl;
+  const envVars = config.envVars ?? {};
+  if (envVars.THOPTER_REDIS_URL && !process.env.THOPTER_REDIS_URL) {
+    process.env.THOPTER_REDIS_URL = envVars.THOPTER_REDIS_URL;
   }
 }
