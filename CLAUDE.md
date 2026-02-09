@@ -32,7 +32,6 @@ package.json   Dependencies: @runloop/api-client, commander, ioredis
 tsconfig.json  TypeScript config (ES2022, NodeNext modules)
 thopter        CLI wrapper script
 todo           Current task list
-setup-steps.md Setup instructions
 ```
 
 ## Key Concepts
@@ -49,5 +48,5 @@ setup-steps.md Setup instructions
 
 ## Configuration
 
-- `~/.thopter.json` on developer laptop: `runloopApiKey`, `redisUrl`, `ntfyChannel`, `defaultSnapshotId`, `envVars`
+- `~/.thopter.json` on developer laptop: `runloopApiKey`, `redisUrl`, `ntfyChannel`, `defaultSnapshotId`, `stopNotifications`, `claudeMdPath`, `uploads`, `envVars`
 - Devbox env vars managed via `./thopter env` or `./thopter setup`
