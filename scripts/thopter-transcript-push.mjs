@@ -245,6 +245,14 @@ function main() {
     }
   }
 
+  // Advance cursor BEFORE pushing to Redis. This prevents duplicate pushes
+  // if two hooks read the cursor before either updates it. The tradeoff:
+  // if Redis push fails, those entries are skipped — acceptable since we
+  // already silently ignore Redis errors to avoid blocking Claude.
+  if (bytesConsumed > 0) {
+    writeFileSync(CURSOR_FILE, String(cursor + bytesConsumed));
+  }
+
   // Push to Redis
   if (newEntries.length > 0) {
     for (const entry of newEntries) {
@@ -256,10 +264,5 @@ function main() {
     // even when list length is constant (at the 500-entry cap)
     rcli("INCRBY", redisCounterKey, String(newEntries.length));
     rcli("EXPIRE", redisCounterKey, String(TTL_SECONDS));
-  }
-
-  // Update cursor — only advance past successfully parsed content
-  if (bytesConsumed > 0) {
-    writeFileSync(CURSOR_FILE, String(cursor + bytesConsumed));
   }
 }

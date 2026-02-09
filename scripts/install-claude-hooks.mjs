@@ -68,29 +68,21 @@ if (!settings.hooks) {
   settings.hooks = {};
 }
 
-let installed = 0;
-let skipped = 0;
+// Remove any existing thopter hooks (identified by commands pointing to HOOKS_DIR)
+// before adding fresh ones. This prevents duplicates from snapshot-based creates.
+for (const [event, matcherList] of Object.entries(settings.hooks)) {
+  if (!Array.isArray(matcherList)) continue;
+  settings.hooks[event] = matcherList.filter(
+    (m) => !m.hooks?.some((h) => h.command?.startsWith(HOOKS_DIR)),
+  );
+}
 
 for (const [event, matchers] of Object.entries(THOPTER_HOOKS)) {
   if (!settings.hooks[event]) {
     settings.hooks[event] = [];
   }
-
   for (const matcher of matchers) {
-    const hookCmd = matcher.hooks[0].command;
-
-    // Check if a hook with this command is already registered
-    const alreadyInstalled = settings.hooks[event].some((existing) =>
-      existing.hooks?.some((h) => h.command === hookCmd),
-    );
-
-    if (alreadyInstalled) {
-      skipped++;
-      continue;
-    }
-
     settings.hooks[event].push(matcher);
-    installed++;
   }
 }
 
