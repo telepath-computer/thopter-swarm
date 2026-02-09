@@ -41,7 +41,7 @@ Add any other env vars your devboxes need — they're all passed through.
   "stopNotifications": true,
   "claudeMdPath": "/Users/jw/projects/my-claude-instructions.md",
   "uploads": [
-    { "local": "/Users/jw/.gitconfig", "remote": "/home/user/.gitconfig" }
+    { "local": "/Users/jw/.npmrc", "remote": "/home/user/.npmrc" }
   ],
   "envVars": {
     "GH_TOKEN": "ghp_abc123...",
