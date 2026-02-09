@@ -12,7 +12,7 @@
 if [ -f /tmp/thopter-active ] && [ "$(find /tmp/thopter-active -mmin -1 2>/dev/null)" ]; then
     /usr/local/bin/thopter-status running >/dev/null 2>&1 || true
 else
-    CURRENT_STATUS=$(redis-cli --tls -u "$REDIS_URL" GET "thopter:${THOPTER_NAME}:status" 2>/dev/null || true)
+    CURRENT_STATUS=$(redis-cli --tls -u "$THOPTER_REDIS_URL" GET "thopter:${THOPTER_NAME}:status" 2>/dev/null || true)
     if [ "$CURRENT_STATUS" = "running" ]; then
         /usr/local/bin/thopter-status inactive >/dev/null 2>&1 || true
     fi

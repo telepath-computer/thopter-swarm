@@ -80,9 +80,9 @@ export async function runSetup(): Promise<void> {
   // --- Step 2: Redis URL ---
   console.log("Step 2: Redis URL");
   console.log("  Upstash Redis URL for status reporting.");
-  const currentRedisUrl = getEnvVars().REDIS_URL;
+  const currentRedisUrl = getEnvVars().THOPTER_REDIS_URL;
   const redisUrl = await askWithDefault("  Redis URL:", currentRedisUrl);
-  setEnvVar("REDIS_URL", redisUrl);
+  setEnvVar("THOPTER_REDIS_URL", redisUrl);
   loadConfigIntoEnv();
   console.log("  Saved.");
   console.log();

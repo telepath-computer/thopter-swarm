@@ -5,7 +5,7 @@
 // Usage: thopter-transcript-push.mjs <transcript_path> [--reset]
 //   --reset: Reset cursor (used on session start)
 //
-// Reads THOPTER_NAME and REDIS_URL from environment.
+// Reads THOPTER_NAME and THOPTER_REDIS_URL from environment.
 // Tracks read position via /tmp/thopter-transcript-cursor.
 // Uses flock on the cursor file to prevent concurrent access races.
 
@@ -23,7 +23,7 @@ const isReset = process.argv.includes("--reset");
 if (!transcriptPath) process.exit(0);
 
 const name = process.env.THOPTER_NAME;
-const redisUrl = process.env.REDIS_URL;
+const redisUrl = process.env.THOPTER_REDIS_URL;
 if (!name || !redisUrl) process.exit(0);
 
 // Validate thopter name for safe use in Redis keys

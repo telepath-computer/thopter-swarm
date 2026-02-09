@@ -6,10 +6,10 @@
 import { Redis } from "ioredis";
 
 function getRedis(): Redis {
-  const url = process.env.REDIS_URL;
+  const url = process.env.THOPTER_REDIS_URL;
   if (!url) {
     throw new Error(
-      "Redis URL not configured. Set it with: thopter env set REDIS_URL <url>",
+      "Redis URL not configured. Set it with: thopter env set THOPTER_REDIS_URL <url>",
     );
   }
   const parsed = new URL(url);

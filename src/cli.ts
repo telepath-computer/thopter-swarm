@@ -298,7 +298,7 @@ configCmd
       default:
         console.error(`Unknown config key: ${key}`);
         console.error("Available keys: runloopApiKey, defaultSnapshotId, stopNotifications");
-        console.error("For env vars (REDIS_URL, THOPTER_NTFY_CHANNEL, etc.): thopter env set <KEY> <VALUE>");
+        console.error("For env vars (THOPTER_REDIS_URL, THOPTER_NTFY_CHANNEL, etc.): thopter env set <KEY> <VALUE>");
         process.exit(1);
     }
   });

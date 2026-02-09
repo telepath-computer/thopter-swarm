@@ -143,7 +143,7 @@ export function loadConfigIntoEnv(): void {
     process.env.RUNLOOP_API_KEY = config.runloopApiKey;
   }
   const envVars = config.envVars ?? {};
-  if (envVars.REDIS_URL && !process.env.REDIS_URL) {
-    process.env.REDIS_URL = envVars.REDIS_URL;
+  if (envVars.THOPTER_REDIS_URL && !process.env.THOPTER_REDIS_URL) {
+    process.env.THOPTER_REDIS_URL = envVars.THOPTER_REDIS_URL;
   }
 }

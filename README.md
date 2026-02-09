@@ -182,10 +182,10 @@ Env vars in the `envVars` section are written to `~/.thopter-env` inside each de
 | Variable | Purpose |
 |----------|---------|
 | `GH_TOKEN` | GitHub token for git clone/push and `gh` CLI (required) |
-| `REDIS_URL` | Upstash Redis URL for status monitoring (required) |
+| `THOPTER_REDIS_URL` | Upstash Redis URL for status monitoring (required) |
 | `THOPTER_NTFY_CHANNEL` | ntfy.sh channel for push notifications (optional) |
 
-`REDIS_URL` is used both by the CLI (for `thopter status` and `thopter tail`) and on devboxes (for heartbeats and status reporting).
+`THOPTER_REDIS_URL` is used both by the CLI (for `thopter status` and `thopter tail`) and on devboxes (for heartbeats and status reporting).
 
 `GH_TOKEN` is also used to configure git credentials (HTTPS credential store) after the devbox boots.
 
