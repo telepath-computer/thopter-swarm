@@ -18,8 +18,8 @@ export const OWNER_KEY = "thopter_owner";
 /** Default devbox resource size. */
 export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
 
-/** Default idle timeout: 12 hours. Suspends on idle (preserves disk). */
-export const DEFAULT_IDLE_TIMEOUT_SECONDS = 12 * 60 * 60;
+/** Default keep-alive time: 12 hours. Devbox shuts down after this period unless reset. */
+export const DEFAULT_KEEP_ALIVE_SECONDS = 12 * 60 * 60;
 
 // --- Local config ---
 
@@ -31,9 +31,12 @@ export interface UploadEntry {
 interface LocalConfig {
   runloopApiKey?: string;
   defaultSnapshotId?: string;
+  defaultRepo?: string;
+  defaultBranch?: string;
   claudeMdPath?: string;
   uploads?: UploadEntry[];
   stopNotifications?: boolean;
+  stopNotificationQuietPeriod?: number;
   envVars?: Record<string, string>;
 }
 
@@ -66,6 +69,26 @@ export function clearDefaultSnapshot(): void {
   saveLocalConfig(config);
 }
 
+export function getDefaultRepo(): string | undefined {
+  return loadLocalConfig().defaultRepo;
+}
+
+export function setDefaultRepo(repo: string): void {
+  const config = loadLocalConfig();
+  config.defaultRepo = repo;
+  saveLocalConfig(config);
+}
+
+export function getDefaultBranch(): string | undefined {
+  return loadLocalConfig().defaultBranch;
+}
+
+export function setDefaultBranch(branch: string): void {
+  const config = loadLocalConfig();
+  config.defaultBranch = branch;
+  saveLocalConfig(config);
+}
+
 export function getStopNotifications(): boolean {
   return loadLocalConfig().stopNotifications ?? false;
 }
@@ -73,6 +96,16 @@ export function getStopNotifications(): boolean {
 export function setStopNotifications(enabled: boolean): void {
   const config = loadLocalConfig();
   config.stopNotifications = enabled;
+  saveLocalConfig(config);
+}
+
+export function getStopNotificationQuietPeriod(): number {
+  return loadLocalConfig().stopNotificationQuietPeriod ?? 30;
+}
+
+export function setStopNotificationQuietPeriod(seconds: number): void {
+  const config = loadLocalConfig();
+  config.stopNotificationQuietPeriod = seconds;
   saveLocalConfig(config);
 }
 

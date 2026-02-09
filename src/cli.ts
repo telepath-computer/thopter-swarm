@@ -42,7 +42,7 @@ examples:
   thopter tail dev                       Show last 20 transcript entries
   thopter tail dev -f                    Follow transcript in real time
   thopter tail dev -n 50                 Show last 50 entries
-  thopter keepalive dev                   Reset idle timer for a devbox
+  thopter keepalive dev                   Reset keep-alive timer for a devbox
   thopter suspend dev                    Suspend a devbox
   thopter resume dev                     Resume a suspended devbox
   thopter destroy dev                    Shut down a devbox`,
@@ -64,9 +64,9 @@ program
   .argument("[name]", "Name for the devbox (auto-generated if omitted)")
   .option("--snapshot <id>", "Snapshot ID or label to restore from")
   .option("--fresh", "Create a fresh devbox, ignoring the default snapshot")
-  .option("--idle-timeout <minutes>", "Idle timeout in minutes before auto-suspend (default: 720)", parseInt)
+  .option("--keep-alive <minutes>", "Keep-alive time in minutes before shutdown (default: 720)", parseInt)
   .option("-a, --attach", "SSH into the devbox after creation")
-  .action(async (name: string | undefined, opts: { snapshot?: string; fresh?: boolean; idleTimeout?: number; attach?: boolean }) => {
+  .action(async (name: string | undefined, opts: { snapshot?: string; fresh?: boolean; keepAlive?: number; attach?: boolean }) => {
     const { createDevbox, sshDevbox } = await import("./devbox.js");
     const { generateName } = await import("./names.js");
     const resolvedName = name ?? generateName();
@@ -74,7 +74,7 @@ program
       name: resolvedName,
       snapshotId: opts.snapshot,
       fresh: opts.fresh,
-      idleTimeout: opts.idleTimeout ? opts.idleTimeout * 60 : undefined,
+      keepAlive: opts.keepAlive ? opts.keepAlive * 60 : undefined,
     });
     if (opts.attach) {
       await sshDevbox(resolvedName);
@@ -119,8 +119,8 @@ program
   .option("--branch <name>", "Git branch to start from")
   .option("--name <name>", "Thopter name (auto-generated if omitted)")
   .option("--snapshot <id>", "Snapshot to use")
-  .option("--idle-timeout <minutes>", "Idle timeout in minutes", parseInt)
-  .action(async (prompt: string, opts: { repo?: string; branch?: string; name?: string; snapshot?: string; idleTimeout?: number }) => {
+  .option("--keep-alive <minutes>", "Keep-alive time in minutes", parseInt)
+  .action(async (prompt: string, opts: { repo?: string; branch?: string; name?: string; snapshot?: string; keepAlive?: number }) => {
     const { runThopter } = await import("./run.js");
     await runThopter({ prompt, ...opts });
   });
@@ -129,6 +129,8 @@ program
 program
   .command("destroy")
   .alias("rm")
+  .alias("kill")
+  .alias("shutdown")
   .description("Shut down a devbox")
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
@@ -159,7 +161,7 @@ program
 // --- keepalive ---
 program
   .command("keepalive")
-  .description("Send a keepalive to reset a devbox's idle timer")
+  .description("Reset a devbox's keep-alive timer")
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
     const { keepaliveDevbox } = await import("./devbox.js");
@@ -281,7 +283,7 @@ configCmd
   .argument("<key>", "Config key")
   .argument("<value>", "Config value")
   .action(async (key: string, value: string) => {
-    const { setRunloopApiKey, setDefaultSnapshot, setStopNotifications } = await import("./config.js");
+    const { setRunloopApiKey, setDefaultSnapshot, setDefaultRepo, setDefaultBranch, setStopNotifications, setStopNotificationQuietPeriod } = await import("./config.js");
     switch (key) {
       case "runloopApiKey":
         setRunloopApiKey(value);
@@ -291,13 +293,25 @@ configCmd
         setDefaultSnapshot(value);
         console.log(`Set defaultSnapshotId to: ${value}`);
         break;
+      case "defaultRepo":
+        setDefaultRepo(value);
+        console.log(`Set defaultRepo to: ${value}`);
+        break;
+      case "defaultBranch":
+        setDefaultBranch(value);
+        console.log(`Set defaultBranch to: ${value}`);
+        break;
       case "stopNotifications":
         setStopNotifications(value === "true" || value === "1");
         console.log(`Set stopNotifications to: ${value === "true" || value === "1"}`);
         break;
+      case "stopNotificationQuietPeriod":
+        setStopNotificationQuietPeriod(parseInt(value, 10));
+        console.log(`Set stopNotificationQuietPeriod to: ${parseInt(value, 10)} seconds`);
+        break;
       default:
         console.error(`Unknown config key: ${key}`);
-        console.error("Available keys: runloopApiKey, defaultSnapshotId, stopNotifications");
+        console.error("Available keys: runloopApiKey, defaultSnapshotId, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod");
         console.error("For env vars (THOPTER_REDIS_URL, THOPTER_NTFY_CHANNEL, etc.): thopter env set <KEY> <VALUE>");
         process.exit(1);
     }
@@ -308,14 +322,17 @@ configCmd
   .description("Get a config value")
   .argument("[key]", "Config key (omit to show all)")
   .action(async (key?: string) => {
-    const { getRunloopApiKey, getDefaultSnapshot, getStopNotifications, getEnvVars } = await import("./config.js");
+    const { getRunloopApiKey, getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars } = await import("./config.js");
     if (!key) {
-      console.log(`runloopApiKey:       ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
-      console.log(`defaultSnapshotId:   ${getDefaultSnapshot() ?? "(not set)"}`);
-      console.log(`stopNotifications:   ${getStopNotifications()}`);
+      console.log(`runloopApiKey:                  ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
+      console.log(`defaultSnapshotId:              ${getDefaultSnapshot() ?? "(not set)"}`);
+      console.log(`defaultRepo:                    ${getDefaultRepo() ?? "(not set)"}`);
+      console.log(`defaultBranch:                  ${getDefaultBranch() ?? "(not set)"}`);
+      console.log(`stopNotifications:              ${getStopNotifications()}`);
+      console.log(`stopNotificationQuietPeriod:    ${getStopNotificationQuietPeriod()}s`);
       const envVars = getEnvVars();
       const envCount = Object.keys(envVars).length;
-      console.log(`envVars:             ${envCount > 0 ? `${envCount} configured (see: thopter env list)` : "(none)"}`);
+      console.log(`envVars:                        ${envCount > 0 ? `${envCount} configured (see: thopter env list)` : "(none)"}`);
     } else {
       switch (key) {
         case "runloopApiKey":
@@ -324,12 +341,21 @@ configCmd
         case "defaultSnapshotId":
           console.log(getDefaultSnapshot() ?? "(not set)");
           break;
+        case "defaultRepo":
+          console.log(getDefaultRepo() ?? "(not set)");
+          break;
+        case "defaultBranch":
+          console.log(getDefaultBranch() ?? "(not set)");
+          break;
         case "stopNotifications":
           console.log(getStopNotifications());
           break;
+        case "stopNotificationQuietPeriod":
+          console.log(`${getStopNotificationQuietPeriod()}s`);
+          break;
         default:
           console.error(`Unknown config key: ${key}`);
-          console.error("Available keys: runloopApiKey, defaultSnapshotId, stopNotifications");
+          console.error("Available keys: runloopApiKey, defaultSnapshotId, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod");
           console.error("For env vars: thopter env list");
           process.exit(1);
       }

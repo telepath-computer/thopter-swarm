@@ -128,6 +128,20 @@ export async function runSetup(): Promise<void> {
     console.log("  Saved.");
   }
 
+  // CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+  if (!currentEnv.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS) {
+    console.log();
+    console.log("  Claude Code Agent Teams (optional)");
+    console.log("  Enables the experimental agent teams feature in Claude Code.");
+    const enableTeams = await ask("  Enable CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1? [Y/n]: ");
+    if (!enableTeams || enableTeams.toLowerCase() === "y" || enableTeams.toLowerCase() === "yes") {
+      setEnvVar("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
+      console.log("  Enabled.");
+    } else {
+      console.log("  Skipped. Enable later with: thopter env set CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 1");
+    }
+  }
+
   // Additional env vars
   while (true) {
     console.log();
@@ -209,7 +223,7 @@ export async function runSetup(): Promise<void> {
   console.log("Manage env vars later with: thopter env {list,set,delete}");
   console.log("");
   console.log("A couple things to keep in mind:");
-  console.log("  - Thopters suspend after 12 hours from launch or the most recent keepalive event:");
+  console.log("  - Thopters shut down after 12 hours. Reset the timer with:");
   console.log("    thopter keepalive <name> ");
   console.log("    A suspended thopter can be resumed with: thopter resume <name>");
   console.log("  - Thopter github credentials can only modify branches starting with");

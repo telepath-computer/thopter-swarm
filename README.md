@@ -110,10 +110,10 @@ thopter destroy my-thopter  # done for good
 | `thopter create --snapshot <id>` | Create from a specific snapshot |
 | `thopter create --fresh` | Create without using default snapshot |
 | `thopter create -a` | Create and immediately SSH in |
-| `thopter create --idle-timeout <min>` | Set idle timeout in minutes (default: 720) |
+| `thopter create --keep-alive <min>` | Set keep-alive time in minutes (default: 720) |
 | `thopter suspend <name>` | Suspend (preserves disk, can resume later) |
 | `thopter resume <name>` | Resume a suspended devbox |
-| `thopter keepalive <name>` | Reset the idle timer |
+| `thopter keepalive <name>` | Reset the keep-alive timer |
 | `thopter destroy <name>` | Permanently shut down a devbox |
 
 ### Connecting
@@ -264,7 +264,7 @@ Each entry copies the local file to the specified remote path on the devbox. Thi
 3. After the devbox is running, env vars from `~/.thopter.json` are written to `~/.thopter-env`, git credentials are configured via the credential store, and thopter scripts (hooks, heartbeat, status) are uploaded
 4. Claude Code hooks fire on session events (start, stop, notification, prompt, tool use) and report to Redis via `thopter-status`
 5. A cron job runs a heartbeat every ~10 seconds, setting an `alive` key with 30s TTL as a dead-man's switch
-6. Devboxes auto-suspend after 12 hours idle (configurable via `--idle-timeout`)
+6. Devboxes shut down after 12 hours (configurable via `--keep-alive`); reset with `thopter keepalive`
 
 ### Devbox Contents
 

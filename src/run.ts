@@ -5,7 +5,7 @@
 import { createInterface } from "node:readline";
 import { createDevbox } from "./devbox.js";
 import { getClient } from "./client.js";
-import { getDefaultSnapshot } from "./config.js";
+import { getDefaultSnapshot, getDefaultRepo, getDefaultBranch } from "./config.js";
 import { generateName } from "./names.js";
 
 function buildRunPrompt(opts: {
@@ -58,7 +58,7 @@ export async function runThopter(opts: {
   branch?: string;
   name?: string;
   snapshot?: string;
-  idleTimeout?: number;
+  keepAlive?: number;
 }): Promise<void> {
   // Snapshot is required for run
   const snapshotId = opts.snapshot ?? getDefaultSnapshot();
@@ -72,19 +72,42 @@ export async function runThopter(opts: {
   // Interactive prompting if --repo not given
   let repo = opts.repo;
   let branch = opts.branch;
+  const configDefaultRepo = getDefaultRepo();
+  const configDefaultBranch = getDefaultBranch();
   if (!repo) {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
-    repo = await ask(rl, "Repository (owner/repo): ");
+    const repoPrompt = configDefaultRepo
+      ? `Repository (owner/repo) [${configDefaultRepo}]: `
+      : "Repository (owner/repo): ";
+    repo = await ask(rl, repoPrompt);
+    if (!repo && configDefaultRepo) {
+      repo = configDefaultRepo;
+      console.log(`  Using default repo: ${repo}`);
+    }
     if (!repo) {
       rl.close();
       console.error("Error: Repository is required.");
+      console.error("  Tip: set a default with: thopter config set defaultRepo owner/repo");
       process.exit(1);
     }
     if (!branch) {
-      const answer = await ask(rl, "Branch (enter for default): ");
-      if (answer) branch = answer;
+      const branchPrompt = configDefaultBranch
+        ? `Branch [${configDefaultBranch}]: `
+        : "Branch (enter for default): ";
+      const answer = await ask(rl, branchPrompt);
+      if (answer) {
+        branch = answer;
+      } else if (configDefaultBranch) {
+        branch = configDefaultBranch;
+        console.log(`  Using default branch: ${branch}`);
+      }
     }
     rl.close();
+  } else {
+    // --repo was given on command line; still apply default branch if not specified
+    if (!branch && configDefaultBranch) {
+      branch = configDefaultBranch;
+    }
   }
 
   // Validate repo and branch to prevent shell injection
@@ -98,7 +121,7 @@ export async function runThopter(opts: {
   const devboxId = await createDevbox({
     name: thopterName,
     snapshotId,
-    idleTimeout: opts.idleTimeout ? opts.idleTimeout * 60 : undefined,
+    keepAlive: opts.keepAlive ? opts.keepAlive * 60 : undefined,
   });
 
   const client = getClient();
