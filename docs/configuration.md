@@ -42,13 +42,13 @@ Thopters push notifications to your phone or desktop via [ntfy.sh](https://ntfy.
 thopter env set THOPTER_NTFY_CHANNEL my-thopters-abc123
 ```
 
-Stop notifications (when Claude finishes a response) are off by default since they're noisy during interactive sessions. Enable them with:
+Stop notifications (when Claude finishes a response) are enabled by default. They're automatically suppressed during interactive sessions — if you sent a message within the last 30 seconds, the notification is silenced (configurable via `stopNotificationQuietPeriod`). Disable them with:
 
 ```bash
-thopter config set stopNotifications true
+thopter config set stopNotifications false
 ```
 
-New thopters created after configuring these will send notifications. Existing thopters need to be re-created or have `THOPTER_NTFY_CHANNEL` (and optionally `THOPTER_STOP_NOTIFY=1`) added to their `~/.thopter-env` manually.
+New thopters created after configuring these will send notifications. Existing thopters need to be re-created or have `THOPTER_NTFY_CHANNEL` added to their `~/.thopter-env` manually.
 
 ## Custom CLAUDE.md
 

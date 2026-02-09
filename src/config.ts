@@ -90,7 +90,7 @@ export function setDefaultBranch(branch: string): void {
 }
 
 export function getStopNotifications(): boolean {
-  return loadLocalConfig().stopNotifications ?? false;
+  return loadLocalConfig().stopNotifications ?? true;
 }
 
 export function setStopNotifications(enabled: boolean): void {

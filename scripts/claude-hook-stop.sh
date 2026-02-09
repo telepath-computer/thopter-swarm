@@ -23,9 +23,9 @@ fi
 # Stream transcript entries to Redis for thopter tail
 [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" 2>/dev/null || true
 
-# Send ntfy notification (only when explicitly enabled via stopNotifications config)
+# Send ntfy notification (enabled by default; set THOPTER_STOP_NOTIFY=0 to disable)
 # Suppress if there's a recent user message (user is actively engaged)
-if [ -n "${THOPTER_NTFY_CHANNEL:-}" ] && [ "${THOPTER_STOP_NOTIFY:-}" = "1" ]; then
+if [ -n "${THOPTER_NTFY_CHANNEL:-}" ] && [ "${THOPTER_STOP_NOTIFY:-1}" != "0" ]; then
     QUIET_PERIOD="${THOPTER_STOP_NOTIFY_QUIET_PERIOD:-30}"
     SUPPRESS=0
     if [ "$QUIET_PERIOD" != "0" ] && [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then

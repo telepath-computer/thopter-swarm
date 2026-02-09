@@ -48,7 +48,7 @@ scripts/        Uploaded to devboxes at create time
 
 ## Config Reference
 
-See `thopter-json-reference.md` for all `~/.thopter.json` keys. Key ones: `runloopApiKey`, `defaultSnapshotId`, `defaultRepo`, `defaultBranch`, `envVars` (must include `GH_TOKEN`, `THOPTER_REDIS_URL`), `claudeMdPath`, `uploads`, `stopNotifications`.
+See `thopter-json-reference.md` for all `~/.thopter.json` keys. Key ones: `runloopApiKey`, `defaultSnapshotId`, `defaultRepo`, `defaultBranch`, `envVars` (must include `GH_TOKEN`, `THOPTER_REDIS_URL`), `claudeMdPath`, `uploads`.
 
 ## Stack
 

@@ -325,8 +325,8 @@ export async function createDevbox(opts: {
     envLines.push(`export THOPTER_NAME="${escapeEnvValue(opts.name)}"`);
     envLines.push(`export THOPTER_ID="${escapeEnvValue(devbox.id)}"`);
     envLines.push(`export THOPTER_OWNER="${escapeEnvValue(ownerName)}"`);
-    if (getStopNotifications()) {
-      envLines.push(`export THOPTER_STOP_NOTIFY=1`);
+    if (!getStopNotifications()) {
+      envLines.push(`export THOPTER_STOP_NOTIFY=0`);
     }
     const quietPeriod = getStopNotificationQuietPeriod();
     envLines.push(`export THOPTER_STOP_NOTIFY_QUIET_PERIOD="${quietPeriod}"`);
