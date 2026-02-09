@@ -18,7 +18,6 @@ import {
   getEnvVars,
   escapeEnvValue,
   getDefaultSnapshot,
-  getNtfyChannel,
   getClaudeMdPath,
   getUploads,
   getStopNotifications,
@@ -328,10 +327,6 @@ export async function createDevbox(opts: {
     envLines.push(`export THOPTER_NAME="${escapeEnvValue(opts.name)}"`);
     envLines.push(`export THOPTER_ID="${escapeEnvValue(devbox.id)}"`);
     envLines.push(`export THOPTER_OWNER="${escapeEnvValue(ownerName)}"`);
-    const ntfyChannel = getNtfyChannel();
-    if (ntfyChannel) {
-      envLines.push(`export THOPTER_NTFY_CHANNEL="${escapeEnvValue(ntfyChannel)}"`);
-    }
     if (getStopNotifications()) {
       envLines.push(`export THOPTER_STOP_NOTIFY=1`);
     }

@@ -281,20 +281,11 @@ configCmd
   .argument("<key>", "Config key")
   .argument("<value>", "Config value")
   .action(async (key: string, value: string) => {
-    const { setRunloopApiKey, setRedisUrl, setNtfyChannel, setDefaultSnapshot, setStopNotifications } = await import("./config.js");
+    const { setRunloopApiKey, setDefaultSnapshot, setStopNotifications } = await import("./config.js");
     switch (key) {
       case "runloopApiKey":
         setRunloopApiKey(value);
         console.log("Set runloopApiKey.");
-        break;
-      case "redisUrl":
-        setRedisUrl(value);
-        console.log("Set redisUrl.");
-        break;
-      case "ntfyChannel":
-        setNtfyChannel(value);
-        console.log(`Set ntfyChannel to: ${value}`);
-        console.log(`Subscribe at: https://ntfy.sh/${value}`);
         break;
       case "defaultSnapshotId":
         setDefaultSnapshot(value);
@@ -306,7 +297,8 @@ configCmd
         break;
       default:
         console.error(`Unknown config key: ${key}`);
-        console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId, stopNotifications");
+        console.error("Available keys: runloopApiKey, defaultSnapshotId, stopNotifications");
+        console.error("For env vars (REDIS_URL, THOPTER_NTFY_CHANNEL, etc.): thopter env set <KEY> <VALUE>");
         process.exit(1);
     }
   });
@@ -316,23 +308,18 @@ configCmd
   .description("Get a config value")
   .argument("[key]", "Config key (omit to show all)")
   .action(async (key?: string) => {
-    const { getRunloopApiKey, getRedisUrl, getNtfyChannel, getDefaultSnapshot, getStopNotifications } = await import("./config.js");
+    const { getRunloopApiKey, getDefaultSnapshot, getStopNotifications, getEnvVars } = await import("./config.js");
     if (!key) {
       console.log(`runloopApiKey:       ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
-      console.log(`redisUrl:            ${getRedisUrl() ? "(set)" : "(not set)"}`);
-      console.log(`ntfyChannel:         ${getNtfyChannel() ?? "(not set)"}`);
       console.log(`defaultSnapshotId:   ${getDefaultSnapshot() ?? "(not set)"}`);
       console.log(`stopNotifications:   ${getStopNotifications()}`);
+      const envVars = getEnvVars();
+      const envCount = Object.keys(envVars).length;
+      console.log(`envVars:             ${envCount > 0 ? `${envCount} configured (see: thopter env list)` : "(none)"}`);
     } else {
       switch (key) {
         case "runloopApiKey":
           console.log(getRunloopApiKey() ? "(set)" : "(not set)");
-          break;
-        case "redisUrl":
-          console.log(getRedisUrl() ? "(set)" : "(not set)");
-          break;
-        case "ntfyChannel":
-          console.log(getNtfyChannel() ?? "(not set)");
           break;
         case "defaultSnapshotId":
           console.log(getDefaultSnapshot() ?? "(not set)");
@@ -342,7 +329,8 @@ configCmd
           break;
         default:
           console.error(`Unknown config key: ${key}`);
-          console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId, stopNotifications");
+          console.error("Available keys: runloopApiKey, defaultSnapshotId, stopNotifications");
+          console.error("For env vars: thopter env list");
           process.exit(1);
       }
     }

@@ -30,9 +30,7 @@ export interface UploadEntry {
 
 interface LocalConfig {
   runloopApiKey?: string;
-  redisUrl?: string;
   defaultSnapshotId?: string;
-  ntfyChannel?: string;
   claudeMdPath?: string;
   uploads?: UploadEntry[];
   stopNotifications?: boolean;
@@ -68,16 +66,6 @@ export function clearDefaultSnapshot(): void {
   saveLocalConfig(config);
 }
 
-export function getNtfyChannel(): string | undefined {
-  return loadLocalConfig().ntfyChannel;
-}
-
-export function setNtfyChannel(channel: string): void {
-  const config = loadLocalConfig();
-  config.ntfyChannel = channel;
-  saveLocalConfig(config);
-}
-
 export function getStopNotifications(): boolean {
   return loadLocalConfig().stopNotifications ?? false;
 }
@@ -95,16 +83,6 @@ export function getRunloopApiKey(): string | undefined {
 export function setRunloopApiKey(key: string): void {
   const config = loadLocalConfig();
   config.runloopApiKey = key;
-  saveLocalConfig(config);
-}
-
-export function getRedisUrl(): string | undefined {
-  return loadLocalConfig().redisUrl;
-}
-
-export function setRedisUrl(url: string): void {
-  const config = loadLocalConfig();
-  config.redisUrl = url;
   saveLocalConfig(config);
 }
 
@@ -164,7 +142,8 @@ export function loadConfigIntoEnv(): void {
   if (config.runloopApiKey && !process.env.RUNLOOP_API_KEY) {
     process.env.RUNLOOP_API_KEY = config.runloopApiKey;
   }
-  if (config.redisUrl && !process.env.REDIS_URL) {
-    process.env.REDIS_URL = config.redisUrl;
+  const envVars = config.envVars ?? {};
+  if (envVars.REDIS_URL && !process.env.REDIS_URL) {
+    process.env.REDIS_URL = envVars.REDIS_URL;
   }
 }

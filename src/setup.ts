@@ -8,10 +8,6 @@ import { getClient } from "./client.js";
 import {
   getRunloopApiKey,
   setRunloopApiKey,
-  getRedisUrl,
-  setRedisUrl,
-  getNtfyChannel,
-  setNtfyChannel,
   getEnvVars,
   setEnvVar,
   loadConfigIntoEnv,
@@ -84,11 +80,11 @@ export async function runSetup(): Promise<void> {
   // --- Step 2: Redis URL ---
   console.log("Step 2: Redis URL");
   console.log("  Upstash Redis URL for status reporting.");
-  const redisUrl = await askWithDefault("  Redis URL:", getRedisUrl());
-  setRedisUrl(redisUrl);
+  const currentRedisUrl = getEnvVars().REDIS_URL;
+  const redisUrl = await askWithDefault("  Redis URL:", currentRedisUrl);
   setEnvVar("REDIS_URL", redisUrl);
   loadConfigIntoEnv();
-  console.log("  Saved (config + devbox env vars).");
+  console.log("  Saved.");
   console.log();
 
   // --- Step 3: Devbox environment variables ---
@@ -114,26 +110,6 @@ export async function runSetup(): Promise<void> {
     console.log("  Saved.");
   }
 
-  // ANTHROPIC_API_KEY
-  if (!currentEnv.ANTHROPIC_API_KEY) {
-    console.log("\n  ANTHROPIC_API_KEY (optional — needed for Claude Code on devboxes)");
-    const anthropicKey = await ask("  Anthropic API key (enter to skip): ");
-    if (anthropicKey) {
-      setEnvVar("ANTHROPIC_API_KEY", anthropicKey);
-      console.log("  Saved.");
-    }
-  }
-
-  // OPENAI_API_KEY
-  if (!currentEnv.OPENAI_API_KEY) {
-    console.log("\n  OPENAI_API_KEY (optional — needed for Codex CLI on devboxes)");
-    const openaiKey = await ask("  OpenAI API key (enter to skip): ");
-    if (openaiKey) {
-      setEnvVar("OPENAI_API_KEY", openaiKey);
-      console.log("  Saved.");
-    }
-  }
-
   // Additional env vars
   while (true) {
     console.log();
@@ -149,21 +125,21 @@ export async function runSetup(): Promise<void> {
   console.log("Step 4: Push Notifications (ntfy.sh)");
   console.log("  Get notified on your phone when Claude stops or needs input.");
   console.log("  Pick a unique channel name and subscribe at https://ntfy.sh/<channel>");
-  const currentNtfy = getNtfyChannel();
+  const currentNtfy = getEnvVars().THOPTER_NTFY_CHANNEL;
   if (currentNtfy) {
     console.log(`  Current channel: ${currentNtfy}`);
     const newNtfy = await ask("  ntfy channel [keep current]: ");
     if (newNtfy) {
-      setNtfyChannel(newNtfy);
+      setEnvVar("THOPTER_NTFY_CHANNEL", newNtfy);
       console.log(`  Updated. Subscribe at: https://ntfy.sh/${newNtfy}`);
     }
   } else {
     const ntfy = await ask("  ntfy channel (enter to skip): ");
     if (ntfy) {
-      setNtfyChannel(ntfy);
+      setEnvVar("THOPTER_NTFY_CHANNEL", ntfy);
       console.log(`  Saved. Subscribe at: https://ntfy.sh/${ntfy}`);
     } else {
-      console.log("  Skipped. Set later with: thopter config set ntfyChannel <channel>");
+      console.log("  Skipped. Set later with: thopter env set THOPTER_NTFY_CHANNEL <channel>");
     }
   }
   console.log();

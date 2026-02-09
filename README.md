@@ -66,6 +66,7 @@ This creates a thopter, clones the repo, and launches Claude with your prompt in
 
 ```bash
 thopter status              # see all your thopters and what they're doing
+thopter tail worker-1 -f    # follow Claude's transcript in real time
 thopter attach worker-1     # attach to tmux (iTerm2 -CC mode)
 thopter ssh worker-1        # SSH in to poke around
 ```
@@ -75,6 +76,7 @@ thopter ssh worker-1        # SSH in to poke around
 ```bash
 thopter status              # overview of all thopters
 thopter status my-thopter   # detailed status + logs for one
+thopter tail my-thopter -f  # follow Claude's transcript in real time
 
 thopter suspend my-thopter  # pause (preserves disk, stops billing)
 thopter resume my-thopter   # wake up later
@@ -121,8 +123,13 @@ thopter destroy my-thopter  # done for good
 |---------|-------------|
 | `thopter status` | Unified view of all thopters (Runloop + Redis) |
 | `thopter status <name>` | Detailed status + logs for one thopter |
+| `thopter tail <name>` | Show last 20 transcript entries |
+| `thopter tail <name> -f` | Follow transcript in real time |
+| `thopter tail <name> -n 50` | Show last 50 entries |
 
 `thopter status` (aliased as `thopter list` / `thopter ls`) shows a combined view with devbox state from Runloop and agent state from Redis: task description, whether Claude is running, last heartbeat time.
+
+`thopter tail` streams Claude's transcript from Redis, showing a condensed view of each conversation turn (user messages, assistant responses, tool calls). Use `-f` to follow in real time — like `tail -f` for your thopter's Claude session.
 
 ### Snapshots
 
@@ -162,13 +169,11 @@ All configuration lives in this file. Managed via `thopter setup`, `thopter conf
 | Key | Description |
 |-----|-------------|
 | `runloopApiKey` | Runloop API key (required) |
-| `redisUrl` | Upstash Redis URL for status monitoring (required) |
 | `defaultSnapshotId` | Default snapshot for `create` (set via `snapshot default`) |
-| `ntfyChannel` | ntfy.sh channel for push notifications |
 | `stopNotifications` | Enable notifications on Claude stop events (`true`/`false`) |
 | `claudeMdPath` | Path to a custom CLAUDE.md to deploy to devboxes |
 | `uploads` | Array of `{local, remote}` file upload entries (see below) |
-| `envVars` | Key-value map of env vars injected into devboxes |
+| `envVars` | Key-value map of env vars injected into devboxes (see below) |
 
 ### Devbox Environment Variables
 
@@ -177,11 +182,14 @@ Env vars in the `envVars` section are written to `~/.thopter-env` inside each de
 | Variable | Purpose |
 |----------|---------|
 | `GH_TOKEN` | GitHub token for git clone/push and `gh` CLI (required) |
-| `ANTHROPIC_API_KEY` | Claude Code authentication |
-| `OPENAI_API_KEY` | Codex CLI authentication |
-| `REDIS_URL` | Status reporting from inside devboxes |
+| `REDIS_URL` | Upstash Redis URL for status monitoring (required) |
+| `THOPTER_NTFY_CHANNEL` | ntfy.sh channel for push notifications (optional) |
+
+`REDIS_URL` is used both by the CLI (for `thopter status` and `thopter tail`) and on devboxes (for heartbeats and status reporting).
 
 `GH_TOKEN` is also used to configure git credentials (HTTPS credential store) after the devbox boots.
+
+Add any other env vars your devboxes need (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) with `thopter env set`.
 
 **Tip:** Use `thopter env set GH_TOKEN` (without the value) to enter it interactively, keeping it out of shell history.
 
@@ -206,7 +214,7 @@ Thopters push notifications to your phone or desktop via [ntfy.sh](https://ntfy.
 3. Configure:
 
 ```bash
-thopter config set ntfyChannel my-thopters-abc123
+thopter env set THOPTER_NTFY_CHANNEL my-thopters-abc123
 ```
 
 Stop notifications (when Claude finishes a response) are off by default since they're noisy during interactive sessions. Enable them with:
@@ -282,6 +290,7 @@ src/           TypeScript source
   cli.ts       CLI entrypoint (Commander.js commands)
   devbox.ts    Devbox lifecycle (create, list, destroy, ssh, exec, snapshot)
   run.ts       thopter run (create + clone + launch Claude)
+  tail.ts      thopter tail (stream transcript from Redis)
   status.ts    Redis status queries
   config.ts    Local config (~/.thopter.json) management
   client.ts    Runloop SDK singleton
@@ -294,6 +303,7 @@ scripts/       Devbox-side scripts (uploaded on create)
   thopter-heartbeat.sh         Heartbeat cron loop
   thopter-cron-install.sh      Installs heartbeat cron job
   thopter-last-message.mjs     Extracts last assistant message from transcript
+  thopter-transcript-push.mjs  Streams transcript entries to Redis (for thopter tail)
   thopter-claude-md.md         CLAUDE.md deployed to devboxes
   install-claude-hooks.mjs     Merges hook config into Claude settings.json
   claude-hook-*.sh             Individual Claude Code event hooks
