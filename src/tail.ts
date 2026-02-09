@@ -82,12 +82,22 @@ function parseEntry(raw: string): TranscriptEntry | null {
   }
 }
 
+function printEntries(entries: string[]): void {
+  for (const raw of entries) {
+    const entry = parseEntry(raw);
+    if (entry) {
+      console.log(formatEntry(entry));
+    }
+  }
+}
+
 export async function tailTranscript(
   name: string,
   opts: { follow?: boolean; lines?: number },
 ): Promise<void> {
   const redis = getRedis();
   const key = `thopter:${name}:transcript`;
+  const seqKey = `thopter:${name}:transcript_seq`;
   const numLines = opts.lines ?? 20;
 
   try {
@@ -100,42 +110,54 @@ export async function tailTranscript(
     }
 
     // Print initial entries
-    for (const raw of entries) {
-      const entry = parseEntry(raw);
-      if (entry) {
-        console.log(formatEntry(entry));
-      }
-    }
+    printEntries(entries);
 
     if (!opts.follow) {
       return;
     }
 
-    // Follow mode — poll for new entries
+    // Follow mode — poll for new entries using a sequence counter.
+    // The devbox-side script increments a counter on each push.
+    // This works correctly even at the 500-entry list cap where LLEN
+    // stays constant after RPUSH + LTRIM.
     if (entries.length === 0) {
       console.log(`No transcript data yet for '${name}'. Waiting...`);
     }
     console.log(c.dim(`Tailing ${name}... (Ctrl-C to stop)`));
 
-    let knownLength = await redis.llen(key);
+    // Snapshot current state: remember the seq counter and list length
+    let lastSeq = parseInt(await redis.get(seqKey) ?? "0", 10);
+    let lastLen = await redis.llen(key);
 
     // Poll every second
     const interval = setInterval(async () => {
       try {
-        const currentLength = await redis.llen(key);
-        if (currentLength > knownLength) {
-          // Fetch only new entries
-          const newEntries = await redis.lrange(key, knownLength, -1);
-          for (const raw of newEntries) {
-            const entry = parseEntry(raw);
-            if (entry) {
-              console.log(formatEntry(entry));
-            }
+        const currentSeq = parseInt(await redis.get(seqKey) ?? "0", 10);
+
+        if (currentSeq > lastSeq) {
+          // New entries were pushed. Figure out how many are new.
+          const newCount = currentSeq - lastSeq;
+          const currentLen = await redis.llen(key);
+
+          // Fetch the last `newCount` entries (or all if list was trimmed)
+          const fetchCount = Math.min(newCount, currentLen);
+          const newEntries = await redis.lrange(key, -fetchCount, -1);
+          printEntries(newEntries);
+
+          lastSeq = currentSeq;
+          lastLen = currentLen;
+        } else {
+          // No seq counter (old devbox without transcript_seq)?
+          // Fall back to length-based detection.
+          const currentLen = await redis.llen(key);
+          if (currentLen > lastLen) {
+            const newEntries = await redis.lrange(key, lastLen, -1);
+            printEntries(newEntries);
+            lastLen = currentLen;
+          } else if (currentLen < lastLen) {
+            // List was cleared — reset
+            lastLen = currentLen;
           }
-          knownLength = currentLength;
-        } else if (currentLength < knownLength) {
-          // List was trimmed or cleared — reset
-          knownLength = currentLength;
         }
       } catch {
         // Ignore transient Redis errors during polling

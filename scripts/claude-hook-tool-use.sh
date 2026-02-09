@@ -7,5 +7,5 @@ read -t 1 INPUT || true
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 [ -n "$TRANSCRIPT" ] && echo "$TRANSCRIPT" > /tmp/thopter-active || touch /tmp/thopter-active
 
-# Stream transcript entries to Redis for thopter tail
-[ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" 2>/dev/null &
+# Stream transcript entries to Redis for thopter tail (synchronous to avoid cursor races)
+[ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" 2>/dev/null || true
