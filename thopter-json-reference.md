@@ -30,3 +30,25 @@ Add any other env vars your devboxes need — they're all passed through.
 | Key | Description |
 |-----|-------------|
 | `docs` | Ignored by the CLI. Points to this reference file. |
+
+## Example
+
+```json
+{
+  "docs": "See thopter-json-reference.md for all config options.",
+  "runloopApiKey": "rl_api_abc123...",
+  "defaultSnapshotId": "jw/golden",
+  "stopNotifications": true,
+  "claudeMdPath": "/Users/jw/projects/my-claude-instructions.md",
+  "uploads": [
+    { "local": "/Users/jw/.gitconfig", "remote": "/home/user/.gitconfig" }
+  ],
+  "envVars": {
+    "GH_TOKEN": "ghp_abc123...",
+    "THOPTER_REDIS_URL": "rediss://default:abc123@us1-example.upstash.io:6379",
+    "THOPTER_NTFY_CHANNEL": "my-thopters-abc123",
+    "ANTHROPIC_API_KEY": "sk-ant-...",
+    "OPENAI_API_KEY": "sk-..."
+  }
+}
+```
