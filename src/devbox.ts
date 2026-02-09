@@ -19,6 +19,7 @@ import {
   escapeEnvValue,
   getDefaultSnapshot,
   getNtfyChannel,
+  getStopNotifications,
 } from "./config.js";
 
 /** Tool installation script that runs inside the devbox on first create. */
@@ -306,6 +307,9 @@ export async function createDevbox(opts: {
     const ntfyChannel = getNtfyChannel();
     if (ntfyChannel) {
       envLines.push(`export THOPTER_NTFY_CHANNEL="${escapeEnvValue(ntfyChannel)}"`);
+    }
+    if (getStopNotifications()) {
+      envLines.push(`export THOPTER_STOP_NOTIFY=1`);
     }
     // User-configured env vars from ~/.thopter.json envVars section
     for (const [key, value] of Object.entries(envVars)) {
