@@ -5,6 +5,9 @@
 import { createInterface } from "node:readline";
 import { execSync } from "node:child_process";
 import { getClient } from "./client.js";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import {
   getRunloopApiKey,
   setRunloopApiKey,
@@ -12,6 +15,19 @@ import {
   setEnvVar,
   loadConfigIntoEnv,
 } from "./config.js";
+
+/** Ensure the docs key exists in the config file. */
+function seedDocsKey(): void {
+  const configFile = join(homedir(), ".thopter.json");
+  let config: Record<string, unknown> = {};
+  if (existsSync(configFile)) {
+    try { config = JSON.parse(readFileSync(configFile, "utf-8")); } catch { /* ignore */ }
+  }
+  if (!config.docs) {
+    config = { docs: "See thopter-json-reference.md for all config options.", ...config };
+    writeFileSync(configFile, JSON.stringify(config, null, 2) + "\n");
+  }
+}
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 
@@ -38,6 +54,8 @@ async function askWithDefault(prompt: string, current: string | undefined): Prom
 }
 
 export async function runSetup(): Promise<void> {
+  seedDocsKey();
+
   console.log("=".repeat(60));
   console.log("Thopter Swarm Setup");
   console.log("=".repeat(60));

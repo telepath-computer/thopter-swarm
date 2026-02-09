@@ -164,9 +164,7 @@ Env vars are stored in `~/.thopter.json` and written to `~/.thopter-env` inside 
 
 ### `~/.thopter.json`
 
-All configuration lives in this file. Managed via `thopter setup`, `thopter config`, `thopter env`, and `thopter snapshot default`. See [`thopter.example.jsonc`](thopter.example.jsonc) for a documented template with all available settings.
-
-The config file supports `//` line comments, so you can comment out settings you don't need.
+All configuration lives in this file. Managed via `thopter setup`, `thopter config`, `thopter env`, and `thopter snapshot default`. See [`thopter-json-reference.md`](thopter-json-reference.md) for a complete reference of all keys.
 
 | Key | Description |
 |-----|-------------|
