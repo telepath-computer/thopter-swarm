@@ -128,6 +128,20 @@ export async function runSetup(): Promise<void> {
     console.log("  Saved.");
   }
 
+  // CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+  if (!currentEnv.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS) {
+    console.log();
+    console.log("  Claude Code Agent Teams (optional)");
+    console.log("  Enables the experimental agent teams feature in Claude Code.");
+    const enableTeams = await ask("  Enable CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1? [Y/n]: ");
+    if (!enableTeams || enableTeams.toLowerCase() === "y" || enableTeams.toLowerCase() === "yes") {
+      setEnvVar("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
+      console.log("  Enabled.");
+    } else {
+      console.log("  Skipped. Enable later with: thopter env set CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 1");
+    }
+  }
+
   // Additional env vars
   while (true) {
     console.log();
