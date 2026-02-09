@@ -21,6 +21,7 @@ import {
   getClaudeMdPath,
   getUploads,
   getStopNotifications,
+  getStopNotificationQuietPeriod,
 } from "./config.js";
 
 /** Tool installation script that runs inside the devbox on first create. */
@@ -335,6 +336,8 @@ export async function createDevbox(opts: {
     if (getStopNotifications()) {
       envLines.push(`export THOPTER_STOP_NOTIFY=1`);
     }
+    const quietPeriod = getStopNotificationQuietPeriod();
+    envLines.push(`export THOPTER_STOP_NOTIFY_QUIET_PERIOD="${quietPeriod}"`);
     // User-configured env vars from ~/.thopter.json envVars section
     for (const [key, value] of Object.entries(envVars)) {
       envLines.push(`export ${key}="${escapeEnvValue(value)}"`);

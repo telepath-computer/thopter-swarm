@@ -7,6 +7,7 @@
 | `runloopApiKey` | string | yes | Runloop API key. Get from the Runloop dashboard. |
 | `defaultSnapshotId` | string | no | Snapshot used by `thopter create` when `--snapshot` isn't passed. Set via `thopter snapshot default`. |
 | `stopNotifications` | boolean | no | Send ntfy.sh notification when Claude finishes a response. Default `false`. Best for unattended thopters — noisy in interactive sessions. |
+| `stopNotificationQuietPeriod` | number | no | Seconds after a user message during which stop notifications are suppressed (user is likely still engaged). Default `30`. Set to `0` to always send. |
 | `claudeMdPath` | string | no | Path to a custom CLAUDE.md deployed to `~/.claude/CLAUDE.md` on every new devbox. Omit to use the built-in default. |
 | `uploads` | array | no | Files to copy to new devboxes at create time. Each entry: `{"local": "/path/on/laptop", "remote": "/path/on/devbox"}`. Runs after all other provisioning. |
 | `envVars` | object | yes | Key-value map of environment variables injected into every devbox. See below. |
@@ -38,6 +39,7 @@ Add any other env vars your devboxes need — they're all passed through, e.g. `
   "runloopApiKey": "rl_api_abc123...",
   "defaultSnapshotId": "jsw-golden",
   "stopNotifications": true,
+  "stopNotificationQuietPeriod": 30,
   "claudeMdPath": "/Users/jw/projects/my-claude-instructions.md",
   "uploads": [
     { "local": "/Users/jw/.npmrc", "remote": "/home/user/.npmrc" }

@@ -34,6 +34,7 @@ interface LocalConfig {
   claudeMdPath?: string;
   uploads?: UploadEntry[];
   stopNotifications?: boolean;
+  stopNotificationQuietPeriod?: number;
   envVars?: Record<string, string>;
 }
 
@@ -73,6 +74,16 @@ export function getStopNotifications(): boolean {
 export function setStopNotifications(enabled: boolean): void {
   const config = loadLocalConfig();
   config.stopNotifications = enabled;
+  saveLocalConfig(config);
+}
+
+export function getStopNotificationQuietPeriod(): number {
+  return loadLocalConfig().stopNotificationQuietPeriod ?? 30;
+}
+
+export function setStopNotificationQuietPeriod(seconds: number): void {
+  const config = loadLocalConfig();
+  config.stopNotificationQuietPeriod = seconds;
   saveLocalConfig(config);
 }
 
