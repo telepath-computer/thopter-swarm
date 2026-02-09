@@ -132,7 +132,7 @@ export async function runThopter(opts: {
     contents: fullPrompt,
   });
 
-  const launchCmd = `tmux kill-session -t claude 2>/dev/null || true; cd /home/user/${repoName} && tmux new-session -d -s claude 'claude --dangerously-skip-permissions -p "Read the file ${promptPath} and follow the instructions in it."'`;
+  const launchCmd = `tmux kill-session -t claude 2>/dev/null || true; cd /home/user/${repoName} && tmux new-session -d -s claude 'claude --dangerously-skip-permissions "Read the file ${promptPath} and follow the instructions in it."'`;
   await client.devboxes.executeAsync(devboxId, { command: launchCmd });
 
   // Step 4: Print summary
