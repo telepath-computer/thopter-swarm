@@ -83,10 +83,11 @@ function summarizeToolUse(toolName, input) {
 }
 
 function extractText(content) {
+  if (typeof content === "string") return content.replace(/\n/g, " ").slice(0, 200);
   if (!Array.isArray(content)) return "";
   return content
-    .filter((b) => b.type === "text" && b.text)
-    .map((b) => b.text)
+    .map((b) => (typeof b === "string" ? b : b.type === "text" ? b.text : ""))
+    .filter(Boolean)
     .join(" ")
     .replace(/\n/g, " ")
     .slice(0, 200);
@@ -96,9 +97,10 @@ function transformEntry(entry) {
   const entries = [];
   const ts = new Date().toISOString();
 
-  if (entry.type === "human") {
+  if (entry.type === "user") {
     const text = extractText(entry.message?.content);
-    if (text) {
+    // Skip internal Claude Code plumbing (slash commands, local-command wrappers)
+    if (text && !text.startsWith("<") && !text.startsWith("[Request interrupted")) {
       entries.push({ ts, role: "user", summary: text });
     }
   } else if (entry.type === "assistant") {
@@ -134,25 +136,30 @@ function transformEntry(entry) {
 
 // Guard against concurrent invocations racing on the cursor file.
 // Hooks call this script synchronously (no &), but rapid events can
-// still overlap. Use a simple pid-based lock with staleness check.
+// still overlap. Use O_CREAT|O_EXCL for atomic lock acquisition.
 function acquireLock() {
   try {
-    if (existsSync(LOCK_FILE)) {
-      const pid = parseInt(readFileSync(LOCK_FILE, "utf-8").trim(), 10);
-      // Check if the lock holder is still alive
-      if (pid) {
-        try {
-          process.kill(pid, 0); // signal 0 = check existence
-          return false; // Lock holder is alive — skip this run
-        } catch {
-          // Lock holder is dead — stale lock, safe to take over
-        }
-      }
-    }
-    writeFileSync(LOCK_FILE, String(process.pid));
+    // Atomic: fails if file already exists (no TOCTOU race)
+    writeFileSync(LOCK_FILE, String(process.pid), { flag: "wx" });
     return true;
   } catch {
-    return true; // On error, proceed best-effort
+    // Lock file exists — check if holder is still alive
+    try {
+      const pid = parseInt(readFileSync(LOCK_FILE, "utf-8").trim(), 10);
+      if (pid) {
+        process.kill(pid, 0); // signal 0 = check existence
+        return false; // Lock holder is alive — skip this run
+      }
+    } catch {
+      // Lock holder is dead or unreadable — stale lock
+    }
+    // Take over stale lock
+    try {
+      writeFileSync(LOCK_FILE, String(process.pid));
+      return true;
+    } catch {
+      return true; // Best-effort
+    }
   }
 }
 
