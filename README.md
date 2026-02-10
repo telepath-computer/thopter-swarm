@@ -6,6 +6,23 @@ Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentia
 
 This is just an internal dev tool we use a [Telepath](https://telepath.computer), but we've made it open as a conversation starter, for feedback, and contributions. Message josh@telepath.computer to chat about it.
 
+## Rationale
+
+We think the optimal way to run Claude Code (or any coding agent) is with:
+- yolo mode
+- push notifications (for when it's done or needs input)
+- multiple instances in parallel
+- remote/cloud machines (for detachable, long-running sessions attachable any device, and to not dog down your laptop's resources)
+- full shell access
+- "golden" bootstrap images that are ready to get to work (pre-authenticated, repos checked out, deps installed, configured how you like it)
+- connected to your git repos (to interact with issues, pull/create branches, make PRs, etc)
+- safely (e.g. a rogue agent can't do catastrophic damage)
+- frictonless devex (launching and managing must be hesistation-free)
+- Anthropic's max plan for cost savings
+- mobile access and notifs for launching and monitoring workers (not implemented here yet, on the TODO list)
+
+This is Telepath's attempt to get this developer experience by wrapping a capable VM sandbox provider with a management and monitoring layer built for day to day developer claude code use.
+
 ## Quick Start
 
 ### Prerequisites
