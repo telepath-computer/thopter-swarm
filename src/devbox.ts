@@ -381,7 +381,7 @@ export async function createDevbox(opts: {
   }
 }
 
-export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
+export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "narrow" }): Promise<void> {
   const client = getClient();
   const { getRedisInfoForNames, relativeTime } = await import("./status.js");
   const { formatTable } = await import("./output.js");
@@ -439,8 +439,10 @@ export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
     }, 0);
     // gaps between all 8 columns (7 × 2) + fixed cols width
     const wideOverhead = 7 * 2 + wideFixedWidth;
-    // Need at least 60 chars for the two flex columns to stay in wide mode
-    const tight = wideOverhead > cols - 60;
+    // Explicit flag overrides auto-detection; otherwise need 60 chars for flex columns
+    const tight = opts?.layout === "narrow" ? true
+      : opts?.layout === "wide" ? false
+      : wideOverhead > cols - 60;
 
     // Gray out suspended rows
     const DIM = "\x1b[90m";

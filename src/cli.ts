@@ -99,14 +99,17 @@ program
   .description("Show thopter status (unified Runloop + Redis view)")
   .argument("[name]", "Thopter name (omit for overview of all)")
   .option("-f, --follow [interval]", "Re-render every N seconds (default: 10)")
-  .action(async (name: string | undefined, opts: { follow?: boolean | string }) => {
+  .option("-w, --wide", "Force wide (single-line) layout")
+  .option("-n, --narrow", "Force narrow (multi-line) layout")
+  .action(async (name: string | undefined, opts: { follow?: boolean | string; wide?: boolean; narrow?: boolean }) => {
     const follow = opts.follow === true ? 10 : opts.follow ? Number(opts.follow) : undefined;
+    const layout = opts.wide ? "wide" as const : opts.narrow ? "narrow" as const : undefined;
     if (name) {
       const { showThopterStatus } = await import("./status.js");
       await showThopterStatus(resolveThopterName(name));
     } else {
       const { listDevboxes } = await import("./devbox.js");
-      await listDevboxes({ follow });
+      await listDevboxes({ follow, layout });
     }
   });
 
