@@ -2,9 +2,9 @@
 
 CLI for managing Runloop.ai devboxes as autonomous Claude Code development environments.
 
-Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentials, developer tools (neovim, starship, tmux), and monitoring hooks that report status to Redis. Create one, point it at a repo and a task, and let Claude work autonomously while you monitor from your laptop.
+Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentials, developer tools, and Claude Code hooks that report status to Redis. Create one, point it at a repo and a task, and let Claude work autonomously while you monitor it from your laptop.
 
-This is an internal dev tool for Telepath, but we've made it open as it's probably useful to others, and welcome feedback and contributions. Message josh@telepath.computer to chat about it.
+This is just an internal dev tool we use a [Telepath](https://telepath.computer), but we've made it open as a conversation starter, for feedback, and contributions. Message josh@telepath.computer to chat about it.
 
 ## Quick Start
 
@@ -12,10 +12,11 @@ This is an internal dev tool for Telepath, but we've made it open as it's probab
 
 - Node.js 18+
 - A [Runloop.ai](https://runloop.ai) account and API key
-- A public Redis instance with a password-protected access URL, we recommend [Upstash](https://upstash.com) (for status monitoring and tailing activity on thopters)
-- The `rli` CLI: `npm install -g @runloop/rl-cli`
-- Iterm2 is the recommended terminal app for detachable tmux sessions on thopters (thanks to its support for tmux control mode)
-- [ntfy.sh](https://ntfy.sh/) account and mac os desktop app. desktop app provides most reliable notifications. define a personal topic id (e.g. `randomstring_thopternotifss` or anything globally unique) and ensure you get pushes for it on your desktop (can also setup iOS)
+- A public Redis instance with a password-protected access URL for status monitoring and tailing activity on thopters, like [Upstash](https://upstash.com)
+- The runloop CLI: `npm install -g @runloop/rl-cli`
+- Iterm2 is the recommended terminal app for the best experience with detachable tmux sessions on thopters (via tmux control mode)
+- [ntfy.sh](https://ntfy.sh/) account and mac os desktop app so thopters can notify you from CC hooks. The desktop app provides the most reliable notifications (there's an iOS/android app too)
+- A github user with access to your repo(s) and a fine-grained PAT that allows issues read/write and content read/write. It's highly recommended to lock down your important branches with rulesets so that this user cannot modify them at all (only submit PRs to them.)
 
 ### Install
 
@@ -28,16 +29,16 @@ npm link    # installs the 'thopter' command globally
 
 ### First-time Setup
 
-**Telepath team:** see our "~/.thopter.json starter" in our 1password vault, put that in your homedir that first and then you can run setup.
+**Telepath team:** see our "~/.thopter.json starter" in our 1password vault, put that in your homedir that first and then you can run setup but with our preconfigured values.
 
 ```bash
 thopter setup
 ```
 
-This walks you through:
+This walks you through configuring critical environment variables for:
 1. Runloop API key
 2. Redis URL
-3. GitHub token (`GH_TOKEN`) and other env vars
+3. GitHub token
 4. ntfy.sh push notifications (optional but highly recommended)
 
 All config is saved to `~/.thopter.json`.
@@ -45,15 +46,16 @@ All config is saved to `~/.thopter.json`.
 ### Your First Thopter
 
 ```bash
-# Create a fresh devbox (installs Claude, neovim, tmux, etc.)
+# Create a fresh devbox (installs Claude, Codex, Neovim, tmux, etc.) with a random name like adventurous-quesadilla
 thopter create --fresh
 
-# The thopter got a random name, grab that and SSH in, look around, authenticate Claude, set things up
-thopter ssh random-name-here
+# SSH in, look around, authenticate Claude, set things up
+thopter ssh adventurous-quesadilla
 
-# Once you're happy, snapshot it as your golden image with your initials
-thopter snapshot create random-name-here myinitials-golden
-thopter snapshot default myinitials-golden
+# Once you're happy, snapshot it as your golden image
+thopter snapshot create adventurous-quesadilla josh-golden
+# set this image as default for new thopters (just edits ~/.thopter.json)
+thopter snapshot default josh-golden
 
 # Now all future creates use your golden snapshot (fast boot, ready to go)
 thopter create worker-1
@@ -65,7 +67,7 @@ thopter create worker-2
 Once you have a golden snapshot, you can dispatch Claude to work on tasks with a single command:
 
 ```bash
-thopter run --repo owner/repo "fix the login bug described in issue #42"
+thopter run --repo owner/repo "fix the login bug described in issue #42 and submit a PR"
 ```
 
 This creates a thopter, clones the repo, and launches Claude with your prompt in a tmux session. You can then:
@@ -77,24 +79,25 @@ thopter attach worker-1     # attach to tmux (iTerm2 -CC mode)
 thopter ssh worker-1        # SSH in to poke around
 ```
 
-**Highly recommended: use iterm2 for your terminal to enable a nice tmux experience for detachable thopter sessions.** `thopter attach` expects that. you can also just use `thopter ssh` and your own terminal, your own terminal multiplexer, or not, as you like. it's just a linux VM.
+**Highly recommended: use iterm2 for your terminal to enable a nice tmux experience for detachable thopter sessions.** `thopter attach` expects that. you can also just use `thopter ssh` and your own terminal, your own terminal multiplexer, or not, as you like. It's just a runloop-managed linux VM, we're just adding devex conveniences over that.
 
 ### Day-to-day Workflow
 
 ```bash
-thopter status              # overview of all thopters
-thopter status my-thopter   # detailed status + logs for one
-thopter tail my-thopter -f  # follow Claude's transcript in real time
+thopter status                # overview of all thopters
+thopter status my-thopter     # detailed status + logs for one
+thopter tail my-thopter -f    # follow Claude's transcript in real time
 
-thopter suspend my-thopter  # pause (preserves disk, stops billing)
-thopter resume my-thopter   # wake up later
+thopter suspend my-thopter    # pause (preserves disk, stops billing)
+thopter resume my-thopter     # wake up later
+thopter keepalive my-thopter  # reset 12 hour auto-suspend countdown timer
 
-thopter destroy my-thopter  # done for good
+thopter destroy my-thopter    # done for good
 ```
 
 ## CLI Reference
 
-The CLI has commands for dispatching work (`run`), managing lifecycle (`create`, `suspend`, `resume`, `destroy`), connecting (`ssh`, `attach`, `exec`), monitoring (`status`, `tail`), snapshots, env vars, and configuration.
+The CLI has commands for dispatching work (`run`), managing lifecycle (`create`, `suspend`, `resume`, `keepalive`, `destroy`), connecting (`ssh`, `attach`, `exec`), monitoring (`status`, `tail`), snapshots, env vars, and configuration.
 
 See [docs/cli-reference.md](docs/cli-reference.md) for the full command reference.
 
