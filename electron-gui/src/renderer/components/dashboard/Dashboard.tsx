@@ -8,6 +8,8 @@ export function Dashboard() {
   const refreshThopters = useStore((s) => s.refreshThopters)
 
   const list = Object.values(thopters)
+  const running = list.filter((t) => t.devboxStatus !== 'suspended')
+  const suspended = list.filter((t) => t.devboxStatus === 'suspended')
 
   if (connectionStatus === 'loading' && list.length === 0) {
     return (
@@ -44,10 +46,36 @@ export function Dashboard() {
           <p className="text-sm">Click "Run New Thopter" to get started.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {list.map((t) => (
-            <ThopterCard key={t.name} thopter={t} />
-          ))}
+        <div className="space-y-8">
+          {/* Running section */}
+          {running.length > 0 && (
+            <section>
+              <h2 className="text-sm font-medium text-muted-foreground mb-3">
+                Running
+                <span className="ml-2 text-xs text-muted-foreground/60">{running.length}</span>
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {running.map((t) => (
+                  <ThopterCard key={t.name} thopter={t} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Suspended section */}
+          {suspended.length > 0 && (
+            <section>
+              <h2 className="text-sm font-medium text-muted-foreground mb-3">
+                Suspended
+                <span className="ml-2 text-xs text-muted-foreground/60">{suspended.length}</span>
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 opacity-50">
+                {suspended.map((t) => (
+                  <ThopterCard key={t.name} thopter={t} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>
