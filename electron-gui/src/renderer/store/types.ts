@@ -27,6 +27,7 @@ export interface StoreState {
   isReauthModalOpen: boolean
   reauthModalStep: number
   isSidebarOpen: boolean
+  autoRefresh: boolean
   unreadNotificationCount: number
 }
 
@@ -56,6 +57,7 @@ export interface StoreActions {
   openReauthModal(): void
   closeReauthModal(): void
   toggleSidebar(): void
+  setAutoRefresh(enabled: boolean): void
   markNotificationsRead(): void
   addNotification(notification: NtfyNotification): void
   removeNotification(id: string): void

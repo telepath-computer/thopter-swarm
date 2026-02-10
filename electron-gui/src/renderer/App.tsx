@@ -14,14 +14,19 @@ import { subscribeNtfy, subscribeMockNtfy } from './services/ntfy'
 export default function App() {
   const activeTab = useStore((s) => s.activeTab)
   const refreshThopters = useStore((s) => s.refreshThopters)
+  const autoRefresh = useStore((s) => s.autoRefresh)
   const addNotification = useStore((s) => s.addNotification)
 
-  // Initial load + auto-refresh every 5 seconds
+  // Initial load + auto-refresh every 30 seconds (when enabled)
   useEffect(() => {
     refreshThopters()
-    const id = setInterval(refreshThopters, 5_000)
-    return () => clearInterval(id)
   }, [refreshThopters])
+
+  useEffect(() => {
+    if (!autoRefresh) return
+    const id = setInterval(refreshThopters, 30_000)
+    return () => clearInterval(id)
+  }, [autoRefresh, refreshThopters])
 
   // Subscribe to ntfy.sh notifications
   useEffect(() => {

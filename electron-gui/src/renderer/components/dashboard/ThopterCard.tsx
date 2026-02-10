@@ -1,8 +1,10 @@
-import { Clock, MessageSquare, Cpu, Pause, Play } from 'lucide-react'
+import { useState } from 'react'
+import { Clock, MessageSquare, Cpu, Pause, Play, Trash2 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
 import { cn, relativeTime } from '@/lib/utils'
 import type { ThopterInfo, ThopterStatus } from '@/services/types'
 import { useStore } from '@/store'
@@ -38,6 +40,8 @@ export function ThopterCard({ thopter }: Props) {
   const openTab = useStore((s) => s.openTab)
   const suspendThopter = useStore((s) => s.suspendThopter)
   const resumeThopter = useStore((s) => s.resumeThopter)
+  const destroyThopter = useStore((s) => s.destroyThopter)
+  const [confirmDestroy, setConfirmDestroy] = useState(false)
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
   const isSuspended = thopter.devboxStatus === 'suspended'
@@ -91,7 +95,7 @@ export function ThopterCard({ thopter }: Props) {
             <span className="line-clamp-2">{thopter.lastMessage}</span>
           </div>
         )}
-        <div className="pt-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5 pt-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           {isSuspended ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -113,8 +117,31 @@ export function ThopterCard({ thopter }: Props) {
               <TooltipContent>Suspend devbox (saves state)</TooltipContent>
             </Tooltip>
           )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="destructive" size="xs" onClick={() => setConfirmDestroy(true)}>
+                <Trash2 className="size-3" />
+                Destroy
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Permanently destroy this devbox</TooltipContent>
+          </Tooltip>
         </div>
       </CardContent>
+
+      {/* Rendered outside card content so dialog doesn't get clipped */}
+      <ConfirmDialog
+        open={confirmDestroy}
+        title="Destroy Thopter"
+        description={`This will permanently destroy "${thopter.name}" and its devbox. This action cannot be undone.`}
+        confirmLabel="Destroy"
+        destructive
+        onConfirm={() => {
+          setConfirmDestroy(false)
+          destroyThopter(thopter.name)
+        }}
+        onCancel={() => setConfirmDestroy(false)}
+      />
     </Card>
   )
 }

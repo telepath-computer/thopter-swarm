@@ -2,12 +2,16 @@ import { useStore } from '@/store'
 import { ThopterCard } from './ThopterCard'
 import { Loader2, WifiOff, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 
 export function Dashboard() {
   const thopters = useStore((s) => s.thopters)
   const connectionStatus = useStore((s) => s.connectionStatus)
   const refreshing = useStore((s) => s.refreshing)
+  const autoRefresh = useStore((s) => s.autoRefresh)
   const refreshThopters = useStore((s) => s.refreshThopters)
+  const setAutoRefresh = useStore((s) => s.setAutoRefresh)
 
   const list = Object.values(thopters)
   const running = list.filter((t) => t.devboxStatus !== 'suspended')
@@ -44,9 +48,16 @@ export function Dashboard() {
 
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-xs text-muted-foreground/50">
-          Auto-refreshing every 5s
-        </span>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="auto-refresh"
+            checked={autoRefresh}
+            onCheckedChange={(v) => setAutoRefresh(v === true)}
+          />
+          <Label htmlFor="auto-refresh" className="text-xs text-muted-foreground/50 cursor-pointer">
+            Auto-refresh every 30s
+          </Label>
+        </div>
         <Button
           variant="ghost"
           size="sm"

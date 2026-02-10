@@ -24,6 +24,7 @@ export const useStore = create<Store>((set, get) => ({
   isReauthModalOpen: false,
   reauthModalStep: 0,
   isSidebarOpen: false,
+  autoRefresh: true,
   unreadNotificationCount: 0,
 
   // Data actions
@@ -152,6 +153,8 @@ export const useStore = create<Store>((set, get) => ({
   closeReauthModal: () => set({ isReauthModalOpen: false, reauthModalStep: 0 }),
 
   toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
+
+  setAutoRefresh: (enabled) => set({ autoRefresh: enabled }),
 
   markNotificationsRead: () => set({ unreadNotificationCount: 0 }),
 
