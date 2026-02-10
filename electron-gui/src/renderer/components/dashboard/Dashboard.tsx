@@ -1,10 +1,12 @@
 import { useStore } from '@/store'
 import { ThopterCard } from './ThopterCard'
-import { Loader2, WifiOff } from 'lucide-react'
+import { Loader2, WifiOff, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 export function Dashboard() {
   const thopters = useStore((s) => s.thopters)
   const connectionStatus = useStore((s) => s.connectionStatus)
+  const refreshing = useStore((s) => s.refreshing)
   const refreshThopters = useStore((s) => s.refreshThopters)
 
   const list = Object.values(thopters)
@@ -40,8 +42,25 @@ export function Dashboard() {
         </div>
       )}
 
+      {/* Toolbar */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-xs text-muted-foreground/50">
+          Auto-refreshing every 5s
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-xs text-muted-foreground"
+          onClick={() => refreshThopters()}
+          disabled={refreshing}
+        >
+          <RefreshCw className={refreshing ? 'size-3 animate-spin' : 'size-3'} />
+          Refresh
+        </Button>
+      </div>
+
       {list.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+        <div className="flex flex-col items-center justify-center h-[calc(100%-3rem)] text-muted-foreground gap-2">
           <p className="text-lg">No thopters running</p>
           <p className="text-sm">Click "Run New Thopter" to get started.</p>
         </div>

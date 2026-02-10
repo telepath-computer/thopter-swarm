@@ -14,6 +14,7 @@ export const useStore = create<Store>((set, get) => ({
   snapshots: [],
   config: null,
   connectionStatus: 'loading',
+  refreshing: false,
 
   // Display state
   activeTab: 'dashboard',
@@ -27,6 +28,7 @@ export const useStore = create<Store>((set, get) => ({
 
   // Data actions
   refreshThopters: async () => {
+    set({ refreshing: true })
     try {
       const service = getService()
       const list = await service.listThopters()
@@ -36,6 +38,8 @@ export const useStore = create<Store>((set, get) => ({
     } catch (err) {
       console.error('[store] refreshThopters failed:', err)
       set({ connectionStatus: 'error' })
+    } finally {
+      set({ refreshing: false })
     }
   },
 

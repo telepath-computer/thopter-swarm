@@ -17,6 +17,7 @@ export interface StoreState {
   snapshots: SnapshotInfo[]
   config: AppConfig | null
   connectionStatus: 'connected' | 'error' | 'loading'
+  refreshing: boolean
 
   // Display state (UI layer)
   activeTab: 'dashboard' | string
