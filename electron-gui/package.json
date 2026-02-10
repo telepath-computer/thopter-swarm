@@ -1,0 +1,37 @@
+{
+  "name": "thopter-swarm-gui",
+  "version": "0.1.0",
+  "description": "Desktop GUI dashboard for Thopter Swarm",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:mock": "THOPTER_MOCK=1 electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "test": "npx playwright test --config=e2e/playwright.config.ts"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "ioredis": "^5.4.1",
+    "lucide-react": "^0.563.0",
+    "radix-ui": "^1.4.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "tailwind-merge": "^2.6.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^34.0.0",
+    "electron-vite": "^5.0.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.2"
+  }
+}
