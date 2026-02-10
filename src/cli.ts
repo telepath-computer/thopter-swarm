@@ -41,6 +41,7 @@ examples:
   thopter use --clear                    Clear default thopter
   thopter ssh .                          SSH into the default thopter
   thopter run --repo owner/repo "prompt"  Launch Claude with a task
+  thopter reauth                         Re-authenticate and update snapshot
   thopter status                         Unified view of all thopters
   thopter status dev                     Detailed status + logs for a thopter
   thopter tail dev                       Show last 20 transcript entries
@@ -146,6 +147,15 @@ program
   .action(async (prompt: string, opts: { repo?: string; branch?: string; name?: string; snapshot?: string; keepAlive?: number }) => {
     const { runThopter } = await import("./run.js");
     await runThopter({ prompt, ...opts });
+  });
+
+// --- reauth ---
+program
+  .command("reauth")
+  .description("Interactive wizard to re-authenticate Claude Code and update the default snapshot")
+  .action(async () => {
+    const { runReauth } = await import("./reauth.js");
+    await runReauth();
   });
 
 // --- use ---
