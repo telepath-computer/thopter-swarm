@@ -99,6 +99,7 @@ export function StatusPanel({ thopter }: Props) {
   const resumeThopter = useStore((s) => s.resumeThopter)
   const destroyThopter = useStore((s) => s.destroyThopter)
   const [confirmDestroy, setConfirmDestroy] = useState(false)
+  const [confirmSuspend, setConfirmSuspend] = useState(false)
 
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
@@ -148,7 +149,7 @@ export function StatusPanel({ thopter }: Props) {
           {isSuspended ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" onClick={() => resumeThopter(thopter.name)}>
+                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => resumeThopter(thopter.name)}>
                   <Play />
                   Resume
                 </Button>
@@ -158,7 +159,7 @@ export function StatusPanel({ thopter }: Props) {
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" onClick={() => suspendThopter(thopter.name)}>
+                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmSuspend(true)}>
                   <Pause />
                   Suspend
                 </Button>
@@ -168,7 +169,7 @@ export function StatusPanel({ thopter }: Props) {
           )}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="destructive" size="xs" onClick={() => setConfirmDestroy(true)}>
+              <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmDestroy(true)}>
                 <Trash2 />
                 Destroy
               </Button>
@@ -180,6 +181,17 @@ export function StatusPanel({ thopter }: Props) {
 
       <EditableTask name={thopter.name} task={thopter.task} />
 
+      <ConfirmDialog
+        open={confirmSuspend}
+        title="Suspend Thopter"
+        description={`This will suspend "${thopter.name}" and its devbox. The state will be saved and you can resume it later.`}
+        confirmLabel="Suspend"
+        onConfirm={() => {
+          setConfirmSuspend(false)
+          suspendThopter(thopter.name)
+        }}
+        onCancel={() => setConfirmSuspend(false)}
+      />
       <ConfirmDialog
         open={confirmDestroy}
         title="Destroy Thopter"

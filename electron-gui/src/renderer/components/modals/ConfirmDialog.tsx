@@ -29,7 +29,7 @@ export function ConfirmDialog({
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+      <DialogContent className="sm:max-w-sm" showCloseButton={false} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

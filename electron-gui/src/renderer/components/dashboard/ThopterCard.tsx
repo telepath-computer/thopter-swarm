@@ -42,9 +42,11 @@ export function ThopterCard({ thopter }: Props) {
   const resumeThopter = useStore((s) => s.resumeThopter)
   const destroyThopter = useStore((s) => s.destroyThopter)
   const [confirmDestroy, setConfirmDestroy] = useState(false)
+  const [confirmSuspend, setConfirmSuspend] = useState(false)
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
   const isSuspended = thopter.devboxStatus === 'suspended'
+  const anyDialogOpen = confirmDestroy || confirmSuspend
 
   return (
     <Card
@@ -52,9 +54,9 @@ export function ThopterCard({ thopter }: Props) {
       tabIndex={0}
       aria-label={`${thopter.name} - ${cfg.label}`}
       className="cursor-pointer hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none transition-all duration-150 py-4 gap-3"
-      onClick={() => openTab(thopter.name)}
+      onClick={() => { if (!anyDialogOpen) openTab(thopter.name) }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (!anyDialogOpen && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault()
           openTab(thopter.name)
         }
@@ -99,7 +101,7 @@ export function ThopterCard({ thopter }: Props) {
           {isSuspended ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" onClick={() => resumeThopter(thopter.name)}>
+                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => resumeThopter(thopter.name)}>
                   <Play className="size-3" />
                   Resume
                 </Button>
@@ -109,7 +111,7 @@ export function ThopterCard({ thopter }: Props) {
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" onClick={() => suspendThopter(thopter.name)}>
+                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmSuspend(true)}>
                   <Pause className="size-3" />
                   Suspend
                 </Button>
@@ -119,7 +121,7 @@ export function ThopterCard({ thopter }: Props) {
           )}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="destructive" size="xs" onClick={() => setConfirmDestroy(true)}>
+              <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmDestroy(true)}>
                 <Trash2 className="size-3" />
                 Destroy
               </Button>
@@ -129,7 +131,17 @@ export function ThopterCard({ thopter }: Props) {
         </div>
       </CardContent>
 
-      {/* Rendered outside card content so dialog doesn't get clipped */}
+      <ConfirmDialog
+        open={confirmSuspend}
+        title="Suspend Thopter"
+        description={`This will suspend "${thopter.name}" and its devbox. The state will be saved and you can resume it later.`}
+        confirmLabel="Suspend"
+        onConfirm={() => {
+          setConfirmSuspend(false)
+          suspendThopter(thopter.name)
+        }}
+        onCancel={() => setConfirmSuspend(false)}
+      />
       <ConfirmDialog
         open={confirmDestroy}
         title="Destroy Thopter"
