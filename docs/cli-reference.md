@@ -10,6 +10,8 @@ Full command reference for the `thopter` CLI. See the [README](../README.md) for
 | `thopter run --repo owner/repo "<prompt>"` | Clone a repo first, then run Claude |
 | `thopter run --branch feature "<prompt>"` | Specify a branch to work on |
 | `thopter run --name my-worker "<prompt>"` | Name the thopter (auto-generated otherwise) |
+| `thopter tell <name> "<message>"` | Send a message to a running Claude session |
+| `thopter tell <name> -i "<message>"` | Interrupt Claude first, then send the message |
 
 ## Lifecycle
 
@@ -46,6 +48,8 @@ Full command reference for the `thopter` CLI. See the [README](../README.md) for
 `thopter status` (aliased as `thopter list` / `thopter ls`) shows a combined view with devbox state from Runloop and agent state from Redis: task description, whether Claude is running, last heartbeat time.
 
 `thopter tail` streams Claude's transcript from Redis, showing a condensed view of each conversation turn (user messages, assistant responses, tool calls). Use `-f` to follow in real time — like `tail -f` for your thopter's Claude session.
+
+`thopter tell` sends a message to a running Claude session via tmux without needing to attach. Use `-i` / `--interrupt` to send Escape first (interrupting Claude's current work) before injecting the message. After sending, it automatically tails the transcript so you can see Claude's response. Ctrl-C to stop tailing.
 
 ## Snapshots
 

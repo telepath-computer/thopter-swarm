@@ -19,6 +19,7 @@ src/
   devbox.ts     Devbox lifecycle: create, list, destroy, ssh, exec, suspend/resume, snapshot
   run.ts        `thopter run`: create devbox + clone repo + launch Claude in tmux
   tail.ts       `thopter tail`: stream Claude transcript from Redis
+  tell.ts       `thopter tell`: send messages to a running Claude session via tmux
   status.ts     Redis status queries (heartbeat, agent state, last message)
   config.ts     ~/.thopter.json read/write, env loading
   setup.ts      Interactive setup wizard

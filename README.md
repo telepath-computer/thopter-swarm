@@ -92,6 +92,7 @@ This creates a thopter, clones the repo, and launches Claude with your prompt in
 ```bash
 thopter status              # see all your thopters and what they're doing
 thopter tail worker-1 -f    # follow Claude's transcript in real time
+thopter tell worker-1 "also fix the tests"  # send a follow-up message
 thopter attach worker-1     # attach to tmux (iTerm2 -CC mode)
 thopter ssh worker-1        # SSH in to poke around
 ```
@@ -104,6 +105,8 @@ thopter ssh worker-1        # SSH in to poke around
 thopter status                # overview of all thopters
 thopter status my-thopter     # detailed status + logs for one
 thopter tail my-thopter -f    # follow Claude's transcript in real time
+thopter tell my-thopter "also fix the tests"      # send a follow-up
+thopter tell my-thopter -i "stop, work on X now"  # interrupt and redirect
 
 thopter suspend my-thopter    # pause (preserves disk, stops billing)
 thopter resume my-thopter     # wake up later
@@ -114,7 +117,7 @@ thopter destroy my-thopter    # done for good
 
 ## CLI Reference
 
-The CLI has commands for dispatching work (`run`), managing lifecycle (`create`, `suspend`, `resume`, `keepalive`, `destroy`), connecting (`ssh`, `attach`, `exec`), monitoring (`status`, `tail`), snapshots, env vars, and configuration.
+The CLI has commands for dispatching work (`run`, `tell`), managing lifecycle (`create`, `suspend`, `resume`, `keepalive`, `destroy`), connecting (`ssh`, `attach`, `exec`), monitoring (`status`, `tail`), snapshots, env vars, and configuration.
 
 See [docs/cli-reference.md](docs/cli-reference.md) for the full command reference.
 
