@@ -274,5 +274,14 @@ function main() {
     // even when list length is constant (at the 500-entry cap)
     rcli("INCRBY", redisCounterKey, String(newEntries.length));
     rcli("EXPIRE", redisCounterKey, String(TTL_SECONDS));
+
+    // Update last_message from the most recent assistant text entry.
+    // This replaces the old approach of a separate script + heartbeat cron.
+    const lastAssistant = newEntries.findLast((e) => e.role === "assistant");
+    if (lastAssistant) {
+      let text = lastAssistant.full ?? lastAssistant.summary;
+      if (text.length > 500) text = text.slice(0, 497) + "...";
+      rcliPipe(text, "SETEX", `thopter:${name}:last_message`, String(TTL_SECONDS));
+    }
   }
 }
