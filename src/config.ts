@@ -28,6 +28,11 @@ export interface UploadEntry {
   remote: string;
 }
 
+export interface RepoConfig {
+  repo: string;     // owner/repo format (e.g. "telepath-computer/thopter-swarm")
+  branch?: string;  // Pinned branch. If omitted → prompt at run time (default: main)
+}
+
 interface LocalConfig {
   runloopApiKey?: string;
   defaultSnapshotId?: string;
@@ -38,6 +43,7 @@ interface LocalConfig {
   stopNotifications?: boolean;
   stopNotificationQuietPeriod?: number;
   envVars?: Record<string, string>;
+  repos?: RepoConfig[];
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -117,6 +123,39 @@ export function setRunloopApiKey(key: string): void {
   const config = loadLocalConfig();
   config.runloopApiKey = key;
   saveLocalConfig(config);
+}
+
+// --- Predefined repos ---
+
+export function getRepos(): RepoConfig[] {
+  return loadLocalConfig().repos ?? [];
+}
+
+export function setRepos(repos: RepoConfig[]): void {
+  const config = loadLocalConfig();
+  config.repos = repos;
+  saveLocalConfig(config);
+}
+
+export function addRepo(entry: RepoConfig): void {
+  const config = loadLocalConfig();
+  if (!config.repos) config.repos = [];
+  config.repos.push(entry);
+  saveLocalConfig(config);
+}
+
+export function removeRepo(repo: string, branch?: string): boolean {
+  const config = loadLocalConfig();
+  if (!config.repos) return false;
+  const before = config.repos.length;
+  config.repos = config.repos.filter((r) => {
+    if (r.repo !== repo) return true;
+    if (branch !== undefined) return r.branch !== branch;
+    return false;
+  });
+  if (config.repos.length === before) return false;
+  saveLocalConfig(config);
+  return true;
 }
 
 // --- Devbox env vars ---

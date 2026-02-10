@@ -11,6 +11,7 @@
 | `stopNotifications` | boolean | no | Send ntfy.sh notification when Claude finishes a response. Default `true`. Notifications are suppressed during the quiet period after a user message (see `stopNotificationQuietPeriod`). Set to `false` to disable. |
 | `stopNotificationQuietPeriod` | number | no | Seconds after a user message during which stop notifications are suppressed (user is likely still engaged). Default `30`. Set to `0` to always send. |
 | `claudeMdPath` | string | no | Path to a custom CLAUDE.md deployed to `~/.claude/CLAUDE.md` on every new devbox. Omit to use the built-in default. |
+| `repos` | array | no | Predefined repositories for `thopter run`. Each entry: `{"repo": "owner/repo", "branch": "main"}`. Branch is optional — if omitted, user is prompted at run time (default: `main`). Multiple entries for the same repo with different branches are supported. Manage with `thopter repos {list,add,remove,edit}`. |
 | `uploads` | array | no | Files to copy to new devboxes at create time. Each entry: `{"local": "/path/on/laptop", "remote": "/path/on/devbox"}`. Runs after all other provisioning. |
 | `envVars` | object | yes | Key-value map of environment variables injected into every devbox. See below. |
 
@@ -42,6 +43,11 @@ Add any other env vars your devboxes need — they're all passed through, e.g. `
   "defaultSnapshotId": "jsw-golden",
   "defaultRepo": "telepath-computer/my-project",
   "defaultBranch": "main",
+  "repos": [
+    { "repo": "telepath-computer/my-app", "branch": "main" },
+    { "repo": "telepath-computer/my-app", "branch": "dev" },
+    { "repo": "telepath-computer/other-project" }
+  ],
   "stopNotificationQuietPeriod": 30,
   "claudeMdPath": "/Users/jw/projects/my-claude-instructions.md",
   "uploads": [
