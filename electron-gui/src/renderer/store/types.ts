@@ -40,6 +40,7 @@ export interface StoreActions {
   // Thopter operations
   runThopter(opts: RunThopterOpts): Promise<string>
   tellThopter(name: string, message: string, interrupt?: boolean): Promise<void>
+  updateTask(name: string, task: string): Promise<void>
   destroyThopter(name: string): Promise<void>
   suspendThopter(name: string): Promise<void>
   resumeThopter(name: string): Promise<void>

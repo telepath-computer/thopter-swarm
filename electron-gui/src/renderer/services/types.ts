@@ -106,6 +106,7 @@ export interface ThopterService {
   destroyThopter(name: string): Promise<void>;
   suspendThopter(name: string): Promise<void>;
   resumeThopter(name: string): Promise<void>;
+  updateTask(name: string, task: string): Promise<void>;
   attachThopter(name: string): void;
   reauth(opts: ReauthOpts): Promise<void>;
 }

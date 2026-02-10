@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import { Send, Pause, Play, Trash2, TerminalSquare, Zap } from 'lucide-react'
+import { Send, TerminalSquare, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
 import { ShellCommandsModal } from '@/components/modals/ShellCommandsModal'
 import { useStore } from '@/store'
 import type { ThopterStatus, DevboxStatus } from '@/services/types'
@@ -15,17 +13,11 @@ interface Props {
   devboxStatus: DevboxStatus
 }
 
-export function ActionBar({ name, status, devboxStatus }: Props) {
+export function ActionBar({ name }: Props) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
-  const [confirmDestroy, setConfirmDestroy] = useState(false)
   const [shellModalOpen, setShellModalOpen] = useState(false)
   const tellThopter = useStore((s) => s.tellThopter)
-  const suspendThopter = useStore((s) => s.suspendThopter)
-  const resumeThopter = useStore((s) => s.resumeThopter)
-  const destroyThopter = useStore((s) => s.destroyThopter)
-
-  const isSuspended = devboxStatus === 'suspended'
 
   const handleSend = async (interrupt: boolean) => {
     if (!message.trim() || sending) return
@@ -79,28 +71,6 @@ export function ActionBar({ name, status, devboxStatus }: Props) {
       </div>
 
       <div className="flex items-center gap-1.5">
-        {isSuspended ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="xs" onClick={() => resumeThopter(name)}>
-                <Play />
-                Resume
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Resume suspended devbox</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="xs" onClick={() => suspendThopter(name)}>
-                <Pause />
-                Suspend
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Suspend devbox (saves state)</TooltipContent>
-          </Tooltip>
-        )}
-
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="outline" size="xs" onClick={() => setShellModalOpen(true)}>
@@ -110,34 +80,9 @@ export function ActionBar({ name, status, devboxStatus }: Props) {
           </TooltipTrigger>
           <TooltipContent>Copy CLI commands for this thopter</TooltipContent>
         </Tooltip>
-
-        <Separator orientation="vertical" className="h-4" />
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="destructive" size="xs" onClick={() => setConfirmDestroy(true)}>
-              <Trash2 />
-              Destroy
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Permanently destroy this devbox</TooltipContent>
-        </Tooltip>
       </div>
 
       <ShellCommandsModal open={shellModalOpen} name={name} onClose={() => setShellModalOpen(false)} />
-
-      <ConfirmDialog
-        open={confirmDestroy}
-        title="Destroy Thopter"
-        description={`This will permanently destroy "${name}" and its devbox. This action cannot be undone.`}
-        confirmLabel="Destroy"
-        destructive
-        onConfirm={() => {
-          setConfirmDestroy(false)
-          destroyThopter(name)
-        }}
-        onCancel={() => setConfirmDestroy(false)}
-      />
     </div>
   )
 }

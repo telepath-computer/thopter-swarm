@@ -304,6 +304,12 @@ export class MockThopterService implements ThopterService {
     info.devboxStatus = 'running';
   }
 
+  async updateTask(name: string, task: string): Promise<void> {
+    const info = this.thopters.get(name);
+    if (!info) throw new Error(`Unknown thopter '${name}'`);
+    info.task = task;
+  }
+
   attachThopter(name: string): void {
     console.log(`[Mock] Would open iTerm2 and SSH into thopter '${name}'`);
   }

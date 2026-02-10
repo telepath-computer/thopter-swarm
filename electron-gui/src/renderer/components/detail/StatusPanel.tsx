@@ -1,7 +1,13 @@
-import { Activity, Clock, Server, User, Cpu } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Activity, Clock, Server, User, Cpu, Pause, Play, Trash2, Pencil, Check } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
 import { cn, relativeTime } from '@/lib/utils'
+import { useStore } from '@/store'
 import type { ThopterInfo, ThopterStatus } from '@/services/types'
 
 const statusConfig: Record<ThopterStatus, { label: string; color: string; dot: string }> = {
@@ -31,9 +37,72 @@ interface Props {
   thopter: ThopterInfo
 }
 
+function EditableTask({ name, task }: { name: string; task: string | null }) {
+  const updateTask = useStore((s) => s.updateTask)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(task ?? '')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Sync draft when task changes externally (e.g. from refresh)
+  useEffect(() => {
+    if (!editing) setDraft(task ?? '')
+  }, [task, editing])
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  const save = async () => {
+    setEditing(false)
+    const trimmed = draft.trim()
+    if (trimmed !== (task ?? '')) {
+      await updateTask(name, trimmed)
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 mt-2">
+        <span className="text-muted-foreground/50 text-sm shrink-0">Task:</span>
+        <Input
+          ref={inputRef}
+          className="text-sm h-7"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+            if (e.key === 'Escape') { setEditing(false); setDraft(task ?? '') }
+          }}
+          onBlur={save}
+        />
+        <Button variant="ghost" size="icon" className="size-6 shrink-0" onClick={save}>
+          <Check className="size-3.5" />
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="flex items-center gap-2 mt-2 group cursor-pointer"
+      onClick={() => setEditing(true)}
+    >
+      <span className="text-muted-foreground/50 text-sm shrink-0">Task:</span>
+      <span className="text-sm">{task || <span className="text-muted-foreground/40 italic">No task set</span>}</span>
+      <Pencil className="size-3 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+    </div>
+  )
+}
+
 export function StatusPanel({ thopter }: Props) {
+  const suspendThopter = useStore((s) => s.suspendThopter)
+  const resumeThopter = useStore((s) => s.resumeThopter)
+  const destroyThopter = useStore((s) => s.destroyThopter)
+  const [confirmDestroy, setConfirmDestroy] = useState(false)
+
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
+  const isSuspended = thopter.devboxStatus === 'suspended'
 
   return (
     <div className="px-4 py-3 border-b bg-card/50">
@@ -74,14 +143,55 @@ export function StatusPanel({ thopter }: Props) {
             </span>
           )}
         </div>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          {isSuspended ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="xs" onClick={() => resumeThopter(thopter.name)}>
+                  <Play />
+                  Resume
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Resume suspended devbox</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="xs" onClick={() => suspendThopter(thopter.name)}>
+                  <Pause />
+                  Suspend
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Suspend devbox (saves state)</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="destructive" size="xs" onClick={() => setConfirmDestroy(true)}>
+                <Trash2 />
+                Destroy
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Permanently destroy this devbox</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
-      {thopter.task && (
-        <p className="text-xs text-muted-foreground mt-2">
-          <span className="text-foreground/50 mr-1">Task:</span>
-          {thopter.task}
-        </p>
-      )}
+      <EditableTask name={thopter.name} task={thopter.task} />
+
+      <ConfirmDialog
+        open={confirmDestroy}
+        title="Destroy Thopter"
+        description={`This will permanently destroy "${thopter.name}" and its devbox. This action cannot be undone.`}
+        confirmLabel="Destroy"
+        destructive
+        onConfirm={() => {
+          setConfirmDestroy(false)
+          destroyThopter(thopter.name)
+        }}
+        onCancel={() => setConfirmDestroy(false)}
+      />
     </div>
   )
 }

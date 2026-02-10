@@ -404,6 +404,19 @@ export class RealThopterService implements ThopterService {
   }
 
   /**
+   * Update the task description in Redis (same key the devbox hook writes to).
+   */
+  async updateTask(name: string, task: string): Promise<void> {
+    const redis = createRedis();
+    await redis.connect();
+    try {
+      await redis.set(`thopter:${name}:task`, task, 'EX', 86400);
+    } finally {
+      redis.disconnect();
+    }
+  }
+
+  /**
    * Open iTerm2 with SSH connection to the thopter's tmux session.
    * Uses osascript (macOS) to create a new iTerm2 window with the attach command.
    */
