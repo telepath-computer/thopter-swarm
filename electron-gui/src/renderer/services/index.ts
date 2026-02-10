@@ -1,9 +1,8 @@
 // Service factory — returns MockThopterService or RealThopterService based on environment.
-// RealThopterService is loaded lazily to avoid pulling in Node.js builtins (child_process,
-// fs, ioredis, etc.) when running in mock mode — ESM renderer can't resolve bare specifiers.
 
 import type { ThopterService } from './types';
 import { MockThopterService } from './mock';
+import { RealThopterService } from './real';
 
 let _service: ThopterService | null = null;
 
@@ -26,14 +25,7 @@ function isMockMode(): boolean {
  */
 export function getService(): ThopterService {
   if (!_service) {
-    if (isMockMode()) {
-      _service = new MockThopterService();
-    } else {
-      // Dynamic require to avoid ESM resolution issues with Node.js builtins
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { RealThopterService } = require('./real') as typeof import('./real');
-      _service = new RealThopterService();
-    }
+    _service = isMockMode() ? new MockThopterService() : new RealThopterService();
   }
   return _service;
 }
