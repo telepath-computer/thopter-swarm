@@ -98,9 +98,9 @@ program
   .alias("ls")
   .description("Show thopter status (unified Runloop + Redis view)")
   .argument("[name]", "Thopter name (omit for overview of all)")
-  .option("-f, --follow [interval]", "Re-render every N seconds (default: 5)")
+  .option("-f, --follow [interval]", "Re-render every N seconds (default: 10)")
   .action(async (name: string | undefined, opts: { follow?: boolean | string }) => {
-    const follow = opts.follow === true ? 5 : opts.follow ? Number(opts.follow) : undefined;
+    const follow = opts.follow === true ? 10 : opts.follow ? Number(opts.follow) : undefined;
     if (name) {
       const { showThopterStatus } = await import("./status.js");
       await showThopterStatus(resolveThopterName(name));
