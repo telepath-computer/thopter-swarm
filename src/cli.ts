@@ -48,6 +48,9 @@ examples:
   thopter tail dev -n 50                 Show last 50 entries
   thopter tell dev "also fix the tests"  Send a message to Claude
   thopter tell dev -i "work on X now"    Interrupt Claude and redirect
+  thopter repos list                     List predefined repos
+  thopter repos add                      Add a predefined repo
+  thopter repos remove                   Remove a predefined repo
   thopter keepalive dev                   Reset keep-alive timer for a devbox
   thopter suspend dev                    Suspend a devbox
   thopter resume dev                     Resume a suspended devbox
@@ -174,6 +177,45 @@ program
         console.log("  Set one with: thopter use <name>");
       }
     }
+  });
+
+// --- repos ---
+const reposCmd = program
+  .command("repos")
+  .description("Manage predefined repositories for `thopter run`");
+
+reposCmd
+  .command("list")
+  .alias("ls")
+  .description("List predefined repos")
+  .action(async () => {
+    const { listRepos } = await import("./repos.js");
+    listRepos();
+  });
+
+reposCmd
+  .command("add")
+  .description("Add a predefined repo (interactive)")
+  .action(async () => {
+    const { addRepoInteractive } = await import("./repos.js");
+    await addRepoInteractive();
+  });
+
+reposCmd
+  .command("remove")
+  .alias("rm")
+  .description("Remove a predefined repo (interactive)")
+  .action(async () => {
+    const { removeRepoInteractive } = await import("./repos.js");
+    await removeRepoInteractive();
+  });
+
+reposCmd
+  .command("edit")
+  .description("Edit a predefined repo (interactive)")
+  .action(async () => {
+    const { editRepoInteractive } = await import("./repos.js");
+    await editRepoInteractive();
   });
 
 // --- destroy ---
@@ -377,7 +419,7 @@ configCmd
   .description("Get a config value")
   .argument("[key]", "Config key (omit to show all)")
   .action(async (key?: string) => {
-    const { getRunloopApiKey, getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars, getDefaultThopter } = await import("./config.js");
+    const { getRunloopApiKey, getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars, getDefaultThopter, getRepos } = await import("./config.js");
     if (!key) {
       console.log(`runloopApiKey:                  ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
       console.log(`defaultSnapshotId:              ${getDefaultSnapshot() ?? "(not set)"}`);
@@ -386,6 +428,9 @@ configCmd
       console.log(`stopNotifications:              ${getStopNotifications()}`);
       console.log(`stopNotificationQuietPeriod:    ${getStopNotificationQuietPeriod()}s`);
       console.log(`defaultThopter:                 ${getDefaultThopter() ?? "(not set)"}`);
+      const repos = getRepos();
+      console.log(`repos:                          ${repos.length > 0 ? `${repos.length} configured (see: thopter repos list)` : "(none)"}`);
+
       const envVars = getEnvVars();
       const envCount = Object.keys(envVars).length;
       console.log(`envVars:                        ${envCount > 0 ? `${envCount} configured (see: thopter env list)` : "(none)"}`);

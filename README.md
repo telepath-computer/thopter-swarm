@@ -87,7 +87,7 @@ Once you have a golden snapshot, you can dispatch Claude to work on tasks with a
 thopter run --repo owner/repo "fix the login bug described in issue #42 and submit a PR"
 ```
 
-This creates a thopter, clones the repo, and launches Claude with your prompt in a tmux session. You can then:
+This creates a thopter, clones the repo, and launches Claude with your prompt in a tmux session. Set up predefined repos with `thopter repos add` to get a numbered chooser when running without `--repo`. You can then:
 
 ```bash
 thopter status              # see all your thopters and what they're doing
