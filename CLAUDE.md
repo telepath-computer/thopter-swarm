@@ -32,7 +32,6 @@ scripts/        Uploaded to devboxes at create time
   thopter-heartbeat.sh          Heartbeat cron (touch activity file, report to Redis)
   thopter-cron-install.sh       Installs heartbeat cron
   thopter-transcript-push.mjs   Streams transcript to Redis (for `thopter tail`)
-  thopter-last-message.mjs      Extracts last assistant message for status display
   install-claude-hooks.mjs      Merges hooks into Claude settings.json
   claude-hook-*.sh              Claude Code event hooks (start, stop, prompt, tool-use, notification)
   thopter-claude-md.md          Default ~/.claude/CLAUDE.md deployed to devboxes
