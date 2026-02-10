@@ -117,9 +117,10 @@ program
   .argument("<name>", "Thopter name")
   .option("-f, --follow", "Continuously poll for new entries")
   .option("-n, --lines <count>", "Number of entries to show (default: 20)", parseInt)
-  .action(async (name: string, opts: { follow?: boolean; lines?: number }) => {
+  .option("-s, --short", "Truncated single-line output (default: full messages)")
+  .action(async (name: string, opts: { follow?: boolean; lines?: number; short?: boolean }) => {
     const { tailTranscript } = await import("./tail.js");
-    await tailTranscript(resolveThopterName(name), { follow: opts.follow, lines: opts.lines });
+    await tailTranscript(resolveThopterName(name), { follow: opts.follow, lines: opts.lines, short: opts.short });
   });
 
 // --- tell ---
