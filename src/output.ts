@@ -35,6 +35,8 @@ export interface TableOptions {
   maxWidth?: number;
   /** Column indices that flex (shrink/expand) to fill remaining space */
   flexColumns?: number[];
+  /** ANSI style per data row (e.g. "\x1b[90m" for gray). Null/undefined = no style. */
+  rowStyles?: (string | null)[];
 }
 
 /**
@@ -119,8 +121,10 @@ export function formatTable(
     lines.push(sepParts.join("  "));
   }
 
-  for (const row of rows) {
-    lines.push(formatRow(row));
+  for (let r = 0; r < rows.length; r++) {
+    const style = options?.rowStyles?.[r];
+    const line = formatRow(rows[r]);
+    lines.push(style ? `${style}${line}\x1b[0m` : line);
   }
 
   return lines.join("\n") + "\n";

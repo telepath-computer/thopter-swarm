@@ -442,6 +442,12 @@ export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
     // Need at least 60 chars for the two flex columns to stay in wide mode
     const tight = wideOverhead > cols - 60;
 
+    // Gray out suspended rows
+    const DIM = "\x1b[90m";
+    const rowStyles = devboxes.map((db) =>
+      db.status === "suspended" ? DIM : null,
+    );
+
     // TASK index = 4, LAST MSG index = 7 (flex columns)
     if (tight) {
       const rows: string[][] = devboxes.map((db) => {
@@ -461,7 +467,7 @@ export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
           msg,
         ];
       });
-      return formatTable(null, rows, { maxWidth: cols, flexColumns: [4, 7] });
+      return formatTable(null, rows, { maxWidth: cols, flexColumns: [4, 7], rowStyles });
     } else {
       const rows: string[][] = devboxes.map((db) => {
         const redis = redisMap.get(db.name);
@@ -483,7 +489,7 @@ export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
       return formatTable(
         ["NAME", "OWNER", "DEVBOX", "AGENT", "TASK", "CLAUDE", "HEARTBEAT", "LAST MSG"],
         rows,
-        { maxWidth: cols, flexColumns: [4, 7] },
+        { maxWidth: cols, flexColumns: [4, 7], rowStyles },
       );
     }
   }
