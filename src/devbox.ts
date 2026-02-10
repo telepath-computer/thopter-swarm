@@ -205,7 +205,7 @@ async function resolveSnapshotId(nameOrId: string): Promise<string> {
 /**
  * Resolve a devbox by name or ID. Searches our managed devboxes by metadata.
  */
-async function resolveDevbox(
+export async function resolveDevbox(
   nameOrId: string,
 ): Promise<{ id: string; name?: string }> {
   const client = getClient();
