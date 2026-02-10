@@ -24,6 +24,11 @@ export default defineConfig({
       }
     },
     plugins: [react(), tailwindcss()],
+    optimizeDeps: {
+      // Prevent Vite dev server from pre-bundling Node.js packages as browser ESM.
+      // real.ts uses window.require to bypass Vite, but this is extra insurance.
+      exclude: ['ioredis'],
+    },
     define: {
       // Electron merged context has real process.env — don't replace it
       'process.env': 'process.env',

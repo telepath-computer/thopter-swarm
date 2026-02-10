@@ -15,14 +15,20 @@ import type {
   Unsubscribe,
 } from './types';
 
-// --- Node.js imports (available in merged-context Electron) ---
+// --- Node.js runtime imports via Electron's native require ---
+// Standard ES imports are intercepted by Vite's dev server, which pre-bundles
+// Node.js packages as browser ESM — breaking ioredis's stream.Readable inheritance.
+// window.require is Electron's real Node.js require (nodeIntegration: true),
+// bypassing Vite entirely. Works in both dev and production modes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const nodeRequire = (window as any).require as NodeRequire;
 
-import { execFile as _execFile } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
-import { promisify } from 'util';
-import Redis from 'ioredis';
+const { execFile: _execFile } = nodeRequire('child_process');
+const { readFileSync, existsSync } = nodeRequire('fs');
+const { join } = nodeRequire('path');
+const { homedir } = nodeRequire('os');
+const { promisify } = nodeRequire('util');
+const Redis = nodeRequire('ioredis');
 
 const execFileAsync = promisify(_execFile);
 
