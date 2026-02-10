@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { Send, Pause, Play, Trash2, Terminal, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
@@ -18,7 +16,6 @@ interface Props {
 
 export function ActionBar({ name, status, devboxStatus }: Props) {
   const [message, setMessage] = useState('')
-  const [interrupt, setInterrupt] = useState(false)
   const [sending, setSending] = useState(false)
   const [confirmDestroy, setConfirmDestroy] = useState(false)
   const tellThopter = useStore((s) => s.tellThopter)
@@ -29,7 +26,7 @@ export function ActionBar({ name, status, devboxStatus }: Props) {
 
   const isSuspended = devboxStatus === 'suspended'
 
-  const handleSend = async () => {
+  const handleSend = async (interrupt: boolean) => {
     if (!message.trim() || sending) return
     setSending(true)
     try {
@@ -52,77 +49,78 @@ export function ActionBar({ name, status, devboxStatus }: Props) {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
-              handleSend()
+              handleSend(false)
             }
           }}
           disabled={sending}
         />
-        <Button size="default" onClick={handleSend} disabled={!message.trim() || sending}>
-          <Send />
-          {sending ? 'Sending...' : 'Send'}
-        </Button>
+        <div className="flex flex-col gap-1.5">
+          <Button size="default" onClick={() => handleSend(false)} disabled={!message.trim() || sending}>
+            <Send />
+            {sending ? 'Sending...' : 'Send'}
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs gap-1"
+                onClick={() => handleSend(true)}
+                disabled={!message.trim() || sending}
+              >
+                <Zap className="size-3" />
+                Interrupt & Send
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Interrupt Claude first, then send message</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <Checkbox
-            id={`interrupt-${name}`}
-            checked={interrupt}
-            onCheckedChange={(v) => setInterrupt(v === true)}
-          />
-          <Label htmlFor={`interrupt-${name}`} className="text-xs cursor-pointer flex items-center gap-1">
-            <Zap className="size-3" />
-            Interrupt
-          </Label>
-        </div>
+      <div className="flex items-center gap-1.5">
+        {isSuspended ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="xs" onClick={() => resumeThopter(name)}>
+                <Play />
+                Resume
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Resume suspended devbox</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="xs" onClick={() => suspendThopter(name)}>
+                <Pause />
+                Suspend
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Suspend devbox (saves state)</TooltipContent>
+          </Tooltip>
+        )}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="xs" onClick={() => attachThopter(name)}>
+              <Terminal />
+              Attach
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Open SSH session in terminal</TooltipContent>
+        </Tooltip>
 
         <Separator orientation="vertical" className="h-4" />
 
-        <div className="flex items-center gap-1.5">
-          {isSuspended ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" onClick={() => resumeThopter(name)}>
-                  <Play />
-                  Resume
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Resume suspended devbox</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" onClick={() => suspendThopter(name)}>
-                  <Pause />
-                  Suspend
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Suspend devbox (saves state)</TooltipContent>
-            </Tooltip>
-          )}
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="xs" onClick={() => attachThopter(name)}>
-                <Terminal />
-                Attach
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Open SSH session in terminal</TooltipContent>
-          </Tooltip>
-
-          <Separator orientation="vertical" className="h-4" />
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="destructive" size="xs" onClick={() => setConfirmDestroy(true)}>
-                <Trash2 />
-                Destroy
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Permanently destroy this devbox</TooltipContent>
-          </Tooltip>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="destructive" size="xs" onClick={() => setConfirmDestroy(true)}>
+              <Trash2 />
+              Destroy
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Permanently destroy this devbox</TooltipContent>
+        </Tooltip>
       </div>
 
       <ConfirmDialog

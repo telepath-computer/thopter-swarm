@@ -1,6 +1,8 @@
-import { Clock, MessageSquare, Cpu } from 'lucide-react'
+import { Clock, MessageSquare, Cpu, Pause, Play } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { cn, relativeTime } from '@/lib/utils'
 import type { ThopterInfo, ThopterStatus } from '@/services/types'
 import { useStore } from '@/store'
@@ -34,8 +36,11 @@ interface Props {
 
 export function ThopterCard({ thopter }: Props) {
   const openTab = useStore((s) => s.openTab)
+  const suspendThopter = useStore((s) => s.suspendThopter)
+  const resumeThopter = useStore((s) => s.resumeThopter)
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
+  const isSuspended = thopter.devboxStatus === 'suspended'
 
   return (
     <Card
@@ -86,6 +91,29 @@ export function ThopterCard({ thopter }: Props) {
             <span className="line-clamp-2">{thopter.lastMessage}</span>
           </div>
         )}
+        <div className="pt-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          {isSuspended ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="xs" onClick={() => resumeThopter(thopter.name)}>
+                  <Play className="size-3" />
+                  Resume
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Resume suspended devbox</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="xs" onClick={() => suspendThopter(thopter.name)}>
+                  <Pause className="size-3" />
+                  Suspend
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Suspend devbox (saves state)</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </CardContent>
     </Card>
   )
