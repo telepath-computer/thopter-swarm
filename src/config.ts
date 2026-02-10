@@ -38,6 +38,7 @@ interface LocalConfig {
   stopNotifications?: boolean;
   stopNotificationQuietPeriod?: number;
   envVars?: Record<string, string>;
+  defaultThopter?: string;
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -117,6 +118,37 @@ export function setRunloopApiKey(key: string): void {
   const config = loadLocalConfig();
   config.runloopApiKey = key;
   saveLocalConfig(config);
+}
+
+export function getDefaultThopter(): string | undefined {
+  return loadLocalConfig().defaultThopter;
+}
+
+export function setDefaultThopter(name: string): void {
+  const config = loadLocalConfig();
+  config.defaultThopter = name;
+  saveLocalConfig(config);
+}
+
+export function clearDefaultThopter(): void {
+  const config = loadLocalConfig();
+  delete config.defaultThopter;
+  saveLocalConfig(config);
+}
+
+/**
+ * Resolve "." to the default thopter name. Pass through anything else unchanged.
+ * Throws if "." is used but no default is set.
+ */
+export function resolveThopterName(name: string): string {
+  if (name !== ".") return name;
+  const defaultName = getDefaultThopter();
+  if (!defaultName) {
+    throw new Error(
+      "No default thopter set. Set one with: thopter use <name>",
+    );
+  }
+  return defaultName;
 }
 
 // --- Devbox env vars ---
