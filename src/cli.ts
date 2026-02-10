@@ -42,6 +42,8 @@ examples:
   thopter tail dev                       Show last 20 transcript entries
   thopter tail dev -f                    Follow transcript in real time
   thopter tail dev -n 50                 Show last 50 entries
+  thopter tell dev "also fix the tests"  Send a message to Claude
+  thopter tell dev -i "work on X now"    Interrupt Claude and redirect
   thopter keepalive dev                   Reset keep-alive timer for a devbox
   thopter suspend dev                    Suspend a devbox
   thopter resume dev                     Resume a suspended devbox
@@ -108,6 +110,18 @@ program
   .action(async (name: string, opts: { follow?: boolean; lines?: number }) => {
     const { tailTranscript } = await import("./tail.js");
     await tailTranscript(name, { follow: opts.follow, lines: opts.lines });
+  });
+
+// --- tell ---
+program
+  .command("tell")
+  .description("Send a message to a running Claude session")
+  .argument("<name>", "Thopter name")
+  .argument("<message>", "Message to send to Claude")
+  .option("-i, --interrupt", "Interrupt Claude first (send Escape), then deliver the message")
+  .action(async (name: string, message: string, opts: { interrupt?: boolean }) => {
+    const { tellThopter } = await import("./tell.js");
+    await tellThopter(name, message, opts);
   });
 
 // --- run ---
