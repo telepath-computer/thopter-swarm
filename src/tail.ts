@@ -4,6 +4,8 @@
  */
 
 import { Redis } from "ioredis";
+import { Marked } from "marked";
+import { markedTerminal } from "marked-terminal";
 
 function getRedis(): Redis {
   const url = process.env.THOPTER_REDIS_URL;
@@ -26,6 +28,7 @@ interface TranscriptEntry {
   ts: string;
   role: string;
   summary: string;
+  full?: string;
 }
 
 // ANSI color helpers — respect NO_COLOR env var
@@ -37,6 +40,16 @@ const c = {
   dim: (s: string) => (useColor ? `\x1b[2m${s}\x1b[0m` : s),
   magenta: (s: string) => (useColor ? `\x1b[35m${s}\x1b[0m` : s),
 };
+
+// Markdown renderer for full mode
+const marked = new Marked(markedTerminal());
+
+function renderMarkdown(text: string): string {
+  const rendered = marked.parse(text);
+  if (typeof rendered !== "string") return text;
+  // marked-terminal adds a trailing newline; trim it
+  return rendered.trimEnd();
+}
 
 function colorRole(role: string): string {
   switch (role) {
@@ -64,10 +77,35 @@ function formatTime(ts: string): string {
   }
 }
 
-function formatEntry(entry: TranscriptEntry): string {
+/** Prefix used for the header line: "HH:MM:SS  role_______  " */
+const HEADER_PREFIX_LEN = 8 + 2 + 11 + 2; // 23 chars
+
+function formatEntry(entry: TranscriptEntry, short: boolean): string {
   const time = c.dim(formatTime(entry.ts));
   const role = colorRole(entry.role);
-  return `${time}  ${role}  ${entry.summary}`;
+
+  // Short mode or tool entries: always single-line summary
+  if (short || entry.role === "tool_use" || entry.role === "tool_result") {
+    return `${time}  ${role}  ${entry.summary}`;
+  }
+
+  // Full mode for user/assistant/system
+  const text = entry.full ?? entry.summary;
+  const isMultiLine = text.includes("\n");
+
+  if (!isMultiLine) {
+    // Single-line: show inline
+    return `${time}  ${role}  ${text}`;
+  }
+
+  // Multi-line: render markdown, indent under the header
+  const rendered = renderMarkdown(text);
+  const indent = " ".repeat(HEADER_PREFIX_LEN);
+  const indented = rendered
+    .split("\n")
+    .map((line) => indent + line)
+    .join("\n");
+  return `${time}  ${role}\n${indented}`;
 }
 
 function parseEntry(raw: string): TranscriptEntry | null {
@@ -82,23 +120,24 @@ function parseEntry(raw: string): TranscriptEntry | null {
   }
 }
 
-function printEntries(entries: string[]): void {
+function printEntries(entries: string[], short: boolean): void {
   for (const raw of entries) {
     const entry = parseEntry(raw);
     if (entry) {
-      console.log(formatEntry(entry));
+      console.log(formatEntry(entry, short));
     }
   }
 }
 
 export async function tailTranscript(
   name: string,
-  opts: { follow?: boolean; lines?: number },
+  opts: { follow?: boolean; lines?: number; short?: boolean },
 ): Promise<void> {
   const redis = getRedis();
   const key = `thopter:${name}:transcript`;
   const seqKey = `thopter:${name}:transcript_seq`;
   const numLines = opts.lines ?? 20;
+  const short = opts.short ?? false;
 
   try {
     // Get initial entries
@@ -110,7 +149,7 @@ export async function tailTranscript(
     }
 
     // Print initial entries
-    printEntries(entries);
+    printEntries(entries, short);
 
     if (!opts.follow) {
       return;
@@ -142,7 +181,7 @@ export async function tailTranscript(
           // Fetch the last `newCount` entries (or all if list was trimmed)
           const fetchCount = Math.min(newCount, currentLen);
           const newEntries = await redis.lrange(key, -fetchCount, -1);
-          printEntries(newEntries);
+          printEntries(newEntries, short);
 
           lastSeq = currentSeq;
           lastLen = currentLen;
@@ -152,7 +191,7 @@ export async function tailTranscript(
           const currentLen = await redis.llen(key);
           if (currentLen > lastLen) {
             const newEntries = await redis.lrange(key, lastLen, -1);
-            printEntries(newEntries);
+            printEntries(newEntries, short);
             lastLen = currentLen;
           } else if (currentLen < lastLen) {
             // List was cleared — reset

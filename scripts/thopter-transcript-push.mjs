@@ -82,15 +82,17 @@ function summarizeToolUse(toolName, input) {
   }
 }
 
-function extractText(content) {
-  if (typeof content === "string") return content.replace(/\n/g, " ").slice(0, 200);
+function extractFullText(content) {
+  if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
     .map((b) => (typeof b === "string" ? b : b.type === "text" ? b.text : ""))
     .filter(Boolean)
-    .join(" ")
-    .replace(/\n/g, " ")
-    .slice(0, 200);
+    .join("\n");
+}
+
+function extractText(content) {
+  return extractFullText(content).replace(/\n/g, " ").slice(0, 200);
 }
 
 function transformEntry(entry) {
@@ -99,9 +101,10 @@ function transformEntry(entry) {
 
   if (entry.type === "user") {
     const text = extractText(entry.message?.content);
+    const full = extractFullText(entry.message?.content);
     // Skip internal Claude Code plumbing (slash commands, local-command wrappers)
     if (text && !text.startsWith("<") && !text.startsWith("[Request interrupted")) {
-      entries.push({ ts, role: "user", summary: text });
+      entries.push({ ts, role: "user", summary: text, full });
     }
   } else if (entry.type === "assistant") {
     const content = entry.message?.content;
@@ -110,7 +113,7 @@ function transformEntry(entry) {
     for (const block of content) {
       if (block.type === "text" && block.text) {
         const text = block.text.replace(/\n/g, " ").slice(0, 200);
-        entries.push({ ts, role: "assistant", summary: text });
+        entries.push({ ts, role: "assistant", summary: text, full: block.text });
       } else if (block.type === "tool_use") {
         const summary = summarizeToolUse(block.name, block.input);
         entries.push({ ts, role: "tool_use", summary });
