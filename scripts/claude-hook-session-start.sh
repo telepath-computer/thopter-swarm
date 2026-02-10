@@ -13,4 +13,9 @@ if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
     node /usr/local/bin/thopter-last-message "$TRANSCRIPT" | thopter-status message 2>/dev/null || true
 fi
 
+# Send ntfy notification
+if [ -n "${THOPTER_NTFY_CHANNEL:-}" ]; then
+    curl -s -H "Title: ${THOPTER_NAME}" -d "Session started" "ntfy.sh/$THOPTER_NTFY_CHANNEL" &
+fi
+
 exit 0

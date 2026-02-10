@@ -38,6 +38,7 @@ interface LocalConfig {
   redisUrl?: string;
   defaultSnapshotId?: string;
   ntfyChannel?: string;
+  defaultThopter?: string;
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -77,6 +78,39 @@ export function setNtfyChannel(channel: string): void {
   const config = loadLocalConfig();
   config.ntfyChannel = channel;
   saveLocalConfig(config);
+}
+
+export function getDefaultThopter(): string | undefined {
+  return loadLocalConfig().defaultThopter;
+}
+
+export function setDefaultThopter(name: string): void {
+  const config = loadLocalConfig();
+  config.defaultThopter = name;
+  saveLocalConfig(config);
+}
+
+export function clearDefaultThopter(): void {
+  const config = loadLocalConfig();
+  delete config.defaultThopter;
+  saveLocalConfig(config);
+}
+
+/**
+ * Resolve a thopter name argument. If ".", returns the default thopter.
+ * Otherwise returns the name as-is.
+ */
+export function resolveThopterName(name: string): string {
+  if (name === ".") {
+    const def = getDefaultThopter();
+    if (!def) {
+      throw new Error(
+        'No default thopter set. Use "thopter use <name>" to set one.',
+      );
+    }
+    return def;
+  }
+  return name;
 }
 
 export function getRunloopApiKey(): string | undefined {

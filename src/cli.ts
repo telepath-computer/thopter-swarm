@@ -5,7 +5,7 @@
  */
 
 import { Command } from "commander";
-import { loadConfigIntoEnv } from "./config.js";
+import { loadConfigIntoEnv, resolveThopterName } from "./config.js";
 
 // Load API keys from ~/.thopter.json into process.env (won't override existing env vars)
 loadConfigIntoEnv();
@@ -25,6 +25,8 @@ lifecycle:
 
 examples:
   thopter setup                          First-time auth & secret config
+  thopter use dev                        Set default thopter context
+  thopter ssh .                          SSH into default thopter (use ".")
   thopter create dev                     Create a devbox
   thopter create --snapshot golden        Create from a snapshot
   thopter ssh dev                        SSH into the devbox
@@ -52,6 +54,37 @@ program
   .action(async () => {
     const { runSetup } = await import("./setup.js");
     await runSetup();
+  });
+
+// --- use ---
+program
+  .command("use")
+  .description("Set or view the default thopter context")
+  .argument("[name]", "Thopter name to set as default (omit to view current)")
+  .option("--clear", "Clear the default thopter")
+  .action(async (name: string | undefined, opts: { clear?: boolean }) => {
+    const {
+      getDefaultThopter,
+      setDefaultThopter,
+      clearDefaultThopter,
+    } = await import("./config.js");
+
+    if (opts.clear) {
+      clearDefaultThopter();
+      console.log("Default thopter cleared.");
+    } else if (name) {
+      setDefaultThopter(name);
+      console.log(`Default thopter set to: ${name}`);
+      console.log('Use "." as the name in any command to reference it.');
+    } else {
+      const current = getDefaultThopter();
+      if (current) {
+        console.log(`Default thopter: ${current}`);
+      } else {
+        console.log("No default thopter set.");
+        console.log("  Set one with: thopter use <name>");
+      }
+    }
   });
 
 // --- create ---
@@ -97,7 +130,7 @@ program
   .action(async (name: string | undefined, opts: { all?: boolean }) => {
     const { showAllStatus, showThopterStatus } = await import("./status.js");
     if (name) {
-      await showThopterStatus(name);
+      await showThopterStatus(resolveThopterName(name));
     } else {
       await showAllStatus({ all: opts.all });
     }
@@ -111,7 +144,7 @@ program
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
     const { destroyDevbox } = await import("./devbox.js");
-    await destroyDevbox(devbox);
+    await destroyDevbox(resolveThopterName(devbox));
   });
 
 // --- suspend ---
@@ -121,7 +154,7 @@ program
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
     const { suspendDevbox } = await import("./devbox.js");
-    await suspendDevbox(devbox);
+    await suspendDevbox(resolveThopterName(devbox));
   });
 
 // --- resume ---
@@ -131,7 +164,7 @@ program
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
     const { resumeDevbox } = await import("./devbox.js");
-    await resumeDevbox(devbox);
+    await resumeDevbox(resolveThopterName(devbox));
   });
 
 // --- keepalive ---
@@ -141,7 +174,7 @@ program
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
     const { keepaliveDevbox } = await import("./devbox.js");
-    await keepaliveDevbox(devbox);
+    await keepaliveDevbox(resolveThopterName(devbox));
   });
 
 // --- ssh ---
@@ -151,7 +184,7 @@ program
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
     const { sshDevbox } = await import("./devbox.js");
-    await sshDevbox(devbox);
+    await sshDevbox(resolveThopterName(devbox));
   });
 
 // --- attach ---
@@ -161,7 +194,7 @@ program
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
     const { attachDevbox } = await import("./devbox.js");
-    await attachDevbox(devbox);
+    await attachDevbox(resolveThopterName(devbox));
   });
 
 // --- exec ---
@@ -172,7 +205,7 @@ program
   .argument("<command...>", "Command and arguments")
   .action(async (devbox: string, command: string[]) => {
     const { execDevbox } = await import("./devbox.js");
-    await execDevbox(devbox, command);
+    await execDevbox(resolveThopterName(devbox), command);
   });
 
 // --- snapshot (subcommand) ---
@@ -196,7 +229,7 @@ snapshotCmd
   .argument("[name]", "Name/label for the snapshot")
   .action(async (devbox: string, name?: string) => {
     const { snapshotDevbox } = await import("./devbox.js");
-    await snapshotDevbox(devbox, name);
+    await snapshotDevbox(resolveThopterName(devbox), name);
   });
 
 snapshotCmd
@@ -206,7 +239,7 @@ snapshotCmd
   .argument("<name>", "Name of the snapshot to replace")
   .action(async (devbox: string, name: string) => {
     const { replaceSnapshot } = await import("./devbox.js");
-    await replaceSnapshot(devbox, name);
+    await replaceSnapshot(resolveThopterName(devbox), name);
   });
 
 snapshotCmd
@@ -259,7 +292,7 @@ configCmd
   .argument("<key>", "Config key")
   .argument("<value>", "Config value")
   .action(async (key: string, value: string) => {
-    const { setRunloopApiKey, setRedisUrl, setNtfyChannel, setDefaultSnapshot } = await import("./config.js");
+    const { setRunloopApiKey, setRedisUrl, setNtfyChannel, setDefaultSnapshot, setDefaultThopter } = await import("./config.js");
     switch (key) {
       case "runloopApiKey":
         setRunloopApiKey(value);
@@ -278,9 +311,13 @@ configCmd
         setDefaultSnapshot(value);
         console.log(`Set defaultSnapshotId to: ${value}`);
         break;
+      case "defaultThopter":
+        setDefaultThopter(value);
+        console.log(`Set defaultThopter to: ${value}`);
+        break;
       default:
         console.error(`Unknown config key: ${key}`);
-        console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId");
+        console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId, defaultThopter");
         process.exit(1);
     }
   });
@@ -290,12 +327,13 @@ configCmd
   .description("Get a config value")
   .argument("[key]", "Config key (omit to show all)")
   .action(async (key?: string) => {
-    const { getRunloopApiKey, getRedisUrl, getNtfyChannel, getDefaultSnapshot } = await import("./config.js");
+    const { getRunloopApiKey, getRedisUrl, getNtfyChannel, getDefaultSnapshot, getDefaultThopter } = await import("./config.js");
     if (!key) {
       console.log(`runloopApiKey:     ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
       console.log(`redisUrl:          ${getRedisUrl() ? "(set)" : "(not set)"}`);
       console.log(`ntfyChannel:       ${getNtfyChannel() ?? "(not set)"}`);
       console.log(`defaultSnapshotId: ${getDefaultSnapshot() ?? "(not set)"}`);
+      console.log(`defaultThopter:    ${getDefaultThopter() ?? "(not set)"}`);
     } else {
       switch (key) {
         case "runloopApiKey":
@@ -310,9 +348,12 @@ configCmd
         case "defaultSnapshotId":
           console.log(getDefaultSnapshot() ?? "(not set)");
           break;
+        case "defaultThopter":
+          console.log(getDefaultThopter() ?? "(not set)");
+          break;
         default:
           console.error(`Unknown config key: ${key}`);
-          console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId");
+          console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId, defaultThopter");
           process.exit(1);
       }
     }
