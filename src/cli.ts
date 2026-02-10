@@ -133,9 +133,10 @@ program
   .argument("<name>", "Thopter name")
   .argument("<message>", "Message to send to Claude")
   .option("-i, --interrupt", "Interrupt Claude first (send Escape), then deliver the message")
-  .action(async (name: string, message: string, opts: { interrupt?: boolean }) => {
+  .option("--no-tail", "Exit after sending (don't follow transcript)")
+  .action(async (name: string, message: string, opts: { interrupt?: boolean; tail?: boolean }) => {
     const { tellThopter } = await import("./tell.js");
-    await tellThopter(resolveThopterName(name), message, opts);
+    await tellThopter(resolveThopterName(name), message, { interrupt: opts.interrupt, noTail: opts.tail === false });
   });
 
 // --- run ---

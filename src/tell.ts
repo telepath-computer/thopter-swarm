@@ -30,7 +30,7 @@ echo "$pane_target"
 export async function tellThopter(
   name: string,
   message: string,
-  opts: { interrupt?: boolean },
+  opts: { interrupt?: boolean; noTail?: boolean },
 ): Promise<void> {
   const { id: devboxId } = await resolveDevbox(name);
   const client = getClient();
@@ -99,8 +99,11 @@ export async function tellThopter(
     process.exit(1);
   }
 
-  console.log("Message sent. Tailing transcript...\n");
+  console.log("Message sent.");
 
-  // Enter tail -f mode so the user sees Claude's response
-  await tailTranscript(name, { follow: true, lines: 5 });
+  if (!opts.noTail) {
+    console.log("Tailing transcript...\n");
+    // Enter tail -f mode so the user sees Claude's response
+    await tailTranscript(name, { follow: true, lines: 5 });
+  }
 }

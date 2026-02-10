@@ -399,7 +399,7 @@ export class RealThopterService implements ThopterService {
    * Send a message to a running Claude session via CLI.
    */
   async tellThopter(name: string, message: string, interrupt?: boolean): Promise<void> {
-    const args = ['tell', name, message];
+    const args = ['tell', name, message, '--no-tail'];
     if (interrupt) args.push('--interrupt');
     await execThopter(...args);
   }
