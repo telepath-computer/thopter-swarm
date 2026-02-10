@@ -101,7 +101,8 @@ program
   .option("-f, --follow [interval]", "Re-render every N seconds (default: 10)")
   .option("-w, --wide", "Force wide (single-line) layout")
   .option("-n, --narrow", "Force narrow (multi-line) layout")
-  .action(async (name: string | undefined, opts: { follow?: boolean | string; wide?: boolean; narrow?: boolean }) => {
+  .option("--json", "Output as JSON (for programmatic use)")
+  .action(async (name: string | undefined, opts: { follow?: boolean | string; wide?: boolean; narrow?: boolean; json?: boolean }) => {
     const follow = opts.follow === true ? 10 : opts.follow ? Number(opts.follow) : undefined;
     const layout = opts.wide ? "wide" as const : opts.narrow ? "narrow" as const : undefined;
     if (name) {
@@ -109,7 +110,7 @@ program
       await showThopterStatus(resolveThopterName(name));
     } else {
       const { listDevboxes } = await import("./devbox.js");
-      await listDevboxes({ follow, layout });
+      await listDevboxes({ follow, layout, json: opts.json });
     }
   });
 

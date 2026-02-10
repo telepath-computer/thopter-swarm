@@ -375,7 +375,60 @@ export async function createDevbox(opts: {
   }
 }
 
-export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "narrow" }): Promise<void> {
+/**
+ * Fetch live thopters from Runloop API + Redis, returning structured data.
+ * This is the single source of truth — Runloop determines which devboxes are
+ * alive, Redis provides agent annotations (status, task, heartbeat, etc.).
+ */
+export async function fetchThopters(): Promise<{
+  name: string; owner: string; id: string; devboxStatus: string;
+  status: string | null; task: string | null; heartbeat: string | null;
+  alive: boolean; claudeRunning: boolean; lastMessage: string | null;
+}[]> {
+  const client = getClient();
+  const { getRedisInfoForNames } = await import("./status.js");
+
+  const devboxes: { name: string; owner: string; id: string; status: string }[] = [];
+  const liveStatuses = ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const;
+  for (const status of liveStatuses) {
+    for await (const db of client.devboxes.list({ status, limit: 100 })) {
+      const meta = db.metadata ?? {};
+      if (meta[MANAGED_BY_KEY] !== MANAGED_BY_VALUE) continue;
+      devboxes.push({
+        name: meta[NAME_KEY] ?? "",
+        owner: meta[OWNER_KEY] ?? "",
+        id: db.id,
+        status: db.status,
+      });
+    }
+  }
+
+  const redisMap = await getRedisInfoForNames(devboxes.map((db) => db.name));
+
+  return devboxes.map((db) => {
+    const redis = redisMap.get(db.name);
+    return {
+      name: db.name,
+      owner: db.owner,
+      id: db.id,
+      devboxStatus: db.status,
+      status: redis?.status ?? null,
+      task: redis?.task ?? null,
+      heartbeat: redis?.heartbeat ?? null,
+      alive: redis?.alive ?? false,
+      claudeRunning: redis?.claudeRunning === "1",
+      lastMessage: redis?.lastMessage ?? null,
+    };
+  });
+}
+
+export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "narrow"; json?: boolean }): Promise<void> {
+  if (opts?.json) {
+    const thopters = await fetchThopters();
+    process.stdout.write(JSON.stringify(thopters) + "\n");
+    return;
+  }
+
   const client = getClient();
   const { getRedisInfoForNames, relativeTime } = await import("./status.js");
   const { formatTable } = await import("./output.js");

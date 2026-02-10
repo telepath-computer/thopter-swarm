@@ -155,52 +155,30 @@ async function execThopter(...args: string[]): Promise<string> {
 
 export class RealThopterService implements ThopterService {
   /**
-   * Discover all thopters via Redis key scan, then batch-fetch their status.
-   * Scans for thopter:*:heartbeat keys to find names.
+   * List live thopters via `thopter status --json`.
+   * Uses the same Runloop API + Redis logic as the CLI — Runloop is the source
+   * of truth for which devboxes are alive, Redis provides agent annotations.
    */
   async listThopters(): Promise<ThopterInfo[]> {
-    const redis = createRedis();
-    await redis.connect();
-    try {
-      // Discover thopter names by scanning for heartbeat keys
-      const names: string[] = [];
-      let cursor = '0';
-      do {
-        const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', 'thopter:*:heartbeat', 'COUNT', 100);
-        cursor = nextCursor;
-        for (const key of keys) {
-          // Extract name from "thopter:{name}:heartbeat"
-          const match = key.match(/^thopter:(.+):heartbeat$/);
-          if (match) names.push(match[1]);
-        }
-      } while (cursor !== '0');
+    const output = await execThopter('status', '--json');
+    const raw = JSON.parse(output) as Array<{
+      name: string; owner: string; id: string; devboxStatus: string;
+      status: string | null; task: string | null; heartbeat: string | null;
+      alive: boolean; claudeRunning: boolean; lastMessage: string | null;
+    }>;
 
-      if (names.length === 0) return [];
-
-      // Batch fetch all fields for each thopter via pipeline
-      const pipeline = redis.pipeline();
-      for (const name of names) {
-        const prefix = `thopter:${name}`;
-        pipeline.mget(...REDIS_FIELDS.map((f) => `${prefix}:${f}`));
-      }
-      const results = await pipeline.exec();
-      if (!results) return [];
-
-      const thopters: ThopterInfo[] = [];
-      for (let i = 0; i < names.length; i++) {
-        const [err, values] = results[i];
-        if (err || !values) continue;
-        const info = parseRedisValues(names[i], values as (string | null)[]);
-        // Only include live thopters (match CLI: running, suspended, provisioning, etc.)
-        if (info.devboxStatus !== 'shutdown' && (info.heartbeat || info.status || info.id)) {
-          thopters.push(info);
-        }
-      }
-
-      return thopters;
-    } finally {
-      redis.disconnect();
-    }
+    return raw.map((t) => ({
+      name: t.name,
+      owner: t.owner,
+      id: t.id,
+      status: (t.status as ThopterStatus) ?? null,
+      task: t.task,
+      heartbeat: t.heartbeat,
+      alive: t.alive,
+      claudeRunning: t.claudeRunning,
+      lastMessage: t.lastMessage,
+      devboxStatus: t.devboxStatus as DevboxStatus,
+    }));
   }
 
   /**
