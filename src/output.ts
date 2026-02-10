@@ -46,7 +46,7 @@ export function formatTable(
   rows: string[][],
   options?: TableOptions,
 ): string {
-  if (rows.length === 0) return "  (none)\n";
+  if (rows.length === 0) return "(none)\n";
 
   const numCols = (headers ?? rows[0]).length;
   const maxWidth = options?.maxWidth;
@@ -61,13 +61,12 @@ export function formatTable(
 
   // Constrain flex columns to fit within maxWidth
   if (flexCols.size > 0 && maxWidth != null) {
-    const indent = 2;
     const gaps = (numCols - 1) * 2;
     const fixedWidth = widths.reduce(
       (sum, w, i) => sum + (flexCols.has(i) ? 0 : w),
       0,
     );
-    const available = maxWidth - indent - gaps - fixedWidth;
+    const available = maxWidth - gaps - fixedWidth;
 
     if (available > 0) {
       // Sort flex columns by natural width so narrow ones keep their size
@@ -105,7 +104,7 @@ export function formatTable(
       if (widths[i] <= 0) continue;
       parts.push(truncate(cells[i] ?? "", widths[i]));
     }
-    return `  ${parts.join("  ")}`;
+    return parts.join("  ");
   };
 
   const lines: string[] = [];
@@ -117,7 +116,7 @@ export function formatTable(
       if (widths[i] <= 0) continue;
       sepParts.push("─".repeat(widths[i]));
     }
-    lines.push(`  ${sepParts.join("  ")}`);
+    lines.push(sepParts.join("  "));
   }
 
   for (const row of rows) {

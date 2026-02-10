@@ -437,10 +437,10 @@ export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
       const maxCell = Math.max(0, ...wideFixedData.map((r) => r[i].length));
       return sum + Math.max(h.length, maxCell);
     }, 0);
-    // indent(2) + gaps between all 8 columns (7 × 2) + fixed cols width
-    const wideOverhead = 2 + 7 * 2 + wideFixedWidth;
-    // Need at least 20 chars for the two flex columns
-    const tight = wideOverhead > cols - 20;
+    // gaps between all 8 columns (7 × 2) + fixed cols width
+    const wideOverhead = 7 * 2 + wideFixedWidth;
+    // Need at least 60 chars for the two flex columns to stay in wide mode
+    const tight = wideOverhead > cols - 60;
 
     // TASK index = 4, LAST MSG index = 7 (flex columns)
     if (tight) {
