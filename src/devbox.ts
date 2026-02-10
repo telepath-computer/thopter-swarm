@@ -140,13 +140,7 @@ async function installThopterScripts(
       contents: readScript(src),
     });
   }
-  // Transcript parser for Stop hook (extracts last assistant message)
-  await client.devboxes.writeFileContents(devboxId, {
-    file_path: "/tmp/thopter-last-message.mjs",
-    contents: readScript("thopter-last-message.mjs"),
-  });
-
-  // Transcript push script for thopter tail (streams entries to Redis)
+  // Transcript push script for thopter tail (streams entries to Redis, updates last_message)
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/tmp/thopter-transcript-push.mjs",
     contents: readScript("thopter-transcript-push.mjs"),
@@ -160,7 +154,7 @@ async function installThopterScripts(
 
   // Install scripts to /usr/local/bin, make hooks executable, register hooks, set up cron
   await client.devboxes.executeAsync(devboxId, {
-    command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-last-message.mjs /usr/local/bin/thopter-last-message && sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
+    command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
   });
 }
 

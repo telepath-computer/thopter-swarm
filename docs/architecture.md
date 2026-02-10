@@ -49,8 +49,7 @@ scripts/       Devbox-side scripts (uploaded on create)
   thopter-status.sh            Redis status reporter
   thopter-heartbeat.sh         Heartbeat cron loop
   thopter-cron-install.sh      Installs heartbeat cron job
-  thopter-last-message.mjs     Extracts last assistant message from transcript
-  thopter-transcript-push.mjs  Streams transcript entries to Redis (for thopter tail)
+  thopter-transcript-push.mjs  Streams transcript entries to Redis (for thopter tail + last_message)
   thopter-claude-md.md         CLAUDE.md deployed to devboxes
   install-claude-hooks.mjs     Merges hook config into Claude settings.json
   claude-hook-*.sh             Individual Claude Code event hooks
