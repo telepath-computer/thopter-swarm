@@ -191,8 +191,8 @@ export class RealThopterService implements ThopterService {
         const [err, values] = results[i];
         if (err || !values) continue;
         const info = parseRedisValues(names[i], values as (string | null)[]);
-        // Only include thopters that have meaningful data
-        if (info.heartbeat || info.status || info.id) {
+        // Only include live thopters (match CLI: running, suspended, provisioning, etc.)
+        if (info.devboxStatus !== 'shutdown' && (info.heartbeat || info.status || info.id)) {
           thopters.push(info);
         }
       }
