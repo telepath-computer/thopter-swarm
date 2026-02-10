@@ -43,10 +43,11 @@ export function ThopterCard({ thopter }: Props) {
   const destroyThopter = useStore((s) => s.destroyThopter)
   const [confirmDestroy, setConfirmDestroy] = useState(false)
   const [confirmSuspend, setConfirmSuspend] = useState(false)
+  const [confirmResume, setConfirmResume] = useState(false)
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
   const isSuspended = thopter.devboxStatus === 'suspended'
-  const anyDialogOpen = confirmDestroy || confirmSuspend
+  const anyDialogOpen = confirmDestroy || confirmSuspend || confirmResume
 
   return (
     <Card
@@ -101,7 +102,7 @@ export function ThopterCard({ thopter }: Props) {
           {isSuspended ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => resumeThopter(thopter.name)}>
+                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmResume(true)}>
                   <Play className="size-3" />
                   Resume
                 </Button>
@@ -131,6 +132,17 @@ export function ThopterCard({ thopter }: Props) {
         </div>
       </CardContent>
 
+      <ConfirmDialog
+        open={confirmResume}
+        title="Resume Thopter"
+        description={`This will resume "${thopter.name}" from its suspended state.`}
+        confirmLabel="Resume"
+        onConfirm={() => {
+          setConfirmResume(false)
+          resumeThopter(thopter.name)
+        }}
+        onCancel={() => setConfirmResume(false)}
+      />
       <ConfirmDialog
         open={confirmSuspend}
         title="Suspend Thopter"

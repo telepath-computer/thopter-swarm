@@ -100,6 +100,7 @@ export function StatusPanel({ thopter }: Props) {
   const destroyThopter = useStore((s) => s.destroyThopter)
   const [confirmDestroy, setConfirmDestroy] = useState(false)
   const [confirmSuspend, setConfirmSuspend] = useState(false)
+  const [confirmResume, setConfirmResume] = useState(false)
 
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
@@ -149,7 +150,7 @@ export function StatusPanel({ thopter }: Props) {
           {isSuspended ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => resumeThopter(thopter.name)}>
+                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmResume(true)}>
                   <Play />
                   Resume
                 </Button>
@@ -181,6 +182,17 @@ export function StatusPanel({ thopter }: Props) {
 
       <EditableTask name={thopter.name} task={thopter.task} />
 
+      <ConfirmDialog
+        open={confirmResume}
+        title="Resume Thopter"
+        description={`This will resume "${thopter.name}" from its suspended state.`}
+        confirmLabel="Resume"
+        onConfirm={() => {
+          setConfirmResume(false)
+          resumeThopter(thopter.name)
+        }}
+        onCancel={() => setConfirmResume(false)}
+      />
       <ConfirmDialog
         open={confirmSuspend}
         title="Suspend Thopter"
