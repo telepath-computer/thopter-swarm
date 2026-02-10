@@ -62,6 +62,17 @@ Full command reference for the `thopter` CLI. See the [README](../README.md) for
 | `thopter snapshot default [name]` | View or set default snapshot |
 | `thopter snapshot default --clear` | Clear default snapshot |
 
+## Predefined Repos
+
+| Command | Description |
+|---------|-------------|
+| `thopter repos list` | List predefined repos |
+| `thopter repos add` | Add a predefined repo (interactive) |
+| `thopter repos remove` | Remove a predefined repo (interactive) |
+| `thopter repos edit` | Edit a predefined repo (interactive) |
+
+Predefined repos appear as a numbered chooser when running `thopter run` without `--repo`. Each entry can pin a branch or leave it unpinned (prompts at run time, defaults to `main`). Multiple entries for the same repo with different branches are supported.
+
 ## Environment Variables
 
 | Command | Description |

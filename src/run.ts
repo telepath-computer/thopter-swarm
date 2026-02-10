@@ -5,8 +5,9 @@
 import { createInterface } from "node:readline";
 import { createDevbox } from "./devbox.js";
 import { getClient } from "./client.js";
-import { getDefaultSnapshot, getDefaultRepo, getDefaultBranch } from "./config.js";
+import { getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getRepos } from "./config.js";
 import { generateName } from "./names.js";
+import { chooseRepo } from "./repos.js";
 
 function buildRunPrompt(opts: {
   repo: string;
@@ -72,43 +73,52 @@ export async function runThopter(opts: {
   // Interactive prompting if --repo not given
   let repo = opts.repo;
   let branch = opts.branch;
-  const configDefaultRepo = getDefaultRepo();
-  const configDefaultBranch = getDefaultBranch();
   if (!repo) {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    const repoPrompt = configDefaultRepo
-      ? `Repository (owner/repo) [${configDefaultRepo}]: `
-      : "Repository (owner/repo): ";
-    repo = await ask(rl, repoPrompt);
-    if (!repo && configDefaultRepo) {
-      repo = configDefaultRepo;
-      console.log(`  Using default repo: ${repo}`);
-    }
-    if (!repo) {
+    const repos = getRepos();
+    if (repos.length > 0) {
+      // Use the numbered repo chooser
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const chosen = await chooseRepo(rl);
       rl.close();
-      console.error("Error: Repository is required.");
-      console.error("  Tip: set a default with: thopter config set defaultRepo owner/repo");
-      process.exit(1);
-    }
-    if (!branch) {
-      const branchPrompt = configDefaultBranch
-        ? `Branch [${configDefaultBranch}]: `
-        : "Branch (enter for default): ";
-      const answer = await ask(rl, branchPrompt);
-      if (answer) {
-        branch = answer;
-      } else if (configDefaultBranch) {
-        branch = configDefaultBranch;
-        console.log(`  Using default branch: ${branch}`);
+      repo = chosen.repo;
+      if (!branch) branch = chosen.branch;
+    } else {
+      // Fall back to defaultRepo/defaultBranch for existing users without repos list
+      const configDefaultRepo = getDefaultRepo();
+      const configDefaultBranch = getDefaultBranch();
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const repoPrompt = configDefaultRepo
+        ? `Repository (owner/repo) [${configDefaultRepo}]: `
+        : "Repository (owner/repo): ";
+      repo = await ask(rl, repoPrompt);
+      if (!repo && configDefaultRepo) {
+        repo = configDefaultRepo;
+        console.log(`  Using default repo: ${repo}`);
       }
-    }
-    rl.close();
-  } else {
-    // --repo was given on command line; still apply default branch if not specified
-    if (!branch && configDefaultBranch) {
-      branch = configDefaultBranch;
+      if (!repo) {
+        rl.close();
+        console.error("Error: Repository is required.");
+        console.error("  Tip: set a default with: thopter config set defaultRepo owner/repo");
+        process.exit(1);
+      }
+      if (!branch) {
+        const branchPrompt = configDefaultBranch
+          ? `Branch [${configDefaultBranch}]: `
+          : "Branch [main]: ";
+        const answer = await ask(rl, branchPrompt);
+        if (answer) {
+          branch = answer;
+        } else if (configDefaultBranch) {
+          branch = configDefaultBranch;
+          console.log(`  Using default branch: ${branch}`);
+        }
+      }
+      rl.close();
     }
   }
+
+  // Default branch to main if still unset
+  if (!branch) branch = "main";
 
   // Validate repo and branch to prevent shell injection
   repo = validateRepo(repo);
@@ -126,14 +136,15 @@ export async function runThopter(opts: {
 
   const client = getClient();
 
-  // Step 2: Clone repo and checkout branch
+  // Step 2: Clone repo and checkout branch (always fetch + reset to remote HEAD)
   const cloneScript = [
     `cd /home/user`,
     `if [ ! -d "${repoName}" ]; then git clone "https://github.com/${repo}.git"; fi`,
     `cd "${repoName}"`,
-    `git fetch --all`,
-    branch ? `git checkout "${branch}" && git pull origin "${branch}" || true` : "",
-  ].filter(Boolean).join(" && ");
+    `git fetch origin`,
+    `git checkout "${branch}"`,
+    `git reset --hard "origin/${branch}"`,
+  ].join(" && ");
 
   console.log(`Cloning ${repo}...`);
   const cloneExec = await client.devboxes.executeAsync(devboxId, { command: cloneScript });
