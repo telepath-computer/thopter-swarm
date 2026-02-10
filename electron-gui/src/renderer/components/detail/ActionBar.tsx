@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Send, Pause, Play, Trash2, Terminal, Zap } from 'lucide-react'
+import { Send, Pause, Play, Trash2, TerminalSquare, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
+import { ShellCommandsModal } from '@/components/modals/ShellCommandsModal'
 import { useStore } from '@/store'
 import type { ThopterStatus, DevboxStatus } from '@/services/types'
 
@@ -18,11 +19,11 @@ export function ActionBar({ name, status, devboxStatus }: Props) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [confirmDestroy, setConfirmDestroy] = useState(false)
+  const [shellModalOpen, setShellModalOpen] = useState(false)
   const tellThopter = useStore((s) => s.tellThopter)
   const suspendThopter = useStore((s) => s.suspendThopter)
   const resumeThopter = useStore((s) => s.resumeThopter)
   const destroyThopter = useStore((s) => s.destroyThopter)
-  const attachThopter = useStore((s) => s.attachThopter)
 
   const isSuspended = devboxStatus === 'suspended'
 
@@ -102,12 +103,12 @@ export function ActionBar({ name, status, devboxStatus }: Props) {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" size="xs" onClick={() => attachThopter(name)}>
-              <Terminal />
-              Attach
+            <Button variant="outline" size="xs" onClick={() => setShellModalOpen(true)}>
+              <TerminalSquare />
+              Shell Commands
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Open SSH session in terminal</TooltipContent>
+          <TooltipContent>Copy CLI commands for this thopter</TooltipContent>
         </Tooltip>
 
         <Separator orientation="vertical" className="h-4" />
@@ -122,6 +123,8 @@ export function ActionBar({ name, status, devboxStatus }: Props) {
           <TooltipContent>Permanently destroy this devbox</TooltipContent>
         </Tooltip>
       </div>
+
+      <ShellCommandsModal open={shellModalOpen} name={name} onClose={() => setShellModalOpen(false)} />
 
       <ConfirmDialog
         open={confirmDestroy}

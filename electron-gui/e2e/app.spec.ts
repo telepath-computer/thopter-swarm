@@ -136,7 +136,7 @@ test('operation buttons are visible', async () => {
 
   await expect(page.getByText('Suspend').or(page.getByText('Resume'))).toBeVisible()
   await expect(page.getByText('Destroy')).toBeVisible()
-  await expect(page.getByText('Attach')).toBeVisible()
+  await expect(page.getByText('Shell Commands')).toBeVisible()
 })
 
 // --- Run modal tests ---
