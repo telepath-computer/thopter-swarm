@@ -94,13 +94,15 @@ program
   .alias("ls")
   .description("Show thopter status (unified Runloop + Redis view)")
   .argument("[name]", "Thopter name (omit for overview of all)")
-  .action(async (name: string | undefined) => {
+  .option("-f, --follow [interval]", "Re-render every N seconds (default: 5)")
+  .action(async (name: string | undefined, opts: { follow?: boolean | string }) => {
+    const follow = opts.follow === true ? 5 : opts.follow ? Number(opts.follow) : undefined;
     if (name) {
       const { showThopterStatus } = await import("./status.js");
       await showThopterStatus(resolveThopterName(name));
     } else {
       const { listDevboxes } = await import("./devbox.js");
-      await listDevboxes();
+      await listDevboxes({ follow });
     }
   });
 

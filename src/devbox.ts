@@ -381,51 +381,70 @@ export async function createDevbox(opts: {
   }
 }
 
-export async function listDevboxes(): Promise<void> {
+export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
   const client = getClient();
   const { getRedisInfoForNames, relativeTime } = await import("./status.js");
 
-  const devboxes: { name: string; owner: string; id: string; status: string }[] = [];
-  const liveStatuses = ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const;
-  for (const status of liveStatuses) {
-    for await (const db of client.devboxes.list({ status, limit: 100 })) {
-      const meta = db.metadata ?? {};
-      if (meta[MANAGED_BY_KEY] !== MANAGED_BY_VALUE) continue;
-      devboxes.push({
-        name: meta[NAME_KEY] ?? "",
-        owner: meta[OWNER_KEY] ?? "",
-        id: db.id,
-        status: db.status,
-      });
+  async function fetchAndRender(): Promise<boolean> {
+    const devboxes: { name: string; owner: string; id: string; status: string }[] = [];
+    const liveStatuses = ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const;
+    for (const status of liveStatuses) {
+      for await (const db of client.devboxes.list({ status, limit: 100 })) {
+        const meta = db.metadata ?? {};
+        if (meta[MANAGED_BY_KEY] !== MANAGED_BY_VALUE) continue;
+        devboxes.push({
+          name: meta[NAME_KEY] ?? "",
+          owner: meta[OWNER_KEY] ?? "",
+          id: db.id,
+          status: db.status,
+        });
+      }
     }
+
+    if (devboxes.length === 0) {
+      console.log("No managed devboxes found.");
+      return false;
+    }
+
+    // Fetch Redis annotations for all devboxes using a single connection
+    const redisMap = await getRedisInfoForNames(devboxes.map((db) => db.name));
+
+    const rows: string[][] = devboxes.map((db) => {
+      const redis = redisMap.get(db.name);
+      let task = redis?.task ?? "-";
+      if (task.length > 40) task = task.slice(0, 37) + "...";
+      let msg = redis?.lastMessage ?? "-";
+      if (msg.length > 80) msg = msg.slice(0, 77) + "...";
+      const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
+      const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat) : "-";
+      return [
+        db.name,
+        db.owner,
+        db.status,
+        redis?.status ?? "-",
+        task,
+        claude,
+        heartbeat,
+        msg,
+      ];
+    });
+
+    printTable(["NAME", "OWNER", "DEVBOX", "AGENT", "TASK", "CLAUDE", "HEARTBEAT", "LAST MSG"], rows);
+    return true;
   }
 
-  if (devboxes.length === 0) {
-    console.log("No managed devboxes found.");
-    return;
+  if (opts?.follow) {
+    const interval = opts.follow;
+    // Loop until Ctrl+C
+    while (true) {
+      process.stdout.write("\x1b[2J\x1b[H");
+      console.log(`Refreshing every ${interval}s — Ctrl+C to exit  (${new Date().toLocaleTimeString()})\n`);
+      await fetchAndRender();
+      await new Promise((r) => setTimeout(r, interval * 1000));
+    }
+  } else {
+    await fetchAndRender();
   }
-
-  // Fetch Redis annotations for all devboxes using a single connection
-  const redisMap = await getRedisInfoForNames(devboxes.map((db) => db.name));
-
-  const rows: string[][] = devboxes.map((db) => {
-    const redis = redisMap.get(db.name);
-    let task = redis?.task ?? "-";
-    if (task.length > 40) task = task.slice(0, 37) + "...";
-    const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
-    const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat) : "-";
-    return [
-      db.name,
-      db.owner,
-      db.status,
-      redis?.status ?? "-",
-      task,
-      claude,
-      heartbeat,
-    ];
-  });
-
-  printTable(["NAME", "OWNER", "DEVBOX", "AGENT", "TASK", "CLAUDE", "HEARTBEAT"], rows);
 }
 
 export async function listSnapshotsCmd(): Promise<void> {
