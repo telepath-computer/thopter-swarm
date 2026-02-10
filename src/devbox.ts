@@ -381,7 +381,7 @@ export async function createDevbox(opts: {
   }
 }
 
-export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
+export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "narrow" }): Promise<void> {
   const client = getClient();
   const { getRedisInfoForNames, relativeTime } = await import("./status.js");
   const { formatTable } = await import("./output.js");
@@ -439,21 +439,30 @@ export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
     }, 0);
     // gaps between all 8 columns (7 × 2) + fixed cols width
     const wideOverhead = 7 * 2 + wideFixedWidth;
-    // Need at least 60 chars for the two flex columns to stay in wide mode
-    const tight = wideOverhead > cols - 60;
+    // Explicit flag overrides auto-detection; otherwise need 60 chars for flex columns
+    const tight = opts?.layout === "narrow" ? true
+      : opts?.layout === "wide" ? false
+      : wideOverhead > cols - 60;
 
     // Gray out suspended rows
     const DIM = "\x1b[90m";
-    const rowStyles = devboxes.map((db) =>
-      db.status === "suspended" ? DIM : null,
-    );
 
-    // TASK index = 4, LAST MSG index = 7 (flex columns)
+    const collapse = (s: string) => s.replace(/\s+/g, " ").trim();
+    const truncate = (s: string, max: number) => {
+      if (s.length <= max) return s;
+      return max <= 3 ? s.slice(0, max) : s.slice(0, max - 3) + "...";
+    };
+
     if (tight) {
-      const rows: string[][] = devboxes.map((db) => {
+      // Multi-line layout: fixed columns, then indented Task/Last message lines
+      const indent = "  ";
+      const taskPrefix = "Task: ";
+      const msgPrefix = "Last message: ";
+      const taskMax = cols - indent.length - taskPrefix.length;
+      const msgMax = cols - indent.length - msgPrefix.length;
+
+      const fixedRows = devboxes.map((db) => {
         const redis = redisMap.get(db.name);
-        const task = redis?.task ?? "-";
-        const msg = redis?.lastMessage ?? "-";
         const claude = redis ? (redis.claudeRunning === "1" ? "y" : redis.claudeRunning === "0" ? "n" : "-") : "-";
         const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat).replace(/ ago$/, "") : "-";
         return [
@@ -461,18 +470,56 @@ export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
           toInitials(db.owner),
           SHORT_STATUS[db.status] ?? db.status,
           redis?.status ?? "-",
-          task,
           claude,
           heartbeat,
-          msg,
         ];
       });
-      return formatTable(null, rows, { maxWidth: cols, flexColumns: [4, 7], rowStyles });
+
+      // Compute fixed column widths
+      const numFixed = fixedRows[0].length;
+      const fixedWidths = Array.from({ length: numFixed }, (_, i) =>
+        Math.max(0, ...fixedRows.map((r) => r[i].length)),
+      );
+
+      const lines: string[] = [];
+      for (let r = 0; r < devboxes.length; r++) {
+        const db = devboxes[r];
+        const redis = redisMap.get(db.name);
+        const style = db.status === "suspended" ? DIM : null;
+        const reset = style ? "\x1b[0m" : "";
+
+        // Fixed columns line
+        const fixedLine = fixedRows[r]
+          .map((cell, i) => cell.padEnd(fixedWidths[i]))
+          .join("  ");
+        lines.push(style ? `${style}${fixedLine}${reset}` : fixedLine);
+
+        // Task line (only if there's actual content)
+        const task = collapse(redis?.task ?? "");
+        if (task && task !== "-") {
+          const taskLine = `${indent}${taskPrefix}${truncate(task, taskMax)}`;
+          lines.push(style ? `${style}${taskLine}${reset}` : taskLine);
+        }
+
+        // Last message line (only if there's actual content)
+        const msg = collapse(redis?.lastMessage ?? "");
+        if (msg && msg !== "-") {
+          const msgLine = `${indent}${msgPrefix}${truncate(msg, msgMax)}`;
+          lines.push(style ? `${style}${msgLine}${reset}` : msgLine);
+        }
+
+        // Blank line between devboxes
+        if (r < devboxes.length - 1) lines.push("");
+      }
+      return lines.join("\n") + "\n";
     } else {
+      const rowStyles = devboxes.map((db) =>
+        db.status === "suspended" ? DIM : null,
+      );
       const rows: string[][] = devboxes.map((db) => {
         const redis = redisMap.get(db.name);
-        const task = redis?.task ?? "-";
-        const msg = redis?.lastMessage ?? "-";
+        const task = collapse(redis?.task ?? "-");
+        const msg = collapse(redis?.lastMessage ?? "-");
         const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
         const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat) : "-";
         return [
