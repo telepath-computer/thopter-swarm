@@ -18,27 +18,33 @@ export const OWNER_KEY = "thopter_owner";
 /** Default devbox resource size. */
 export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
 
-/** Default idle timeout: 12 hours. Suspends on idle (preserves disk). */
-export const DEFAULT_IDLE_TIMEOUT_SECONDS = 12 * 60 * 60;
+/** Default keep-alive time: 12 hours. Devbox shuts down after this period unless reset. */
+export const DEFAULT_KEEP_ALIVE_SECONDS = 12 * 60 * 60;
 
-/**
- * Build secret mappings dynamically from all Runloop secrets.
- * Convention: secret name in Runloop = env var name in devbox.
- */
-export async function getSecretMappings(): Promise<Record<string, string>> {
-  const { listSecrets } = await import("./secrets.js");
-  const secrets = await listSecrets();
-  return Object.fromEntries(secrets.map((s) => [s.name, s.name]));
+// --- Local config ---
+
+export interface UploadEntry {
+  local: string;
+  remote: string;
 }
 
-// --- Local config (default snapshot only) ---
+export interface RepoConfig {
+  repo: string;     // owner/repo format (e.g. "telepath-computer/thopter-swarm")
+  branch?: string;  // Pinned branch. If omitted → prompt at run time (default: main)
+}
 
 interface LocalConfig {
   runloopApiKey?: string;
-  redisUrl?: string;
   defaultSnapshotId?: string;
-  ntfyChannel?: string;
+  defaultRepo?: string;
+  defaultBranch?: string;
+  claudeMdPath?: string;
+  uploads?: UploadEntry[];
+  stopNotifications?: boolean;
+  stopNotificationQuietPeriod?: number;
+  envVars?: Record<string, string>;
   defaultThopter?: string;
+  repos?: RepoConfig[];
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -70,13 +76,53 @@ export function clearDefaultSnapshot(): void {
   saveLocalConfig(config);
 }
 
-export function getNtfyChannel(): string | undefined {
-  return loadLocalConfig().ntfyChannel;
+export function getDefaultRepo(): string | undefined {
+  return loadLocalConfig().defaultRepo;
 }
 
-export function setNtfyChannel(channel: string): void {
+export function setDefaultRepo(repo: string): void {
   const config = loadLocalConfig();
-  config.ntfyChannel = channel;
+  config.defaultRepo = repo;
+  saveLocalConfig(config);
+}
+
+export function getDefaultBranch(): string | undefined {
+  return loadLocalConfig().defaultBranch;
+}
+
+export function setDefaultBranch(branch: string): void {
+  const config = loadLocalConfig();
+  config.defaultBranch = branch;
+  saveLocalConfig(config);
+}
+
+export function getStopNotifications(): boolean {
+  return loadLocalConfig().stopNotifications ?? true;
+}
+
+export function setStopNotifications(enabled: boolean): void {
+  const config = loadLocalConfig();
+  config.stopNotifications = enabled;
+  saveLocalConfig(config);
+}
+
+export function getStopNotificationQuietPeriod(): number {
+  return loadLocalConfig().stopNotificationQuietPeriod ?? 30;
+}
+
+export function setStopNotificationQuietPeriod(seconds: number): void {
+  const config = loadLocalConfig();
+  config.stopNotificationQuietPeriod = seconds;
+  saveLocalConfig(config);
+}
+
+export function getRunloopApiKey(): string | undefined {
+  return loadLocalConfig().runloopApiKey;
+}
+
+export function setRunloopApiKey(key: string): void {
+  const config = loadLocalConfig();
+  config.runloopApiKey = key;
   saveLocalConfig(config);
 }
 
@@ -97,40 +143,98 @@ export function clearDefaultThopter(): void {
 }
 
 /**
- * Resolve a thopter name argument. If ".", returns the default thopter.
- * Otherwise returns the name as-is.
+ * Resolve "." to the default thopter name. Pass through anything else unchanged.
+ * Throws if "." is used but no default is set.
  */
 export function resolveThopterName(name: string): string {
-  if (name === ".") {
-    const def = getDefaultThopter();
-    if (!def) {
-      throw new Error(
-        'No default thopter set. Use "thopter use <name>" to set one.',
-      );
-    }
-    return def;
+  if (name !== ".") return name;
+  const defaultName = getDefaultThopter();
+  if (!defaultName) {
+    throw new Error(
+      "No default thopter set. Set one with: thopter use <name>",
+    );
   }
-  return name;
+  return defaultName;
 }
 
-export function getRunloopApiKey(): string | undefined {
-  return loadLocalConfig().runloopApiKey;
+// --- Predefined repos ---
+
+export function getRepos(): RepoConfig[] {
+  return loadLocalConfig().repos ?? [];
 }
 
-export function setRunloopApiKey(key: string): void {
+export function setRepos(repos: RepoConfig[]): void {
   const config = loadLocalConfig();
-  config.runloopApiKey = key;
+  config.repos = repos;
   saveLocalConfig(config);
 }
 
-export function getRedisUrl(): string | undefined {
-  return loadLocalConfig().redisUrl;
+export function addRepo(entry: RepoConfig): void {
+  const config = loadLocalConfig();
+  if (!config.repos) config.repos = [];
+  config.repos.push(entry);
+  saveLocalConfig(config);
 }
 
-export function setRedisUrl(url: string): void {
+export function removeRepo(repo: string, branch?: string): boolean {
   const config = loadLocalConfig();
-  config.redisUrl = url;
+  if (!config.repos) return false;
+  const before = config.repos.length;
+  config.repos = config.repos.filter((r) => {
+    if (r.repo !== repo) return true;
+    if (branch !== undefined) return r.branch !== branch;
+    return false;
+  });
+  if (config.repos.length === before) return false;
   saveLocalConfig(config);
+  return true;
+}
+
+// --- Devbox env vars ---
+
+const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export function validateEnvKey(key: string): void {
+  if (!ENV_KEY_RE.test(key)) {
+    throw new Error(
+      `Invalid env var name '${key}'. Must match [A-Za-z_][A-Za-z0-9_]*.`,
+    );
+  }
+}
+
+/** Escape a value for safe inclusion in a shell `export KEY="VALUE"` line. */
+export function escapeEnvValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
+}
+
+export function getEnvVars(): Record<string, string> {
+  return loadLocalConfig().envVars ?? {};
+}
+
+export function setEnvVar(key: string, value: string): void {
+  validateEnvKey(key);
+  const config = loadLocalConfig();
+  if (!config.envVars) config.envVars = {};
+  config.envVars[key] = value;
+  saveLocalConfig(config);
+}
+
+export function deleteEnvVar(key: string): void {
+  const config = loadLocalConfig();
+  if (config.envVars) {
+    delete config.envVars[key];
+    saveLocalConfig(config);
+  }
+}
+
+// --- Custom CLAUDE.md and file uploads ---
+
+export function getClaudeMdPath(): string | undefined {
+  return loadLocalConfig().claudeMdPath;
+}
+
+export function getUploads(): UploadEntry[] {
+  return loadLocalConfig().uploads ?? [];
 }
 
 /**
@@ -142,7 +246,8 @@ export function loadConfigIntoEnv(): void {
   if (config.runloopApiKey && !process.env.RUNLOOP_API_KEY) {
     process.env.RUNLOOP_API_KEY = config.runloopApiKey;
   }
-  if (config.redisUrl && !process.env.REDIS_URL) {
-    process.env.REDIS_URL = config.redisUrl;
+  const envVars = config.envVars ?? {};
+  if (envVars.THOPTER_REDIS_URL && !process.env.THOPTER_REDIS_URL) {
+    process.env.THOPTER_REDIS_URL = envVars.THOPTER_REDIS_URL;
   }
 }

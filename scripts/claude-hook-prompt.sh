@@ -9,6 +9,8 @@ TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
 if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
     node /usr/local/bin/thopter-last-message "$TRANSCRIPT" | thopter-status message 2>/dev/null || true
+    # Stream transcript entries to Redis for thopter tail (synchronous to avoid cursor races)
+    node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" 2>/dev/null || true
 fi
 
 exit 0

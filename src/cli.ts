@@ -24,9 +24,7 @@ lifecycle:
                         create --snapshot → ssh/exec → ...
 
 examples:
-  thopter setup                          First-time auth & secret config
-  thopter use dev                        Set default thopter context
-  thopter ssh .                          SSH into default thopter (use ".")
+  thopter setup                          First-time auth & env var config
   thopter create dev                     Create a devbox
   thopter create --snapshot golden        Create from a snapshot
   thopter ssh dev                        SSH into the devbox
@@ -38,10 +36,23 @@ examples:
   thopter snapshot default golden         Set default snapshot
   thopter snapshot default               View default snapshot
   thopter snapshot default --clear        Clear default snapshot
-  thopter list                           Show running devboxes
-  thopter status                         Overview of all thopters from redis
+  thopter use dev                        Set default thopter
+  thopter use                            View current default
+  thopter use --clear                    Clear default thopter
+  thopter ssh .                          SSH into the default thopter
+  thopter run --repo owner/repo "prompt"  Launch Claude with a task
+  thopter reauth                         Re-authenticate and update snapshot
+  thopter status                         Unified view of all thopters
   thopter status dev                     Detailed status + logs for a thopter
-  thopter keepalive dev                   Reset idle timer for a devbox
+  thopter tail dev                       Show last 20 transcript entries
+  thopter tail dev -f                    Follow transcript in real time
+  thopter tail dev -n 50                 Show last 50 entries
+  thopter tell dev "also fix the tests"  Send a message to Claude
+  thopter tell dev -i "work on X now"    Interrupt Claude and redirect
+  thopter repos list                     List predefined repos
+  thopter repos add                      Add a predefined repo
+  thopter repos remove                   Remove a predefined repo
+  thopter keepalive dev                   Reset keep-alive timer for a devbox
   thopter suspend dev                    Suspend a devbox
   thopter resume dev                     Resume a suspended devbox
   thopter destroy dev                    Shut down a devbox`,
@@ -50,16 +61,107 @@ examples:
 // --- setup ---
 program
   .command("setup")
-  .description("Check Runloop auth and interactively configure secrets")
+  .description("Interactive first-time setup (API keys, env vars, notifications)")
   .action(async () => {
     const { runSetup } = await import("./setup.js");
     await runSetup();
   });
 
+// --- create ---
+program
+  .command("create")
+  .description("Create a new devbox")
+  .argument("[name]", "Name for the devbox (auto-generated if omitted)")
+  .option("--snapshot <id>", "Snapshot ID or label to restore from")
+  .option("--fresh", "Create a fresh devbox, ignoring the default snapshot")
+  .option("--keep-alive <minutes>", "Keep-alive time in minutes before shutdown (default: 720)", parseInt)
+  .option("-a, --attach", "SSH into the devbox after creation")
+  .action(async (name: string | undefined, opts: { snapshot?: string; fresh?: boolean; keepAlive?: number; attach?: boolean }) => {
+    const { createDevbox, sshDevbox } = await import("./devbox.js");
+    const { generateName } = await import("./names.js");
+    const resolvedName = name ?? generateName();
+    await createDevbox({
+      name: resolvedName,
+      snapshotId: opts.snapshot,
+      fresh: opts.fresh,
+      keepAlive: opts.keepAlive ? opts.keepAlive * 60 : undefined,
+    });
+    if (opts.attach) {
+      await sshDevbox(resolvedName);
+    }
+  });
+
+// --- status (unified: Runloop API + Redis annotations) ---
+program
+  .command("status")
+  .alias("list")
+  .alias("ls")
+  .description("Show thopter status (unified Runloop + Redis view)")
+  .argument("[name]", "Thopter name (omit for overview of all)")
+  .option("-f, --follow [interval]", "Re-render every N seconds (default: 5)")
+  .action(async (name: string | undefined, opts: { follow?: boolean | string }) => {
+    const follow = opts.follow === true ? 5 : opts.follow ? Number(opts.follow) : undefined;
+    if (name) {
+      const { showThopterStatus } = await import("./status.js");
+      await showThopterStatus(resolveThopterName(name));
+    } else {
+      const { listDevboxes } = await import("./devbox.js");
+      await listDevboxes({ follow });
+    }
+  });
+
+// --- tail ---
+program
+  .command("tail")
+  .description("Tail a thopter's Claude transcript from Redis")
+  .argument("<name>", "Thopter name")
+  .option("-f, --follow", "Continuously poll for new entries")
+  .option("-n, --lines <count>", "Number of entries to show (default: 20)", parseInt)
+  .action(async (name: string, opts: { follow?: boolean; lines?: number }) => {
+    const { tailTranscript } = await import("./tail.js");
+    await tailTranscript(resolveThopterName(name), { follow: opts.follow, lines: opts.lines });
+  });
+
+// --- tell ---
+program
+  .command("tell")
+  .description("Send a message to a running Claude session")
+  .argument("<name>", "Thopter name")
+  .argument("<message>", "Message to send to Claude")
+  .option("-i, --interrupt", "Interrupt Claude first (send Escape), then deliver the message")
+  .action(async (name: string, message: string, opts: { interrupt?: boolean }) => {
+    const { tellThopter } = await import("./tell.js");
+    await tellThopter(resolveThopterName(name), message, opts);
+  });
+
+// --- run ---
+program
+  .command("run")
+  .description("Create a thopter and run Claude with a prompt")
+  .argument("<prompt>", "The task/prompt to give Claude")
+  .option("--repo <owner/repo>", "GitHub repository to clone")
+  .option("--branch <name>", "Git branch to start from")
+  .option("--name <name>", "Thopter name (auto-generated if omitted)")
+  .option("--snapshot <id>", "Snapshot to use")
+  .option("--keep-alive <minutes>", "Keep-alive time in minutes", parseInt)
+  .action(async (prompt: string, opts: { repo?: string; branch?: string; name?: string; snapshot?: string; keepAlive?: number }) => {
+    const { runThopter } = await import("./run.js");
+    await runThopter({ prompt, ...opts });
+  });
+
+// --- reauth ---
+program
+  .command("reauth")
+  .description("Interactive wizard to re-authenticate Claude Code and update the default snapshot")
+  .action(async () => {
+    const { runReauth } = await import("./reauth.js");
+    await runReauth();
+  });
+
 // --- use ---
 program
   .command("use")
-  .description("Set or view the default thopter context")
+  .description("Set or view the default thopter (use '.' in commands to reference it)")
   .argument("[name]", "Thopter name to set as default (omit to view current)")
   .option("--clear", "Clear the default thopter")
   .action(async (name: string | undefined, opts: { clear?: boolean }) => {
@@ -75,7 +177,7 @@ program
     } else if (name) {
       setDefaultThopter(name);
       console.log(`Default thopter set to: ${name}`);
-      console.log('Use "." as the name in any command to reference it.');
+      console.log("Use '.' as the name in any command to reference it.");
     } else {
       const current = getDefaultThopter();
       if (current) {
@@ -87,59 +189,51 @@ program
     }
   });
 
-// --- create ---
-program
-  .command("create")
-  .description("Create a new devbox")
-  .argument("[name]", "Name for the devbox (auto-generated if omitted)")
-  .option("--snapshot <id>", "Snapshot ID or label to restore from")
-  .option("--fresh", "Create a fresh devbox, ignoring the default snapshot")
-  .option("--idle-timeout <minutes>", "Idle timeout in minutes before auto-suspend (default: 720)", parseInt)
-  .option("-a, --attach", "SSH into the devbox after creation")
-  .action(async (name: string | undefined, opts: { snapshot?: string; fresh?: boolean; idleTimeout?: number; attach?: boolean }) => {
-    const { createDevbox, sshDevbox } = await import("./devbox.js");
-    const { generateName } = await import("./names.js");
-    const resolvedName = name ?? generateName();
-    await createDevbox({
-      name: resolvedName,
-      snapshotId: opts.snapshot,
-      fresh: opts.fresh,
-      idleTimeout: opts.idleTimeout ? opts.idleTimeout * 60 : undefined,
-    });
-    if (opts.attach) {
-      await sshDevbox(resolvedName);
-    }
-  });
+// --- repos ---
+const reposCmd = program
+  .command("repos")
+  .description("Manage predefined repositories for `thopter run`");
 
-// --- list ---
-program
+reposCmd
   .command("list")
   .alias("ls")
-  .description("List managed devboxes")
+  .description("List predefined repos")
   .action(async () => {
-    const { listDevboxes } = await import("./devbox.js");
-    await listDevboxes();
+    const { listRepos } = await import("./repos.js");
+    listRepos();
   });
 
-// --- status ---
-program
-  .command("status")
-  .description("Show thopter status from redis")
-  .argument("[name]", "Thopter name (omit for overview of all)")
-  .option("-a, --all", "Show all thopters including stale ones")
-  .action(async (name: string | undefined, opts: { all?: boolean }) => {
-    const { showAllStatus, showThopterStatus } = await import("./status.js");
-    if (name) {
-      await showThopterStatus(resolveThopterName(name));
-    } else {
-      await showAllStatus({ all: opts.all });
-    }
+reposCmd
+  .command("add")
+  .description("Add a predefined repo (interactive)")
+  .action(async () => {
+    const { addRepoInteractive } = await import("./repos.js");
+    await addRepoInteractive();
+  });
+
+reposCmd
+  .command("remove")
+  .alias("rm")
+  .description("Remove a predefined repo (interactive)")
+  .action(async () => {
+    const { removeRepoInteractive } = await import("./repos.js");
+    await removeRepoInteractive();
+  });
+
+reposCmd
+  .command("edit")
+  .description("Edit a predefined repo (interactive)")
+  .action(async () => {
+    const { editRepoInteractive } = await import("./repos.js");
+    await editRepoInteractive();
   });
 
 // --- destroy ---
 program
   .command("destroy")
   .alias("rm")
+  .alias("kill")
+  .alias("shutdown")
   .description("Shut down a devbox")
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
@@ -170,7 +264,7 @@ program
 // --- keepalive ---
 program
   .command("keepalive")
-  .description("Send a keepalive to reset a devbox's idle timer")
+  .description("Reset a devbox's keep-alive timer")
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
     const { keepaliveDevbox } = await import("./devbox.js");
@@ -292,24 +386,31 @@ configCmd
   .argument("<key>", "Config key")
   .argument("<value>", "Config value")
   .action(async (key: string, value: string) => {
-    const { setRunloopApiKey, setRedisUrl, setNtfyChannel, setDefaultSnapshot, setDefaultThopter } = await import("./config.js");
+    const { setRunloopApiKey, setDefaultSnapshot, setDefaultRepo, setDefaultBranch, setStopNotifications, setStopNotificationQuietPeriod, setDefaultThopter } = await import("./config.js");
     switch (key) {
       case "runloopApiKey":
         setRunloopApiKey(value);
         console.log("Set runloopApiKey.");
         break;
-      case "redisUrl":
-        setRedisUrl(value);
-        console.log("Set redisUrl.");
-        break;
-      case "ntfyChannel":
-        setNtfyChannel(value);
-        console.log(`Set ntfyChannel to: ${value}`);
-        console.log(`Subscribe at: https://ntfy.sh/${value}`);
-        break;
       case "defaultSnapshotId":
         setDefaultSnapshot(value);
         console.log(`Set defaultSnapshotId to: ${value}`);
+        break;
+      case "defaultRepo":
+        setDefaultRepo(value);
+        console.log(`Set defaultRepo to: ${value}`);
+        break;
+      case "defaultBranch":
+        setDefaultBranch(value);
+        console.log(`Set defaultBranch to: ${value}`);
+        break;
+      case "stopNotifications":
+        setStopNotifications(value === "true" || value === "1");
+        console.log(`Set stopNotifications to: ${value === "true" || value === "1"}`);
+        break;
+      case "stopNotificationQuietPeriod":
+        setStopNotificationQuietPeriod(parseInt(value, 10));
+        console.log(`Set stopNotificationQuietPeriod to: ${parseInt(value, 10)} seconds`);
         break;
       case "defaultThopter":
         setDefaultThopter(value);
@@ -317,7 +418,8 @@ configCmd
         break;
       default:
         console.error(`Unknown config key: ${key}`);
-        console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId, defaultThopter");
+        console.error("Available keys: runloopApiKey, defaultSnapshotId, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
+        console.error("For env vars (THOPTER_REDIS_URL, THOPTER_NTFY_CHANNEL, etc.): thopter env set <KEY> <VALUE>");
         process.exit(1);
     }
   });
@@ -327,97 +429,119 @@ configCmd
   .description("Get a config value")
   .argument("[key]", "Config key (omit to show all)")
   .action(async (key?: string) => {
-    const { getRunloopApiKey, getRedisUrl, getNtfyChannel, getDefaultSnapshot, getDefaultThopter } = await import("./config.js");
+    const { getRunloopApiKey, getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars, getDefaultThopter, getRepos } = await import("./config.js");
     if (!key) {
-      console.log(`runloopApiKey:     ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
-      console.log(`redisUrl:          ${getRedisUrl() ? "(set)" : "(not set)"}`);
-      console.log(`ntfyChannel:       ${getNtfyChannel() ?? "(not set)"}`);
-      console.log(`defaultSnapshotId: ${getDefaultSnapshot() ?? "(not set)"}`);
-      console.log(`defaultThopter:    ${getDefaultThopter() ?? "(not set)"}`);
+      console.log(`runloopApiKey:                  ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
+      console.log(`defaultSnapshotId:              ${getDefaultSnapshot() ?? "(not set)"}`);
+      console.log(`defaultRepo:                    ${getDefaultRepo() ?? "(not set)"}`);
+      console.log(`defaultBranch:                  ${getDefaultBranch() ?? "(not set)"}`);
+      console.log(`stopNotifications:              ${getStopNotifications()}`);
+      console.log(`stopNotificationQuietPeriod:    ${getStopNotificationQuietPeriod()}s`);
+      console.log(`defaultThopter:                 ${getDefaultThopter() ?? "(not set)"}`);
+      const repos = getRepos();
+      console.log(`repos:                          ${repos.length > 0 ? `${repos.length} configured (see: thopter repos list)` : "(none)"}`);
+
+      const envVars = getEnvVars();
+      const envCount = Object.keys(envVars).length;
+      console.log(`envVars:                        ${envCount > 0 ? `${envCount} configured (see: thopter env list)` : "(none)"}`);
+
     } else {
       switch (key) {
         case "runloopApiKey":
           console.log(getRunloopApiKey() ? "(set)" : "(not set)");
           break;
-        case "redisUrl":
-          console.log(getRedisUrl() ? "(set)" : "(not set)");
-          break;
-        case "ntfyChannel":
-          console.log(getNtfyChannel() ?? "(not set)");
-          break;
         case "defaultSnapshotId":
           console.log(getDefaultSnapshot() ?? "(not set)");
+          break;
+        case "defaultRepo":
+          console.log(getDefaultRepo() ?? "(not set)");
+          break;
+        case "defaultBranch":
+          console.log(getDefaultBranch() ?? "(not set)");
+          break;
+        case "stopNotifications":
+          console.log(getStopNotifications());
+          break;
+        case "stopNotificationQuietPeriod":
+          console.log(`${getStopNotificationQuietPeriod()}s`);
           break;
         case "defaultThopter":
           console.log(getDefaultThopter() ?? "(not set)");
           break;
         default:
           console.error(`Unknown config key: ${key}`);
-          console.error("Available keys: runloopApiKey, redisUrl, ntfyChannel, defaultSnapshotId, defaultThopter");
+          console.error("Available keys: runloopApiKey, defaultSnapshotId, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
+          console.error("For env vars: thopter env list");
           process.exit(1);
       }
     }
   });
 
-// --- secrets ---
-const secretsCmd = program
-  .command("secrets")
-  .description("Manage Runloop secrets");
+// --- env ---
+const envCmd = program
+  .command("env")
+  .description("Manage devbox environment variables (stored in ~/.thopter.json)");
 
-secretsCmd
+envCmd
   .command("list")
   .alias("ls")
-  .description("List Runloop secrets")
+  .description("List configured env vars (values masked)")
   .action(async () => {
-    const { listSecrets } = await import("./secrets.js");
+    const { getEnvVars } = await import("./config.js");
     const { printTable } = await import("./output.js");
-    const secrets = await listSecrets();
-    console.log("Secrets:");
+    const envVars = getEnvVars();
+    const entries = Object.entries(envVars);
+    if (entries.length === 0) {
+      console.log("No env vars configured.");
+      console.log("  Set one with: thopter env set <KEY> <VALUE>");
+      return;
+    }
+    console.log("Devbox environment variables:");
     printTable(
-      ["NAME", "ID"],
-      secrets.map((s) => [s.name, s.id]),
+      ["NAME", "VALUE"],
+      entries.map(([k, v]) => [k, v.length > 4 ? v.slice(0, 4) + "..." : "***"]),
     );
   });
 
-secretsCmd
+envCmd
   .command("set")
-  .description("Create or update a secret (prompts for value)")
-  .argument("<name>", "Secret name")
-  .action(async (name: string) => {
-    const { createInterface } = await import("node:readline");
-    const rl = createInterface({
-      input: process.stdin,
-      terminal: true,
-    });
-
-    process.stdout.write(`Value for ${name}: `);
-    const value = await new Promise<string>((resolve) => {
-      rl.question("", (answer) => {
-        rl.close();
-        process.stdout.write("\n");
-        resolve(answer.trim());
-      });
-    });
+  .description("Set a devbox environment variable (prompts for value if omitted)")
+  .argument("<key>", "Variable name (e.g. GH_TOKEN)")
+  .argument("[value]", "Variable value (omit to enter interactively)")
+  .action(async (key: string, value?: string) => {
+    const { setEnvVar } = await import("./config.js");
 
     if (!value) {
-      console.log("No value provided. Aborting.");
-      return;
+      // Interactive prompt — keeps sensitive values out of shell history
+      const { createInterface } = await import("node:readline");
+      const rl = createInterface({ input: process.stdin, terminal: true });
+      process.stdout.write(`Value for ${key}: `);
+      value = await new Promise<string>((resolve) => {
+        rl.question("", (answer) => {
+          rl.close();
+          process.stdout.write("\n");
+          resolve(answer.trim());
+        });
+      });
+      if (!value) {
+        console.log("No value provided. Aborting.");
+        return;
+      }
     }
 
-    const { createOrUpdateSecret } = await import("./secrets.js");
-    await createOrUpdateSecret(name, value);
-    console.log(`Secret '${name}' saved.`);
+    setEnvVar(key, value);
+    console.log(`Set ${key}.`);
   });
 
-secretsCmd
+envCmd
   .command("delete")
   .alias("rm")
-  .description("Delete a secret")
-  .argument("<name>", "Secret name")
-  .action(async (name: string) => {
-    const { deleteSecret } = await import("./secrets.js");
-    await deleteSecret(name);
-    console.log(`Secret '${name}' deleted.`);
+  .description("Remove a devbox environment variable")
+  .argument("<key>", "Variable name")
+  .action(async (key: string) => {
+    const { deleteEnvVar } = await import("./config.js");
+    deleteEnvVar(key);
+    console.log(`Deleted ${key}.`);
   });
 
 // Parse and run
