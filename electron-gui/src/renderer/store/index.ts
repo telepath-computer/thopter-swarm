@@ -33,7 +33,8 @@ export const useStore = create<Store>((set, get) => ({
       const thopters: Record<string, ThopterInfo> = {}
       for (const t of list) thopters[t.name] = t
       set({ thopters, connectionStatus: 'connected' })
-    } catch {
+    } catch (err) {
+      console.error('[store] refreshThopters failed:', err)
       set({ connectionStatus: 'error' })
     }
   },
