@@ -384,8 +384,24 @@ export async function createDevbox(opts: {
 export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
   const client = getClient();
   const { getRedisInfoForNames, relativeTime } = await import("./status.js");
+  const { formatTable } = await import("./output.js");
 
-  async function fetchAndRender(): Promise<boolean> {
+  function toInitials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 3);
+    return parts.map((p) => p[0]).join("").toUpperCase();
+  }
+
+  const SHORT_STATUS: Record<string, string> = {
+    running: "run",
+    suspended: "susp",
+    provisioning: "prov",
+    initializing: "init",
+    suspending: "susp…",
+    resuming: "res…",
+  };
+
+  async function fetchAndRender(): Promise<string> {
     const devboxes: { name: string; owner: string; id: string; status: string }[] = [];
     const liveStatuses = ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const;
     for (const status of liveStatuses) {
@@ -402,48 +418,88 @@ export async function listDevboxes(opts?: { follow?: number }): Promise<void> {
     }
 
     if (devboxes.length === 0) {
-      console.log("No managed devboxes found.");
-      return false;
+      return "No managed devboxes found.\n";
     }
 
     // Fetch Redis annotations for all devboxes using a single connection
     const redisMap = await getRedisInfoForNames(devboxes.map((db) => db.name));
+    const cols = process.stdout.columns || 120;
 
-    const rows: string[][] = devboxes.map((db) => {
+    // Compute fixed-column width needed in wide mode (everything except TASK and LAST MSG)
+    const wideFixedData = devboxes.map((db) => {
       const redis = redisMap.get(db.name);
-      let task = redis?.task ?? "-";
-      if (task.length > 40) task = task.slice(0, 37) + "...";
-      let msg = redis?.lastMessage ?? "-";
-      if (msg.length > 80) msg = msg.slice(0, 77) + "...";
       const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
       const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat) : "-";
-      return [
-        db.name,
-        db.owner,
-        db.status,
-        redis?.status ?? "-",
-        task,
-        claude,
-        heartbeat,
-        msg,
-      ];
+      return [db.name, db.owner, db.status, redis?.status ?? "-", claude, heartbeat];
     });
+    const wideFixedHeaders = ["NAME", "OWNER", "DEVBOX", "AGENT", "CLAUDE", "HEARTBEAT"];
+    const wideFixedWidth = wideFixedHeaders.reduce((sum, h, i) => {
+      const maxCell = Math.max(0, ...wideFixedData.map((r) => r[i].length));
+      return sum + Math.max(h.length, maxCell);
+    }, 0);
+    // indent(2) + gaps between all 8 columns (7 × 2) + fixed cols width
+    const wideOverhead = 2 + 7 * 2 + wideFixedWidth;
+    // Need at least 20 chars for the two flex columns
+    const tight = wideOverhead > cols - 20;
 
-    printTable(["NAME", "OWNER", "DEVBOX", "AGENT", "TASK", "CLAUDE", "HEARTBEAT", "LAST MSG"], rows);
-    return true;
+    // TASK index = 4, LAST MSG index = 7 (flex columns)
+    if (tight) {
+      const rows: string[][] = devboxes.map((db) => {
+        const redis = redisMap.get(db.name);
+        const task = redis?.task ?? "-";
+        const msg = redis?.lastMessage ?? "-";
+        const claude = redis ? (redis.claudeRunning === "1" ? "y" : redis.claudeRunning === "0" ? "n" : "-") : "-";
+        const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat).replace(/ ago$/, "") : "-";
+        return [
+          db.name,
+          toInitials(db.owner),
+          SHORT_STATUS[db.status] ?? db.status,
+          redis?.status ?? "-",
+          task,
+          claude,
+          heartbeat,
+          msg,
+        ];
+      });
+      return formatTable(null, rows, { maxWidth: cols, flexColumns: [4, 7] });
+    } else {
+      const rows: string[][] = devboxes.map((db) => {
+        const redis = redisMap.get(db.name);
+        const task = redis?.task ?? "-";
+        const msg = redis?.lastMessage ?? "-";
+        const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
+        const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat) : "-";
+        return [
+          db.name,
+          db.owner,
+          db.status,
+          redis?.status ?? "-",
+          task,
+          claude,
+          heartbeat,
+          msg,
+        ];
+      });
+      return formatTable(
+        ["NAME", "OWNER", "DEVBOX", "AGENT", "TASK", "CLAUDE", "HEARTBEAT", "LAST MSG"],
+        rows,
+        { maxWidth: cols, flexColumns: [4, 7] },
+      );
+    }
   }
 
   if (opts?.follow) {
     const interval = opts.follow;
-    // Loop until Ctrl+C
+    // Loop until Ctrl+C — compute output first, then clear and redraw
     while (true) {
+      const output = await fetchAndRender();
       process.stdout.write("\x1b[2J\x1b[H");
-      console.log(`Refreshing every ${interval}s — Ctrl+C to exit  (${new Date().toLocaleTimeString()})\n`);
-      await fetchAndRender();
+      process.stdout.write(`Refreshing every ${interval}s — Ctrl+C to exit  (${new Date().toLocaleTimeString()})\n\n`);
+      process.stdout.write(output);
       await new Promise((r) => setTimeout(r, interval * 1000));
     }
   } else {
-    await fetchAndRender();
+    process.stdout.write(await fetchAndRender());
   }
 }
 
