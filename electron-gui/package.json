@@ -8,7 +8,7 @@
     "dev:mock": "THOPTER_MOCK=1 electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "test": "npx playwright test --config=e2e/playwright.config.ts"
+    "test": "xvfb-run --auto-servernum npx playwright test --config=e2e/playwright.config.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

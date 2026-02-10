@@ -15,6 +15,10 @@ export default defineConfig({
       }
     },
     plugins: [react(), tailwindcss()],
+    define: {
+      // Electron merged context has real process.env — don't replace it
+      'process.env': 'process.env',
+    },
     build: {
       rollupOptions: {
         external: [

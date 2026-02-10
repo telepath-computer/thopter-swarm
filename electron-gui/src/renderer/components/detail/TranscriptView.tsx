@@ -25,8 +25,10 @@ interface Props {
   name: string
 }
 
+const EMPTY_ENTRIES: never[] = []
+
 export function TranscriptView({ name }: Props) {
-  const entries = useStore((s) => s.transcripts[name] ?? [])
+  const entries = useStore((s) => s.transcripts[name] ?? EMPTY_ENTRIES)
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const wasAtBottomRef = useRef(true)
