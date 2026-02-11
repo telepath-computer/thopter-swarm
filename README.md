@@ -4,7 +4,7 @@ CLI for managing Runloop.ai devboxes as autonomous Claude Code development envir
 
 Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentials, developer tools, and Claude Code hooks that report status to Redis. Create one, point it at a repo and a task, and let Claude work autonomously while you monitor it from your laptop.
 
-This is just an internal dev tool we use a [Telepath](https://telepath.computer), but we've made it open as a conversation starter, for feedback, and contributions. Message josh@telepath.computer to chat about it.
+This is just an internal dev tool we use at [Telepath](https://telepath.computer), but we've made it open as a conversation starter, for feedback, and contributions. Message josh@telepath.computer to chat about it.
 
 ## Rationale
 
@@ -56,7 +56,9 @@ This walks you through configuring critical environment variables for:
 1. Runloop API key
 2. Redis URL
 3. GitHub token
-4. ntfy.sh push notifications (optional but highly recommended)
+4. ntfy.sh push notifications (optional but highly recommended) *
+
+\* For push notifications: before setup, go to [ntfy.sh](https://ntfy.sh/), sign-up for a free account, click "Subscribe to topic," click "Generate name," note the topic name provided, and then enter that topic name during Thopterswarm setup process.   
 
 All config is saved to `~/.thopter.json`.
 
