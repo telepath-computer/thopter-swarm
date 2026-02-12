@@ -16,6 +16,7 @@ export const useStore = create<Store>((set, get) => ({
   connectionStatus: 'loading',
   refreshing: false,
   claudeReady: {},
+  draftMessages: {},
 
   // Display state
   activeTab: 'dashboard',
@@ -164,6 +165,8 @@ export const useStore = create<Store>((set, get) => ({
   closeReauthModal: () => set({ isReauthModalOpen: false, reauthModalStep: 0 }),
 
   toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
+
+  setDraftMessage: (name, message) => set((s) => ({ draftMessages: { ...s.draftMessages, [name]: message } })),
 
   setAutoRefresh: (enabled) => set({ autoRefresh: enabled }),
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock, MessageSquare, Cpu, Pause, Play, Trash2 } from 'lucide-react'
+import { Clock, MessageSquare, Cpu, Pause, Play, Trash2, User } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -75,6 +75,12 @@ export function ThopterCard({ thopter }: Props) {
       <CardContent className="space-y-2 text-xs text-muted-foreground">
         <p className="line-clamp-2 text-foreground/80">{thopter.task ?? 'No task'}</p>
         <div className="flex items-center gap-3">
+          {thopter.owner && (
+            <span className="flex items-center gap-1">
+              <User className="size-3" />
+              {thopter.owner}
+            </span>
+          )}
           <span className="flex items-center gap-1">
             <Clock className="size-3" />
             {relativeTime(thopter.heartbeat)}

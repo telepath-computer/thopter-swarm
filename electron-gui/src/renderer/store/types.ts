@@ -20,6 +20,7 @@ export interface StoreState {
   connectionStatus: 'connected' | 'error' | 'loading'
   refreshing: boolean
   claudeReady: Record<string, ClaudeReadyStatus>
+  draftMessages: Record<string, string>
 
   // Display state (UI layer)
   activeTab: 'dashboard' | string
@@ -60,6 +61,7 @@ export interface StoreActions {
   openReauthModal(): void
   closeReauthModal(): void
   toggleSidebar(): void
+  setDraftMessage(name: string, message: string): void
   setAutoRefresh(enabled: boolean): void
   markNotificationsRead(): void
   addNotification(notification: NtfyNotification): void

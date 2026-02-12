@@ -31,7 +31,8 @@ function getUnavailableReason(devboxStatus: DevboxStatus, claudeReady?: ClaudeRe
 }
 
 export function ActionBar({ name, devboxStatus, claudeReady }: Props) {
-  const [message, setMessage] = useState('')
+  const message = useStore((s) => s.draftMessages[name] ?? '')
+  const setMessage = useStore((s) => s.setDraftMessage)
   const [sending, setSending] = useState(false)
   const [shellModalOpen, setShellModalOpen] = useState(false)
   const tellThopter = useStore((s) => s.tellThopter)
@@ -45,7 +46,7 @@ export function ActionBar({ name, devboxStatus, claudeReady }: Props) {
     setSending(true)
     try {
       await tellThopter(name, message, interrupt)
-      setMessage('')
+      setMessage(name, '')
     } finally {
       setSending(false)
       // Re-check Claude status after send (it may have exited)
@@ -69,7 +70,7 @@ export function ActionBar({ name, devboxStatus, claudeReady }: Props) {
           rows={2}
           placeholder={unavailableReason ? 'Claude is not running...' : 'Send a message to Claude...'}
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => setMessage(name, e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
