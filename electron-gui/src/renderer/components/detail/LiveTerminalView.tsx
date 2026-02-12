@@ -107,6 +107,9 @@ export function LiveTerminalView({ name }: Props) {
 
     // Re-fit right before spawning in case layout shifted during the async call
     fitAddon.fit()
+    const rect = container.getBoundingClientRect()
+    console.log('[LiveTerminal] container size:', Math.round(rect.width), 'x', Math.round(rect.height))
+    console.log('[LiveTerminal] term cols/rows:', term.cols, 'x', term.rows)
 
     // Spawn PTY
     const ptyProcess = pty.spawn(spawnInfo.command, spawnInfo.args, {
@@ -129,6 +132,7 @@ export function LiveTerminalView({ name }: Props) {
     resizePulseRef.current = setInterval(() => {
       if (fitAddonRef.current && termRef.current && ptyRef.current) {
         fitAddonRef.current.fit()
+        console.log('[LiveTerminal] pulse resize:', termRef.current.cols, 'x', termRef.current.rows)
         ptyRef.current.resize(termRef.current.cols, termRef.current.rows)
       }
     }, 500)
