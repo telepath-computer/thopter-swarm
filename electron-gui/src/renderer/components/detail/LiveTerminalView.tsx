@@ -82,10 +82,13 @@ export function LiveTerminalView({ name }: Props) {
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
     term.open(container)
-    fitAddon.fit()
 
     termRef.current = term
     fitAddonRef.current = fitAddon
+
+    // Defer initial fit to next frame so the DOM has fully laid out
+    await new Promise((r) => requestAnimationFrame(r))
+    fitAddon.fit()
 
     // Get SSH spawn info from service
     let spawnInfo: { command: string; args: string[] }
@@ -101,6 +104,9 @@ export function LiveTerminalView({ name }: Props) {
       return
     }
 
+    // Re-fit right before spawning in case layout shifted during the async call
+    fitAddon.fit()
+
     // Spawn PTY
     const ptyProcess = pty.spawn(spawnInfo.command, spawnInfo.args, {
       name: 'xterm-256color',
@@ -112,8 +118,19 @@ export function LiveTerminalView({ name }: Props) {
     ptyRef.current = ptyProcess
 
     // Wire data: pty → terminal
+    // On first data received, re-fit and send resize so tmux sees the correct size
+    let firstData = true
     ptyProcess.onData((data: string) => {
       term.write(data)
+      if (firstData) {
+        firstData = false
+        requestAnimationFrame(() => {
+          if (fitAddonRef.current && termRef.current && ptyRef.current) {
+            fitAddonRef.current.fit()
+            ptyRef.current.resize(termRef.current.cols, termRef.current.rows)
+          }
+        })
+      }
     })
 
     // Wire data: terminal → pty
