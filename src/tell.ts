@@ -20,7 +20,10 @@ pane_target=""
 for line in $(tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index}:#{pane_pid}'); do
   target="\${line%:*}"
   pid="\${line##*:}"
-  if ps --ppid "$pid" -o comm= 2>/dev/null | grep -q '^claude$'; then
+  # Check if the pane process itself is claude (direct launch without shell)
+  # or if claude is a child of the pane's shell
+  if ps -p "$pid" -o comm= 2>/dev/null | grep -q '^claude$' ||
+     ps --ppid "$pid" -o comm= 2>/dev/null | grep -q '^claude$'; then
     pane_target="$target"
     break
   fi
