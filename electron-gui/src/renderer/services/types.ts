@@ -107,6 +107,9 @@ export interface ThopterService {
   checkClaude(name: string): Promise<ClaudeReadyStatus>;
   getScreenDump(name: string): Promise<string | null>;
 
+  // SSH
+  getSSHSpawn(name: string): Promise<{ command: string; args: string[] }>;
+
   // Mutations
   runThopter(opts: RunThopterOpts): Promise<{ name: string }>;
   tellThopter(name: string, message: string, interrupt?: boolean): Promise<void>;

@@ -13,6 +13,7 @@ import { subscribeNtfy, subscribeMockNtfy } from './services/ntfy'
 
 export default function App() {
   const activeTab = useStore((s) => s.activeTab)
+  const openTabs = useStore((s) => s.openTabs)
   const refreshThopters = useStore((s) => s.refreshThopters)
   const autoRefresh = useStore((s) => s.autoRefresh)
   const addNotification = useStore((s) => s.addNotification)
@@ -68,7 +69,14 @@ export default function App() {
         <Header />
         <TabBar />
         <main className="flex-1 overflow-hidden">
-          {activeTab === 'dashboard' ? <Dashboard /> : <ThopterDetail />}
+          <div className="h-full" style={{ display: activeTab === 'dashboard' ? undefined : 'none' }}>
+            <Dashboard />
+          </div>
+          {openTabs.map((name) => (
+            <div key={name} className="h-full" style={{ display: activeTab === name ? undefined : 'none' }}>
+              <ThopterDetail tabName={name} />
+            </div>
+          ))}
         </main>
         <NotificationSidebar />
         <RunModal />

@@ -51,7 +51,7 @@ export function TerminalView({ name }: Props) {
       className="flex-1 overflow-y-auto bg-[#0d1117] p-4"
     >
       <pre className="font-mono text-xs leading-5 text-[#c9d1d9] whitespace-pre">
-        {screenDump}
+        {screenDump.replace(/\n+$/, '')}
       </pre>
     </div>
   )

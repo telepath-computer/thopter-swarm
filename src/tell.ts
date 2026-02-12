@@ -110,10 +110,19 @@ export async function tellThopter(
     process.exit(1);
   }
 
-  // Write message to a temp file on the devbox (avoids shell escaping issues)
+  // Sanitize message: strip bare newlines (which would submit prematurely).
+  // Preserve \n sequences — Claude Code interprets backslash+newline as a
+  // line break within the input rather than a submission.
+  const sanitized = message
+    .replace(/\\n/g, "\x00")       // stash \n sequences
+    .replace(/[\r\n]+/g, " ")      // collapse bare newlines to spaces
+    .replace(/\x00/g, "\\\n")      // restore as literal backslash + newline
+    .trim();
+
+  // Write sanitized message to a temp file on the devbox (avoids shell escaping issues)
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/tmp/thopter-tell-msg",
-    contents: message,
+    contents: sanitized,
   });
 
   // Build the tmux command sequence targeting the discovered pane
@@ -125,10 +134,12 @@ export async function tellThopter(
     parts.push("sleep 0.5");
   }
 
-  // Load message into a tmux buffer and paste it into the target pane,
-  // then press Enter to submit. This avoids any shell escaping issues.
+  // Load message into a tmux buffer and paste it into the target pane.
+  // Sleep before sending Enter so Claude doesn't interpret the rapid
+  // paste+enter as a single paste event and swallow the newline.
   parts.push("tmux load-buffer -b tell /tmp/thopter-tell-msg");
   parts.push(`tmux paste-buffer -b tell -t '${paneTarget}' -d`);
+  parts.push("sleep 0.3");
   parts.push(`tmux send-keys -t '${paneTarget}' Enter`);
 
   const cmd = parts.join(" && ");
