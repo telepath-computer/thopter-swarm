@@ -140,7 +140,39 @@ See [docs/architecture.md](docs/architecture.md) for details on the stack, how p
 - [Clipboard setup](docs/clipboard.md) (Neovim + tmux + iTerm2 OSC 52)
 - [Design docs and ideas](docs/)
 
-## Build
+## Electron GUI (Experimental)
+
+A desktop GUI for managing thopters, built with Electron + React + Zustand. Dashboard view, live transcript streaming, tmux screen captures, and interactive SSH terminals (xterm.js + node-pty).
+
+**This is highly experimental.** It works for day-to-day use but expect rough edges.
+
+### Prerequisites
+
+- Everything from the CLI prerequisites above
+- `node-pty` requires native compilation: `build-essential` on Linux, Xcode Command Line Tools on macOS
+
+### Build & Launch
+
+```bash
+cd electron-gui
+npm install
+npm run rebuild      # rebuild node-pty for Electron's Node ABI
+npm run dev          # launch in dev mode (connects to real Redis)
+npm run dev:mock     # launch with mock data (no Redis needed)
+```
+
+The GUI shells out to the `thopter` CLI for mutations (run, destroy, suspend, etc.) and reads directly from Redis for live data (status, transcripts, screen dumps). Make sure the CLI is installed and configured first (`thopter setup`).
+
+### Features
+
+- **Dashboard**: live overview of all thopters with status, task, and action buttons
+- **Transcript view**: streaming Claude conversation from Redis
+- **Screen view**: tmux screen capture with send-message form
+- **Live terminal**: interactive SSH session via xterm.js (persists across tab switches)
+- **Run modal**: create new thopters with repo/branch/prompt selection
+- **Notifications**: ntfy.sh integration with sidebar
+
+## Build (CLI)
 
 ```bash
 npm install          # install dependencies
