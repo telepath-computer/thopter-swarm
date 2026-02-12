@@ -10,7 +10,8 @@ import type {
   SnapshotInfo,
   RepoConfig,
   RunThopterOpts,
-  ReauthOpts,
+  ReauthPrepareOpts,
+  ReauthPrepareResult,
   AppConfig,
   ClaudeReadyStatus,
   Unsubscribe,
@@ -39,7 +40,8 @@ const CONFIG_PATH = join(homedir(), '.thopter.json');
 
 interface ThopterConfig {
   runloopApiKey?: string;
-  defaultSnapshotId?: string;
+  defaultSnapshotName?: string;
+  defaultSnapshotId?: string; // Legacy alias for defaultSnapshotName
   defaultRepo?: string;
   defaultBranch?: string;
   claudeMdPath?: string;
@@ -343,7 +345,7 @@ export class RealThopterService implements ThopterService {
     return {
       defaultRepo: config.defaultRepo,
       defaultBranch: config.defaultBranch,
-      defaultSnapshot: config.defaultSnapshotId,
+      defaultSnapshot: config.defaultSnapshotName ?? config.defaultSnapshotId,
       ntfyChannel: config.envVars?.THOPTER_NTFY_CHANNEL,
       repos: config.repos ?? [],
       stopNotifications: config.stopNotifications ?? true,
@@ -400,15 +402,11 @@ export class RealThopterService implements ThopterService {
   }
 
   /**
-   * Get SSH spawn command + args to connect to a thopter's tmux session.
+   * Resolve SSH spawn info from a devbox ID.
    * Parses `rli devbox ssh --config-only <id>` output (same as src/devbox.ts).
    */
-  async getSSHSpawn(name: string): Promise<{ command: string; args: string[] }> {
-    // Resolve devbox ID from status
-    const status = await this.getThopterStatus(name);
-    if (!status.id) throw new Error(`No devbox ID for thopter '${name}'`);
-
-    const { stdout: configOutput } = await execFileAsync('rli', ['devbox', 'ssh', '--config-only', status.id], {
+  private async resolveSSHSpawn(devboxId: string): Promise<{ command: string; args: string[] }> {
+    const { stdout: configOutput } = await execFileAsync('rli', ['devbox', 'ssh', '--config-only', devboxId], {
       encoding: 'utf-8',
       timeout: 15_000,
     });
@@ -432,6 +430,22 @@ export class RealThopterService implements ThopterService {
         'bash -l',
       ],
     };
+  }
+
+  /**
+   * Get SSH spawn command + args by thopter name (resolves devbox ID via Redis).
+   */
+  async getSSHSpawn(name: string): Promise<{ command: string; args: string[] }> {
+    const status = await this.getThopterStatus(name);
+    if (!status.id) throw new Error(`No devbox ID for thopter '${name}'`);
+    return this.resolveSSHSpawn(status.id);
+  }
+
+  /**
+   * Get SSH spawn command + args directly by devbox ID (skips Redis lookup).
+   */
+  async getSSHSpawnById(devboxId: string): Promise<{ command: string; args: string[] }> {
+    return this.resolveSSHSpawn(devboxId);
   }
 
   /**
@@ -507,34 +521,51 @@ export class RealThopterService implements ThopterService {
   }
 
   /**
-   * Re-authenticate Claude Code and update the default snapshot.
-   * Delegates to the CLI's interactive reauth wizard.
+   * Prepare a devbox for re-authentication.
+   * For 'existing': finds the devbox, resumes it if suspended.
+   * For 'snapshot'/'fresh': creates a new devbox.
    */
-  async reauth(opts: ReauthOpts): Promise<void> {
-    // The CLI reauth is interactive (prompts for input), so we can't use it directly.
-    // Instead, build the workflow from individual CLI commands.
-    const config = loadConfig();
-
-    let devboxName: string;
-
+  async reauthPrepare(opts: ReauthPrepareOpts): Promise<ReauthPrepareResult> {
     if (opts.machine === 'existing') {
       if (!opts.devboxName) throw new Error('devboxName required for existing machine reauth');
-      devboxName = opts.devboxName;
-    } else if (opts.machine === 'snapshot') {
-      // Create a devbox from the default snapshot
-      const snapshotId = config.defaultSnapshotId;
-      if (!snapshotId) throw new Error('No default snapshot configured for snapshot-based reauth');
-      devboxName = `reauth-${Date.now()}`;
-      await execThopter('create', devboxName, '--snapshot', snapshotId);
-    } else {
-      // Fresh devbox
-      devboxName = `reauth-${Date.now()}`;
-      await execThopter('create', devboxName, '--fresh');
+      const thopters = await this.listThopters();
+      const thopter = thopters.find((t) => t.name === opts.devboxName);
+      if (!thopter) throw new Error(`Devbox '${opts.devboxName}' not found`);
+      if (!thopter.id) throw new Error(`No devbox ID for '${opts.devboxName}'`);
+
+      if (thopter.devboxStatus === 'suspended') {
+        await execThopter('resume', opts.devboxName);
+      }
+
+      return { devboxName: opts.devboxName, devboxId: thopter.id };
     }
 
-    // At this point the user needs to SSH in and authenticate manually.
-    // The GUI should show the SSH command and wait for user confirmation.
-    // After manual auth, snapshot the devbox.
-    await execThopter('snapshot', 'replace', devboxName, opts.snapshotName);
+    const config = loadConfig();
+    const devboxName = `reauth-${Date.now()}`;
+
+    if (opts.machine === 'snapshot') {
+      const snapshotName = config.defaultSnapshotName ?? config.defaultSnapshotId;
+      if (!snapshotName) throw new Error('No default snapshot configured for snapshot-based reauth');
+      const output = await execThopter('create', devboxName, '--snapshot', snapshotName);
+      const match = output.match(/Devbox created:\s*(\S+)/);
+      const devboxId = match?.[1];
+      if (!devboxId) throw new Error('Could not parse devbox ID from create output');
+      return { devboxName, devboxId };
+    }
+
+    // fresh
+    const output = await execThopter('create', devboxName, '--fresh');
+    const match = output.match(/Devbox created:\s*(\S+)/);
+    const devboxId = match?.[1];
+    if (!devboxId) throw new Error('Could not parse devbox ID from create output');
+    return { devboxName, devboxId };
+  }
+
+  /**
+   * Finalize re-authentication: snapshot the devbox and set it as the default.
+   */
+  async reauthFinalize(devboxName: string, snapshotName: string): Promise<void> {
+    await execThopter('snapshot', 'replace', devboxName, snapshotName);
+    await execThopter('snapshot', 'default', snapshotName);
   }
 }

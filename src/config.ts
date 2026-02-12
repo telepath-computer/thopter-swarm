@@ -35,7 +35,8 @@ export interface RepoConfig {
 
 interface LocalConfig {
   runloopApiKey?: string;
-  defaultSnapshotId?: string;
+  defaultSnapshotName?: string;
+  defaultSnapshotId?: string; // Legacy alias for defaultSnapshotName (stores a name, not an ID)
   defaultRepo?: string;
   defaultBranch?: string;
   claudeMdPath?: string;
@@ -61,17 +62,20 @@ function saveLocalConfig(config: LocalConfig): void {
 }
 
 export function getDefaultSnapshot(): string | undefined {
-  return loadLocalConfig().defaultSnapshotId;
+  const config = loadLocalConfig();
+  return config.defaultSnapshotName ?? config.defaultSnapshotId;
 }
 
-export function setDefaultSnapshot(snapshotId: string): void {
+export function setDefaultSnapshot(name: string): void {
   const config = loadLocalConfig();
-  config.defaultSnapshotId = snapshotId;
+  config.defaultSnapshotName = name;
+  delete config.defaultSnapshotId; // Migrate away from legacy field
   saveLocalConfig(config);
 }
 
 export function clearDefaultSnapshot(): void {
   const config = loadLocalConfig();
+  delete config.defaultSnapshotName;
   delete config.defaultSnapshotId;
   saveLocalConfig(config);
 }

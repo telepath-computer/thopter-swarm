@@ -10,7 +10,8 @@ import type {
   SnapshotInfo,
   RepoConfig,
   RunThopterOpts,
-  ReauthOpts,
+  ReauthPrepareOpts,
+  ReauthPrepareResult,
   AppConfig,
   ClaudeReadyStatus,
   Unsubscribe,
@@ -288,6 +289,11 @@ export class MockThopterService implements ThopterService {
     return { command: '/bin/bash', args: ['-l'] };
   }
 
+  async getSSHSpawnById(_devboxId: string): Promise<{ command: string; args: string[] }> {
+    await delay(200);
+    return { command: '/bin/bash', args: ['-l'] };
+  }
+
   async tellThopter(name: string, message: string, _interrupt?: boolean): Promise<void> {
     await delay(500);
     const info = this.thopters.get(name);
@@ -378,7 +384,7 @@ export class MockThopterService implements ThopterService {
     return {
       defaultRepo: 'telepath-computer/thopter-swarm',
       defaultBranch: 'main',
-      defaultSnapshot: 'snp_mock_default_001',
+      defaultSnapshot: 'default',
       ntfyChannel: 'thopter-mock',
       repos: await this.listRepos(),
       stopNotifications: true,
@@ -386,15 +392,33 @@ export class MockThopterService implements ThopterService {
     };
   }
 
-  async reauth(opts: ReauthOpts): Promise<void> {
-    console.log(`[Mock] Re-authenticating: machine=${opts.machine}, snapshot=${opts.snapshotName}`);
+  async reauthPrepare(opts: ReauthPrepareOpts): Promise<ReauthPrepareResult> {
+    console.log(`[Mock] reauthPrepare: machine=${opts.machine}`);
     if (opts.devboxName) console.log(`[Mock]   devbox: ${opts.devboxName}`);
+
+    if (opts.machine === 'existing') {
+      const info = this.thopters.get(opts.devboxName!);
+      if (!info) throw new Error(`Thopter '${opts.devboxName}' not found`);
+      if (info.devboxStatus === 'suspended') {
+        console.log(`[Mock] Resuming suspended devbox '${opts.devboxName}'...`);
+        await delay(1_500);
+        info.devboxStatus = 'running';
+        info.alive = true;
+      }
+      return { devboxName: opts.devboxName!, devboxId: info.id! };
+    }
+
     await delay(2_000);
-    console.log('[Mock] SSH step: would show SSH command for manual auth');
+    const devboxName = `reauth-${Date.now()}`;
+    const devboxId = `dvbx_mock_reauth_${Date.now()}`;
+    console.log(`[Mock] Created devbox: ${devboxName} (${devboxId})`);
+    return { devboxName, devboxId };
+  }
+
+  async reauthFinalize(devboxName: string, snapshotName: string): Promise<void> {
+    console.log(`[Mock] reauthFinalize: devbox=${devboxName}, snapshot=${snapshotName}`);
     await delay(2_000);
-    console.log('[Mock] Creating snapshot and saving as default...');
-    await delay(1_000);
-    console.log('[Mock] Re-auth complete');
+    console.log(`[Mock] Snapshot '${snapshotName}' saved as default`);
   }
 }
 

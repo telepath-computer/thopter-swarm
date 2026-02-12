@@ -64,6 +64,16 @@ export interface ReauthOpts {
   snapshotName: string;
 }
 
+export interface ReauthPrepareOpts {
+  machine: ReauthMachine;
+  devboxName?: string; // required when machine === 'existing'
+}
+
+export interface ReauthPrepareResult {
+  devboxName: string;
+  devboxId: string;
+}
+
 export interface AppConfig {
   defaultRepo?: string;
   defaultBranch?: string;
@@ -109,6 +119,7 @@ export interface ThopterService {
 
   // SSH
   getSSHSpawn(name: string): Promise<{ command: string; args: string[] }>;
+  getSSHSpawnById(devboxId: string): Promise<{ command: string; args: string[] }>;
 
   // Mutations
   runThopter(opts: RunThopterOpts): Promise<{ name: string }>;
@@ -118,5 +129,6 @@ export interface ThopterService {
   resumeThopter(name: string): Promise<void>;
   updateTask(name: string, task: string): Promise<void>;
   attachThopter(name: string): void;
-  reauth(opts: ReauthOpts): Promise<void>;
+  reauthPrepare(opts: ReauthPrepareOpts): Promise<ReauthPrepareResult>;
+  reauthFinalize(devboxName: string, snapshotName: string): Promise<void>;
 }
