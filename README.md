@@ -41,7 +41,8 @@ This is Telepath's attempt to get this developer experience by wrapping a capabl
 git clone <this-repo>
 cd thopter-swarm
 npm install
-npm link    # installs the 'thopter' command globally
+npm run build   # not strictly necessary, but does a typescript validation
+npm link        # installs the 'thopter' command globally
 ```
 
 ### First-time Setup
@@ -142,28 +143,9 @@ See [docs/architecture.md](docs/architecture.md) for details on the stack, how p
 
 ## Electron GUI (Experimental)
 
-A desktop GUI for managing thopters, built with Electron + React + Zustand. Dashboard view, live transcript streaming, tmux screen captures, and interactive SSH terminals (xterm.js + node-pty).
+A desktop GUI for managing thopters, built with Electron + React. Dashboard view, live transcript streaming, tmux screen captures, and interactive SSH terminals (xterm.js + node-pty).
 
 **This is highly experimental.** It works for day-to-day use but expect rough edges.
-
-### Prerequisites
-
-- Everything from the CLI prerequisites above
-- `node-pty` requires native compilation: `build-essential` on Linux, Xcode Command Line Tools on macOS
-
-### Build & Launch
-
-```bash
-cd electron-gui
-npm install
-npm run rebuild      # rebuild node-pty for Electron's Node ABI
-npm run dev          # launch in dev mode (connects to real Redis)
-npm run dev:mock     # launch with mock data (no Redis needed)
-```
-
-The GUI shells out to the `thopter` CLI for mutations (run, destroy, suspend, etc.) and reads directly from Redis for live data (status, transcripts, screen dumps). Make sure the CLI is installed and configured first (`thopter setup`).
-
-### Features
 
 - **Dashboard**: live overview of all thopters with status, task, and action buttons
 - **Transcript view**: streaming Claude conversation from Redis
@@ -172,12 +154,14 @@ The GUI shells out to the `thopter` CLI for mutations (run, destroy, suspend, et
 - **Run modal**: create new thopters with repo/branch/prompt selection
 - **Notifications**: ntfy.sh integration with sidebar
 
-## Build (CLI)
+Note: `node-pty` requires native compilation, so requires `build-essential` on Linux, Xcode Command Line Tools on macOS
 
 ```bash
-npm install          # install dependencies
-npm run build        # compile TypeScript (tsc)
-./thopter --help     # see CLI commands
+cd electron-gui
+npm install
+npm run rebuild      # rebuild node-pty for Electron's Node ABI
+npm run dev          # launch in dev mode (connects to real Redis)
 ```
 
-The `thopter` wrapper script runs `src/cli.ts` via `tsx` so you don't need to compile during development, but always run `npm run build` before committing to verify TypeScript compiles cleanly.
+The GUI shells out to the `thopter` CLI for mutations (run, destroy, suspend, etc.) and reads directly from Redis for live data (status, transcripts, screen dumps). Make sure the CLI is installed and configured first (`thopter setup`).
+
