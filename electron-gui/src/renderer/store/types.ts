@@ -5,6 +5,7 @@ import type {
   RepoConfig,
   SnapshotInfo,
   AppConfig,
+  ClaudeReadyStatus,
   RunThopterOpts,
 } from '../services/types'
 
@@ -18,6 +19,7 @@ export interface StoreState {
   config: AppConfig | null
   connectionStatus: 'connected' | 'error' | 'loading'
   refreshing: boolean
+  claudeReady: Record<string, ClaudeReadyStatus>
 
   // Display state (UI layer)
   activeTab: 'dashboard' | string
@@ -39,6 +41,7 @@ export interface StoreActions {
   unsubscribeTranscript(name: string): void
 
   // Thopter operations
+  checkClaude(name: string): Promise<void>
   runThopter(opts: RunThopterOpts): Promise<string>
   tellThopter(name: string, message: string, interrupt?: boolean): Promise<void>
   updateTask(name: string, task: string): Promise<void>

@@ -15,6 +15,7 @@ export const useStore = create<Store>((set, get) => ({
   config: null,
   connectionStatus: 'loading',
   refreshing: false,
+  claudeReady: {},
 
   // Display state
   activeTab: 'dashboard',
@@ -76,6 +77,16 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   // Thopter operations
+  checkClaude: async (name) => {
+    const service = getService()
+    try {
+      const result = await service.checkClaude(name)
+      set((s) => ({ claudeReady: { ...s.claudeReady, [name]: result } }))
+    } catch {
+      set((s) => ({ claudeReady: { ...s.claudeReady, [name]: { tmux: false, claude: false } } }))
+    }
+  },
+
   runThopter: async (opts) => {
     const service = getService()
     const result = await service.runThopter(opts)

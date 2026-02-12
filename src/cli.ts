@@ -127,6 +127,30 @@ program
     await tailTranscript(resolveThopterName(name), { follow: opts.follow, lines: opts.lines, short: opts.short });
   });
 
+// --- check ---
+program
+  .command("check")
+  .description("Check if a thopter has tmux and Claude running")
+  .argument("<name>", "Thopter name")
+  .option("--json", "Output as JSON")
+  .action(async (name: string, opts: { json?: boolean }) => {
+    const { checkClaude } = await import("./tell.js");
+    const result = await checkClaude(resolveThopterName(name));
+    if (opts.json) {
+      process.stdout.write(JSON.stringify(result) + "\n");
+    } else {
+      console.log(`tmux:   ${result.tmux ? "running" : "not running"}`);
+      console.log(`claude: ${result.claude ? "running" : "not running"}`);
+      if (!result.tmux) {
+        console.log("\nNo tmux session. Claude needs to be launched.");
+        console.log(`  SSH in and start Claude: thopter ssh ${name}`);
+      } else if (!result.claude) {
+        console.log("\ntmux is running but Claude is not in any pane.");
+        console.log(`  SSH in and start Claude: thopter ssh ${name}`);
+      }
+    }
+  });
+
 // --- tell ---
 program
   .command("tell")

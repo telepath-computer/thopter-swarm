@@ -90,6 +90,11 @@ export interface NtfyNotification {
 
 export type Unsubscribe = () => void;
 
+export interface ClaudeReadyStatus {
+  tmux: boolean;
+  claude: boolean;
+}
+
 export interface ThopterService {
   // Queries
   listThopters(): Promise<ThopterInfo[]>;
@@ -99,6 +104,7 @@ export interface ThopterService {
   listSnapshots(): Promise<SnapshotInfo[]>;
   listRepos(): Promise<RepoConfig[]>;
   getConfig(): Promise<AppConfig>;
+  checkClaude(name: string): Promise<ClaudeReadyStatus>;
 
   // Mutations
   runThopter(opts: RunThopterOpts): Promise<{ name: string }>;

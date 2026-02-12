@@ -12,6 +12,7 @@ import type {
   RunThopterOpts,
   ReauthOpts,
   AppConfig,
+  ClaudeReadyStatus,
   Unsubscribe,
 } from './types';
 
@@ -371,6 +372,18 @@ export class RealThopterService implements ThopterService {
     if (opts.name) return { name: opts.name };
 
     throw new Error('Could not determine thopter name from CLI output');
+  }
+
+  /**
+   * Check if a thopter has tmux and Claude running via CLI.
+   */
+  async checkClaude(name: string): Promise<ClaudeReadyStatus> {
+    try {
+      const output = await execThopter('check', name, '--json');
+      return JSON.parse(output) as ClaudeReadyStatus;
+    } catch {
+      return { tmux: false, claude: false };
+    }
   }
 
   /**

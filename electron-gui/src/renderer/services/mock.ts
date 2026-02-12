@@ -12,6 +12,7 @@ import type {
   RunThopterOpts,
   ReauthOpts,
   AppConfig,
+  ClaudeReadyStatus,
   Unsubscribe,
 } from './types';
 
@@ -246,6 +247,15 @@ export class MockThopterService implements ThopterService {
     ]);
 
     return { name };
+  }
+
+  async checkClaude(name: string): Promise<ClaudeReadyStatus> {
+    await delay(300);
+    const info = this.thopters.get(name);
+    if (!info) return { tmux: false, claude: false };
+    // Suspended thopters have no tmux or Claude
+    if (info.devboxStatus === 'suspended') return { tmux: false, claude: false };
+    return { tmux: true, claude: info.claudeRunning };
   }
 
   async tellThopter(name: string, message: string, _interrupt?: boolean): Promise<void> {

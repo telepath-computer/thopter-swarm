@@ -7,6 +7,11 @@ import { getClient } from "./client.js";
 import { tailTranscript } from "./tail.js";
 
 /**
+ * Check whether tmux is running on the devbox.
+ */
+const CHECK_TMUX_SCRIPT = `tmux list-sessions >/dev/null 2>&1 && echo "ok" || echo "no"`;
+
+/**
  * Find the tmux pane running a `claude` process by checking which pane's
  * shell PID is the parent of a claude process. Returns a target like "0:0.0".
  */
@@ -21,11 +26,44 @@ for line in $(tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_inde
   fi
 done
 if [ -z "$pane_target" ]; then
-  echo "ERROR: No tmux pane running claude found" >&2
-  exit 1
+  echo "NO_CLAUDE"
+else
+  echo "$pane_target"
 fi
-echo "$pane_target"
 `.trim();
+
+/**
+ * Check if a devbox has tmux running and Claude in a tmux pane.
+ * Returns { tmux: boolean, claude: boolean }.
+ */
+export async function checkClaude(name: string): Promise<{ tmux: boolean; claude: boolean }> {
+  const { id: devboxId } = await resolveDevbox(name);
+  const client = getClient();
+
+  // Step 1: Check tmux
+  const tmuxExec = await client.devboxes.executeAsync(devboxId, {
+    command: CHECK_TMUX_SCRIPT,
+  });
+  const tmuxResult = await client.devboxes.executions.awaitCompleted(
+    devboxId,
+    tmuxExec.execution_id,
+  );
+  const hasTmux = (tmuxResult.stdout ?? "").trim() === "ok";
+  if (!hasTmux) return { tmux: false, claude: false };
+
+  // Step 2: Check Claude in tmux
+  const claudeExec = await client.devboxes.executeAsync(devboxId, {
+    command: FIND_CLAUDE_PANE_SCRIPT,
+  });
+  const claudeResult = await client.devboxes.executions.awaitCompleted(
+    devboxId,
+    claudeExec.execution_id,
+  );
+  const output = (claudeResult.stdout ?? "").trim();
+  const hasClaude = output !== "" && output !== "NO_CLAUDE";
+
+  return { tmux: true, claude: hasClaude };
+}
 
 export async function tellThopter(
   name: string,
@@ -34,6 +72,23 @@ export async function tellThopter(
 ): Promise<void> {
   const { id: devboxId } = await resolveDevbox(name);
   const client = getClient();
+
+  // Pre-flight: check tmux and Claude
+  const tmuxExec = await client.devboxes.executeAsync(devboxId, {
+    command: CHECK_TMUX_SCRIPT,
+  });
+  const tmuxResult = await client.devboxes.executions.awaitCompleted(
+    devboxId,
+    tmuxExec.execution_id,
+  );
+  const hasTmux = (tmuxResult.stdout ?? "").trim() === "ok";
+
+  if (!hasTmux) {
+    console.error("No tmux session found on this thopter.");
+    console.error("  The devbox may have been resumed without relaunching Claude.");
+    console.error("  SSH in and start Claude: thopter ssh " + name);
+    process.exit(1);
+  }
 
   // Find the tmux pane running Claude
   const findExec = await client.devboxes.executeAsync(devboxId, {
@@ -44,15 +99,11 @@ export async function tellThopter(
     findExec.execution_id,
   );
 
-  if (findResult.exit_status && findResult.exit_status !== 0) {
-    console.error("No running Claude session found on this thopter.");
-    if (findResult.stderr) process.stderr.write(findResult.stderr);
-    process.exit(1);
-  }
-
   const paneTarget = (findResult.stdout ?? "").trim();
-  if (!paneTarget) {
-    console.error("No running Claude session found on this thopter.");
+  if (!paneTarget || paneTarget === "NO_CLAUDE") {
+    console.error("tmux is running but no Claude process found in any pane.");
+    console.error("  Claude may have exited or not been started after resume.");
+    console.error("  SSH in and start Claude: thopter ssh " + name);
     process.exit(1);
   }
 
