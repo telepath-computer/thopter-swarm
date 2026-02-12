@@ -77,7 +77,7 @@ export function ThopterDetail() {
               : 'text-muted-foreground hover:text-foreground hover:bg-muted',
           )}
         >
-          Terminal
+          Screen
         </button>
         <button
           onClick={() => setDetailViewMode(activeTab, 'live')}
@@ -100,7 +100,9 @@ export function ThopterDetail() {
         <LiveTerminalView name={thopter.name} />
       )}
 
-      <ActionBar name={thopter.name} status={thopter.status} devboxStatus={thopter.devboxStatus} claudeReady={claudeReady} />
+      {viewMode !== 'live' && (
+        <ActionBar name={thopter.name} status={thopter.status} devboxStatus={thopter.devboxStatus} claudeReady={claudeReady} />
+      )}
     </div>
   )
 }

@@ -139,6 +139,7 @@ export function LiveTerminalView({ name }: Props) {
     })
 
     setState('connected')
+    term.focus()
 
     // Resize observer: fit terminal to container and update PTY dimensions
     const observer = new ResizeObserver(() => {

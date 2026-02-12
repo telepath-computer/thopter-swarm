@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { Activity, Clock, Server, User, Cpu, Pause, Play, Trash2, Pencil, Check } from 'lucide-react'
+import { Activity, Clock, Server, User, Cpu, Pause, Play, Trash2, Pencil, Check, TerminalSquare } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
+import { ShellCommandsModal } from '@/components/modals/ShellCommandsModal'
 import { cn, relativeTime } from '@/lib/utils'
 import { useStore } from '@/store'
 import type { ThopterInfo, ThopterStatus } from '@/services/types'
@@ -101,6 +102,7 @@ export function StatusPanel({ thopter }: Props) {
   const [confirmDestroy, setConfirmDestroy] = useState(false)
   const [confirmSuspend, setConfirmSuspend] = useState(false)
   const [confirmResume, setConfirmResume] = useState(false)
+  const [shellModalOpen, setShellModalOpen] = useState(false)
 
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
@@ -177,6 +179,16 @@ export function StatusPanel({ thopter }: Props) {
             </TooltipTrigger>
             <TooltipContent>Permanently destroy this devbox</TooltipContent>
           </Tooltip>
+          <Separator orientation="vertical" className="h-5" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setShellModalOpen(true)}>
+                <TerminalSquare />
+                Shell Commands
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy CLI commands for this thopter</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -216,6 +228,7 @@ export function StatusPanel({ thopter }: Props) {
         }}
         onCancel={() => setConfirmDestroy(false)}
       />
+      <ShellCommandsModal open={shellModalOpen} name={thopter.name} onClose={() => setShellModalOpen(false)} />
     </div>
   )
 }

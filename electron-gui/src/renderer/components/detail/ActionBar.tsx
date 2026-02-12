@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Send, TerminalSquare, Zap, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Send, Zap, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { ShellCommandsModal } from '@/components/modals/ShellCommandsModal'
 import { useStore } from '@/store'
 import type { ThopterStatus, DevboxStatus, ClaudeReadyStatus } from '@/services/types'
 
@@ -34,7 +33,6 @@ export function ActionBar({ name, devboxStatus, claudeReady }: Props) {
   const message = useStore((s) => s.draftMessages[name] ?? '')
   const setMessage = useStore((s) => s.setDraftMessage)
   const [sending, setSending] = useState(false)
-  const [shellModalOpen, setShellModalOpen] = useState(false)
   const tellThopter = useStore((s) => s.tellThopter)
   const checkClaudeFn = useStore((s) => s.checkClaude)
 
@@ -77,7 +75,7 @@ export function ActionBar({ name, devboxStatus, claudeReady }: Props) {
         <Textarea
           className="flex-1 text-sm resize-none min-h-[56px] font-mono"
           rows={2}
-          placeholder={unavailableReason ? 'Claude is not running...' : 'Send a message to Claude...'}
+          placeholder={unavailableReason ? 'Claude is not running...' : 'Send a message to Claude... (experimental — pastes text then sends Enter; message may be lost if Claude is not waiting for input)'}
           value={message}
           onChange={(e) => setMessage(name, e.target.value)}
           onKeyDown={(e) => {
@@ -111,19 +109,6 @@ export function ActionBar({ name, devboxStatus, claudeReady }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="outline" size="xs" onClick={() => setShellModalOpen(true)}>
-              <TerminalSquare />
-              Shell Commands
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Copy CLI commands for this thopter</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <ShellCommandsModal open={shellModalOpen} name={name} onClose={() => setShellModalOpen(false)} />
     </div>
   )
 }
