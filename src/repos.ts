@@ -85,19 +85,23 @@ async function askCheckouts(
   repos: RepoConfig[],
 ): Promise<Array<{ repo: string; branch: string }>> {
   const checkouts: Array<{ repo: string; branch: string }> = [];
+  const addedRepos = new Set<string>();
 
   console.log("\nPre-checkout repositories (optional, press Enter to skip):");
 
   while (true) {
-    if (repos.length > 0) {
-      for (let i = 0; i < repos.length; i++) {
-        console.log(`  ${i + 1}. ${formatEntry(repos[i])}`);
+    // Filter out already-added repos
+    const available = repos.filter((r) => !addedRepos.has(r.repo));
+
+    if (available.length > 0) {
+      for (let i = 0; i < available.length; i++) {
+        console.log(`  ${i + 1}. ${formatEntry(available[i])}`);
       }
-      console.log(`  ${repos.length + 1}. Enter a custom repo`);
+      console.log(`  ${available.length + 1}. Enter a custom repo`);
     }
 
-    const prompt = repos.length > 0
-      ? `Add repo [1-${repos.length + 1}] or Enter to finish: `
+    const prompt = available.length > 0
+      ? `Add repo [1-${available.length + 1}] or Enter to finish: `
       : "Repository (owner/repo) or Enter to finish: ";
 
     const choice = await ask(rl, prompt);
@@ -107,14 +111,14 @@ async function askCheckouts(
     let branch: string | undefined;
     const idx = parseInt(choice, 10);
 
-    if (repos.length > 0 && idx >= 1 && idx <= repos.length) {
-      const entry = repos[idx - 1];
+    if (available.length > 0 && idx >= 1 && idx <= available.length) {
+      const entry = available[idx - 1];
       repo = entry.repo;
       branch = entry.branch;
-    } else if (repos.length > 0 && idx === repos.length + 1) {
+    } else if (available.length > 0 && idx === available.length + 1) {
       repo = await ask(rl, "Repository (owner/repo): ");
       if (!repo) continue;
-    } else if (repos.length === 0) {
+    } else if (available.length === 0) {
       repo = choice;
     } else {
       continue; // invalid input
@@ -126,7 +130,14 @@ async function askCheckouts(
     }
 
     checkouts.push({ repo, branch });
-    console.log(`  Added: ${repo} (${branch})`);
+    addedRepos.add(repo);
+
+    // Show current checkout list
+    console.log(`\n  Checkouts:`);
+    for (const c of checkouts) {
+      console.log(`    - ${c.repo} (${c.branch})`);
+    }
+    console.log();
   }
 
   return checkouts;
