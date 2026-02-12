@@ -101,7 +101,8 @@ program
   .option("-f, --follow [interval]", "Re-render every N seconds (default: 10)")
   .option("-w, --wide", "Force wide (single-line) layout")
   .option("-n, --narrow", "Force narrow (multi-line) layout")
-  .action(async (name: string | undefined, opts: { follow?: boolean | string; wide?: boolean; narrow?: boolean }) => {
+  .option("--json", "Output as JSON (for programmatic use)")
+  .action(async (name: string | undefined, opts: { follow?: boolean | string; wide?: boolean; narrow?: boolean; json?: boolean }) => {
     const follow = opts.follow === true ? 10 : opts.follow ? Number(opts.follow) : undefined;
     const layout = opts.wide ? "wide" as const : opts.narrow ? "narrow" as const : undefined;
     if (name) {
@@ -109,7 +110,7 @@ program
       await showThopterStatus(resolveThopterName(name));
     } else {
       const { listDevboxes } = await import("./devbox.js");
-      await listDevboxes({ follow, layout });
+      await listDevboxes({ follow, layout, json: opts.json });
     }
   });
 
@@ -126,6 +127,30 @@ program
     await tailTranscript(resolveThopterName(name), { follow: opts.follow, lines: opts.lines, short: opts.short });
   });
 
+// --- check ---
+program
+  .command("check")
+  .description("Check if a thopter has tmux and Claude running")
+  .argument("<name>", "Thopter name")
+  .option("--json", "Output as JSON")
+  .action(async (name: string, opts: { json?: boolean }) => {
+    const { checkClaude } = await import("./tell.js");
+    const result = await checkClaude(resolveThopterName(name));
+    if (opts.json) {
+      process.stdout.write(JSON.stringify(result) + "\n");
+    } else {
+      console.log(`tmux:   ${result.tmux ? "running" : "not running"}`);
+      console.log(`claude: ${result.claude ? "running" : "not running"}`);
+      if (!result.tmux) {
+        console.log("\nNo tmux session. Claude needs to be launched.");
+        console.log(`  SSH in and start Claude: thopter ssh ${name}`);
+      } else if (!result.claude) {
+        console.log("\ntmux is running but Claude is not in any pane.");
+        console.log(`  SSH in and start Claude: thopter ssh ${name}`);
+      }
+    }
+  });
+
 // --- tell ---
 program
   .command("tell")
@@ -133,9 +158,10 @@ program
   .argument("<name>", "Thopter name")
   .argument("<message>", "Message to send to Claude")
   .option("-i, --interrupt", "Interrupt Claude first (send Escape), then deliver the message")
-  .action(async (name: string, message: string, opts: { interrupt?: boolean }) => {
+  .option("--no-tail", "Exit after sending (don't follow transcript)")
+  .action(async (name: string, message: string, opts: { interrupt?: boolean; tail?: boolean }) => {
     const { tellThopter } = await import("./tell.js");
-    await tellThopter(resolveThopterName(name), message, opts);
+    await tellThopter(resolveThopterName(name), message, { interrupt: opts.interrupt, noTail: opts.tail === false });
   });
 
 // --- run ---

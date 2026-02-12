@@ -11,6 +11,17 @@ npm install && npm run build   # always build (tsc) before committing
 
 No test suite exists. TypeScript compilation (`npm run build`) is the only validation step.
 
+### Electron GUI
+
+```
+cd electron-gui
+npm install && npm run rebuild   # rebuild node-pty for Electron
+npm run dev                      # launch (real Redis)
+npm run dev:mock                 # launch (mock data, no Redis)
+```
+
+The GUI shells out to the `thopter` CLI for mutations and reads Redis directly for live data.
+
 ## Source Map
 
 ```
@@ -36,6 +47,18 @@ scripts/        Uploaded to devboxes at create time
   claude-hook-*.sh              Claude Code event hooks (start, stop, prompt, tool-use, notification)
   thopter-claude-md.md          Default ~/.claude/CLAUDE.md deployed to devboxes
   starship.toml / tmux.conf / nvim-options.lua   Devbox tool configs
+
+electron-gui/   Electron desktop app (experimental)
+  src/main/index.ts                     Electron main process
+  src/renderer/App.tsx                  Root React component
+  src/renderer/store/                   Zustand store (state + actions)
+  src/renderer/services/                Service layer (real.ts = Redis + CLI, mock.ts = dev data)
+  src/renderer/components/dashboard/    Dashboard + ThopterCard
+  src/renderer/components/detail/       ThopterDetail, TranscriptView, TerminalView, LiveTerminalView, ActionBar, StatusPanel
+  src/renderer/components/layout/       Header, TabBar, NotificationSidebar
+  src/renderer/components/modals/       RunModal, ReauthModal, ShellCommandsModal, ConfirmDialog
+  src/renderer/components/ui/           shadcn/ui primitives
+  electron.vite.config.ts              Vite config (node-pty in externals)
 ```
 
 ## Key Architecture
@@ -52,7 +75,9 @@ See `thopter-json-reference.md` for all `~/.thopter.json` keys. Key ones: `runlo
 
 ## Stack
 
-TypeScript (ES2022, NodeNext modules, strict). Deps: `@runloop/api-client`, `commander`, `ioredis`, `friendly-words`. No framework — just a CLI. Output to `dist/` but runtime uses `tsx` directly.
+**CLI**: TypeScript (ES2022, NodeNext modules, strict). Deps: `@runloop/api-client`, `commander`, `ioredis`, `friendly-words`. Output to `dist/` but runtime uses `tsx` directly.
+
+**GUI**: Electron + React 18 + Zustand + Tailwind CSS v4. Uses merged context (`nodeIntegration: true`) — renderer uses `window.require` for Node.js modules (ioredis, node-pty, child_process). Built with electron-vite. xterm.js + node-pty for live terminals.
 
 ## Task List
 
