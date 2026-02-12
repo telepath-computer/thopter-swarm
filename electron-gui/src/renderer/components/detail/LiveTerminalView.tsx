@@ -11,11 +11,12 @@ const pty = nodeRequire('node-pty')
 
 interface Props {
   name: string
+  visible?: boolean
 }
 
 type ViewState = 'connecting' | 'connected' | 'error' | 'exited'
 
-export function LiveTerminalView({ name }: Props) {
+export function LiveTerminalView({ name, visible = true }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -153,6 +154,20 @@ export function LiveTerminalView({ name }: Props) {
     observer.observe(container)
     observerRef.current = observer
   }, [name])
+
+  // Re-fit and re-focus when becoming visible (after being hidden via display:none)
+  useEffect(() => {
+    if (!visible) return
+    requestAnimationFrame(() => {
+      if (fitAddonRef.current && termRef.current) {
+        fitAddonRef.current.fit()
+        if (ptyRef.current) {
+          ptyRef.current.resize(termRef.current.cols, termRef.current.rows)
+        }
+        termRef.current.focus()
+      }
+    })
+  }, [visible])
 
   // Connect on mount, clean up on unmount
   useEffect(() => {

@@ -22,6 +22,7 @@ export interface StoreState {
   claudeReady: Record<string, ClaudeReadyStatus>
   screenDumps: Record<string, string | null>
   detailViewMode: Record<string, 'transcript' | 'terminal' | 'live'>
+  liveTerminals: string[] // thopter names with active live terminal sessions
   draftMessages: Record<string, string>
 
   // Display state (UI layer)

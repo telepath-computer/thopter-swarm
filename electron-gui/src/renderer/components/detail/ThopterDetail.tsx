@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils'
 import { StatusPanel } from './StatusPanel'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from './TerminalView'
-import { LiveTerminalView } from './LiveTerminalView'
 import { ActionBar } from './ActionBar'
 
 export function ThopterDetail() {
@@ -92,12 +91,14 @@ export function ThopterDetail() {
         </button>
       </div>
 
+      {/* Live terminal is rendered at App level to persist across tab switches.
+          Show transcript/screen here; live mode leaves this area empty (terminal overlays it). */}
       {viewMode === 'transcript' ? (
         <TranscriptView name={thopter.name} />
       ) : viewMode === 'terminal' ? (
         <TerminalView name={thopter.name} />
       ) : (
-        <LiveTerminalView name={thopter.name} />
+        <div className="flex-1" />
       )}
 
       {viewMode === 'terminal' && (

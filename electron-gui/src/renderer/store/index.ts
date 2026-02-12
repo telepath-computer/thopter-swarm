@@ -18,6 +18,7 @@ export const useStore = create<Store>((set, get) => ({
   claudeReady: {},
   screenDumps: {},
   detailViewMode: {},
+  liveTerminals: [],
   draftMessages: {},
 
   // Display state
@@ -150,7 +151,14 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   setDetailViewMode: (name, mode) => {
-    set((s) => ({ detailViewMode: { ...s.detailViewMode, [name]: mode } }))
+    set((s) => {
+      const update: Partial<typeof s> = { detailViewMode: { ...s.detailViewMode, [name]: mode } }
+      // Track live terminal sessions so they persist across tab switches
+      if (mode === 'live' && !s.liveTerminals.includes(name)) {
+        update.liveTerminals = [...s.liveTerminals, name]
+      }
+      return update
+    })
   },
 
   // UI actions
@@ -170,7 +178,11 @@ export const useStore = create<Store>((set, get) => ({
         s.activeTab === name
           ? openTabs[openTabs.length - 1] || 'dashboard'
           : s.activeTab
-      return { openTabs, activeTab }
+      return {
+        openTabs,
+        activeTab,
+        liveTerminals: s.liveTerminals.filter((t) => t !== name),
+      }
     })
   },
 
