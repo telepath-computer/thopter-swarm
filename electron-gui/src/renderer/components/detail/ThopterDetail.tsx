@@ -100,7 +100,7 @@ export function ThopterDetail() {
         <LiveTerminalView name={thopter.name} />
       )}
 
-      {viewMode !== 'live' && (
+      {viewMode === 'terminal' && (
         <ActionBar name={thopter.name} status={thopter.status} devboxStatus={thopter.devboxStatus} claudeReady={claudeReady} />
       )}
     </div>
