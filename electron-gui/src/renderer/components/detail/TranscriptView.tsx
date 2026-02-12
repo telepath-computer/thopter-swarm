@@ -67,7 +67,9 @@ export function TranscriptView({ name }: Props) {
       ) : (
         entries.map((entry, i) => {
           const cfg = roleConfig[entry.role] ?? roleConfig.system
-          const showMarkdown = entry.role === 'assistant' && entry.full
+          const isConversational = entry.role === 'user' || entry.role === 'assistant'
+          const fullText = entry.full ?? (isConversational ? entry.summary : null)
+          const showMarkdown = isConversational && fullText
 
           return (
             <div
@@ -87,12 +89,11 @@ export function TranscriptView({ name }: Props) {
               <div className="min-w-0 flex-1 break-words leading-5">
                 {showMarkdown ? (
                   <div className="prose prose-invert prose-sm max-w-none [&_p]:my-0.5 [&_pre]:my-1 [&_pre]:bg-background/50 [&_pre]:p-2 [&_pre]:rounded [&_code]:text-primary/80 [&_ol]:my-0.5 [&_ul]:my-0.5 [&_li]:my-0 [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs font-sans text-sm">
-                    <ReactMarkdown>{entry.full!}</ReactMarkdown>
+                    <ReactMarkdown>{fullText}</ReactMarkdown>
                   </div>
                 ) : (
                   <span className={cn(
                     entry.role === 'tool_result' && 'text-zinc-500',
-                    entry.role === 'assistant' && 'text-foreground',
                   )}>
                     {entry.summary}
                   </span>
