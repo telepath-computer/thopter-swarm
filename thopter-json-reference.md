@@ -5,7 +5,7 @@
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
 | `runloopApiKey` | string | yes | Runloop API key. Get from the Runloop dashboard. |
-| `defaultSnapshotId` | string | no | Snapshot used by `thopter create` when `--snapshot` isn't passed. Set via `thopter snapshot default`. |
+| `defaultSnapshotName` | string | no | Snapshot name used by `thopter create` when `--snapshot` isn't passed. Set via `thopter snapshot default`. |
 | `defaultRepo` | string | no | Default repository (`owner/repo`) for `thopter run` when `--repo` isn't passed. Set via `thopter config set defaultRepo owner/repo`. |
 | `defaultBranch` | string | no | Default branch for `thopter run` when `--branch` isn't passed. Set via `thopter config set defaultBranch main`. |
 | `stopNotifications` | boolean | no | Send ntfy.sh notification when Claude finishes a response. Default `true`. Notifications are suppressed during the quiet period after a user message (see `stopNotificationQuietPeriod`). Set to `false` to disable. |
@@ -40,7 +40,7 @@ Add any other env vars your devboxes need — they're all passed through, e.g. `
 {
   "docs": "See thopter-json-reference.md for all config options.",
   "runloopApiKey": "rl_api_abc123...",
-  "defaultSnapshotId": "jsw-golden",
+  "defaultSnapshotName": "jsw-golden",
   "defaultRepo": "telepath-computer/my-project",
   "defaultBranch": "main",
   "repos": [

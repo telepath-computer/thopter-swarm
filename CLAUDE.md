@@ -71,7 +71,7 @@ electron-gui/   Electron desktop app (experimental)
 
 ## Config Reference
 
-See `thopter-json-reference.md` for all `~/.thopter.json` keys. Key ones: `runloopApiKey`, `defaultSnapshotId`, `defaultRepo`, `defaultBranch`, `envVars` (must include `GH_TOKEN`, `THOPTER_REDIS_URL`), `claudeMdPath`, `uploads`.
+See `thopter-json-reference.md` for all `~/.thopter.json` keys. Key ones: `runloopApiKey`, `defaultSnapshotName`, `defaultRepo`, `defaultBranch`, `envVars` (must include `GH_TOKEN`, `THOPTER_REDIS_URL`), `claudeMdPath`, `uploads`.
 
 ## Stack
 

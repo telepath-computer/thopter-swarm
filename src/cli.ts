@@ -428,9 +428,10 @@ configCmd
         setRunloopApiKey(value);
         console.log("Set runloopApiKey.");
         break;
-      case "defaultSnapshotId":
+      case "defaultSnapshotName":
+      case "defaultSnapshotId": // Legacy alias
         setDefaultSnapshot(value);
-        console.log(`Set defaultSnapshotId to: ${value}`);
+        console.log(`Set defaultSnapshotName to: ${value}`);
         break;
       case "defaultRepo":
         setDefaultRepo(value);
@@ -454,7 +455,7 @@ configCmd
         break;
       default:
         console.error(`Unknown config key: ${key}`);
-        console.error("Available keys: runloopApiKey, defaultSnapshotId, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
+        console.error("Available keys: runloopApiKey, defaultSnapshotName, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
         console.error("For env vars (THOPTER_REDIS_URL, THOPTER_NTFY_CHANNEL, etc.): thopter env set <KEY> <VALUE>");
         process.exit(1);
     }
@@ -468,7 +469,7 @@ configCmd
     const { getRunloopApiKey, getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars, getDefaultThopter, getRepos } = await import("./config.js");
     if (!key) {
       console.log(`runloopApiKey:                  ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
-      console.log(`defaultSnapshotId:              ${getDefaultSnapshot() ?? "(not set)"}`);
+      console.log(`defaultSnapshotName:             ${getDefaultSnapshot() ?? "(not set)"}`);
       console.log(`defaultRepo:                    ${getDefaultRepo() ?? "(not set)"}`);
       console.log(`defaultBranch:                  ${getDefaultBranch() ?? "(not set)"}`);
       console.log(`stopNotifications:              ${getStopNotifications()}`);
@@ -485,7 +486,8 @@ configCmd
         case "runloopApiKey":
           console.log(getRunloopApiKey() ? "(set)" : "(not set)");
           break;
-        case "defaultSnapshotId":
+        case "defaultSnapshotName":
+        case "defaultSnapshotId": // Legacy alias
           console.log(getDefaultSnapshot() ?? "(not set)");
           break;
         case "defaultRepo":
@@ -505,7 +507,7 @@ configCmd
           break;
         default:
           console.error(`Unknown config key: ${key}`);
-          console.error("Available keys: runloopApiKey, defaultSnapshotId, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
+          console.error("Available keys: runloopApiKey, defaultSnapshotName, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
           console.error("For env vars: thopter env list");
           process.exit(1);
       }

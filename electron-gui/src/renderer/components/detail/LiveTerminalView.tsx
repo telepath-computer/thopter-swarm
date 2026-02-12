@@ -12,11 +12,12 @@ const pty = nodeRequire('node-pty')
 interface Props {
   name: string
   visible?: boolean
+  spawnInfo?: { command: string; args: string[] }
 }
 
 type ViewState = 'connecting' | 'connected' | 'error' | 'exited'
 
-export function LiveTerminalView({ name, visible = true }: Props) {
+export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoProp }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -91,10 +92,10 @@ export function LiveTerminalView({ name, visible = true }: Props) {
     await new Promise((r) => requestAnimationFrame(r))
     fitAddon.fit()
 
-    // Get SSH spawn info from service
+    // Get SSH spawn info from prop or service
     let spawnInfo: { command: string; args: string[] }
     try {
-      spawnInfo = await getService().getSSHSpawn(name)
+      spawnInfo = spawnInfoProp ?? await getService().getSSHSpawn(name)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setErrorMsg(msg)
@@ -153,7 +154,7 @@ export function LiveTerminalView({ name, visible = true }: Props) {
     })
     observer.observe(container)
     observerRef.current = observer
-  }, [name])
+  }, [name, spawnInfoProp])
 
   // Re-fit and re-focus when becoming visible (after being hidden via display:none)
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useStore } from '@/store'
 import { getService } from '@/services'
 import type { ReauthMachine, ThopterInfo } from '@/services/types'
@@ -14,9 +14,11 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Copy, Terminal, Check, Loader2 } from 'lucide-react'
+import { LiveTerminalView } from '@/components/detail/LiveTerminalView'
+import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
+import { Check, Loader2 } from 'lucide-react'
 
-type Step = 'machine' | 'snapshot-name' | 'ssh' | 'finalize'
+type Step = 'machine' | 'snapshot-name' | 'preparing' | 'ssh' | 'finalize'
 
 export function ReauthModal() {
   const isOpen = useStore((s) => s.isReauthModalOpen)
@@ -27,14 +29,35 @@ export function ReauthModal() {
   const [machine, setMachine] = useState<ReauthMachine>('snapshot')
   const [devboxName, setDevboxName] = useState('')
   const [snapshotName, setSnapshotName] = useState('')
+  const [defaultSnapshotName, setDefaultSnapshotName] = useState<string | null>(null)
+  const [configLoaded, setConfigLoaded] = useState(false)
+  const [preparedDevbox, setPreparedDevbox] = useState<{ devboxName: string; devboxId: string } | null>(null)
+  const [sshSpawnInfo, setSSHSpawnInfo] = useState<{ command: string; args: string[] } | null>(null)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [isWorking, setIsWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [isDone, setIsDone] = useState(false)
 
   const runningThopters = Object.values(thopters).filter(
     (t: ThopterInfo) => t.devboxStatus === 'running' || t.devboxStatus === 'suspended'
   )
+
+  // Load config on modal open to get default snapshot name.
+  // The config value (defaultSnapshotName, with legacy defaultSnapshotId fallback)
+  // is always a snapshot name, never an ID.
+  useEffect(() => {
+    if (!isOpen) return
+    setConfigLoaded(false)
+    getService().getConfig().then((config) => {
+      if (config.defaultSnapshot) {
+        setDefaultSnapshotName(config.defaultSnapshot)
+        setSnapshotName(config.defaultSnapshot)
+      } else {
+        setDefaultSnapshotName(null)
+      }
+      setConfigLoaded(true)
+    }).catch(() => setConfigLoaded(true))
+  }, [isOpen])
 
   function handleClose() {
     closeReauthModal()
@@ -44,9 +67,13 @@ export function ReauthModal() {
       setMachine('snapshot')
       setDevboxName('')
       setSnapshotName('')
+      setDefaultSnapshotName(null)
+      setConfigLoaded(false)
+      setPreparedDevbox(null)
+      setSSHSpawnInfo(null)
+      setShowConfirm(false)
       setIsWorking(false)
       setError(null)
-      setCopied(false)
       setIsDone(false)
     }, 200)
   }
@@ -61,50 +88,79 @@ export function ReauthModal() {
   }
 
   function handleNextFromSnapshotName() {
-    if (!snapshotName.trim()) {
+    const effectiveName = snapshotName.trim() || defaultSnapshotName
+    if (!effectiveName) {
       setError('Snapshot name is required')
       return
     }
-    setError(null)
-    setStep('ssh')
-  }
-
-  function handleCopyCommand() {
-    const target = machine === 'existing' ? devboxName : 'the new devbox'
-    const command = `thopter ssh ${target}`
-    navigator.clipboard.writeText(command)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  function handleOpenTerminal() {
-    const service = getService()
-    if (machine === 'existing' && devboxName) {
-      service.attachThopter(devboxName)
+    // Ensure snapshotName state has the resolved value
+    if (!snapshotName.trim() && defaultSnapshotName) {
+      setSnapshotName(defaultSnapshotName)
     }
+    setError(null)
+    setStep('preparing')
   }
 
-  async function handleFinalize() {
+  // Auto-run prepare when entering the preparing step
+  const runPrepare = useCallback(async () => {
     setIsWorking(true)
     setError(null)
     try {
       const service = getService()
-      await service.reauth({
+      const result = await service.reauthPrepare({
         machine,
         devboxName: machine === 'existing' ? devboxName : undefined,
-        snapshotName: snapshotName.trim(),
       })
+      setPreparedDevbox(result)
+
+      const spawn = await service.getSSHSpawnById(result.devboxId)
+      setSSHSpawnInfo(spawn)
+
+      setStep('ssh')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to prepare devbox')
+    } finally {
+      setIsWorking(false)
+    }
+  }, [machine, devboxName])
+
+  useEffect(() => {
+    if (step === 'preparing') {
+      runPrepare()
+    }
+  }, [step, runPrepare])
+
+  async function handleFinalize() {
+    if (!preparedDevbox) return
+    const effectiveName = snapshotName.trim() || defaultSnapshotName
+    if (!effectiveName) return
+
+    setShowConfirm(false)
+    setStep('finalize')
+    setIsWorking(true)
+    setError(null)
+    try {
+      await getService().reauthFinalize(preparedDevbox.devboxName, effectiveName)
       setIsDone(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reauth failed')
+      setError(err instanceof Error ? err.message : 'Failed to save snapshot')
     } finally {
       setIsWorking(false)
     }
   }
 
+  const preparingMessage =
+    machine === 'existing'
+      ? 'Resuming devbox...'
+      : machine === 'snapshot'
+        ? 'Creating devbox from snapshot...'
+        : 'Creating fresh devbox...'
+
+  const effectiveSnapshotName = snapshotName.trim() || defaultSnapshotName || ''
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={step === 'ssh' ? 'sm:max-w-3xl' : 'sm:max-w-md'}>
         <DialogHeader>
           <DialogTitle>Re-Authenticate</DialogTitle>
           <DialogDescription>
@@ -196,12 +252,24 @@ export function ReauthModal() {
               </p>
             </div>
 
-            <Input
-              value={snapshotName}
-              onChange={(e) => setSnapshotName(e.target.value)}
-              placeholder="e.g. default"
-              autoFocus
-            />
+            <div className="space-y-1.5">
+              <Input
+                value={snapshotName}
+                onChange={(e) => setSnapshotName(e.target.value)}
+                placeholder={
+                  defaultSnapshotName
+                    ? `Default: ${defaultSnapshotName}`
+                    : 'Enter snapshot name'
+                }
+                autoFocus
+                disabled={!configLoaded}
+              />
+              {configLoaded && defaultSnapshotName && !snapshotName.trim() && (
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to use current default: <code className="font-mono">{defaultSnapshotName}</code>
+                </p>
+              )}
+            </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -209,59 +277,60 @@ export function ReauthModal() {
               <Button variant="outline" onClick={() => { setError(null); setStep('machine') }}>
                 Back
               </Button>
-              <Button onClick={handleNextFromSnapshotName}>Next</Button>
+              <Button onClick={handleNextFromSnapshotName} disabled={!configLoaded}>
+                Next
+              </Button>
             </DialogFooter>
           </div>
         )}
 
-        {/* Step 3: SSH instructions */}
-        {step === 'ssh' && (
+        {/* Step 3: Preparing (auto-transition) */}
+        {step === 'preparing' && (
+          <div className="space-y-4">
+            {isWorking ? (
+              <div className="flex flex-col items-center gap-3 py-6">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">{preparingMessage}</p>
+              </div>
+            ) : error ? (
+              <>
+                <p className="text-sm text-destructive">{error}</p>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setError(null); setStep('snapshot-name') }}>
+                    Back
+                  </Button>
+                </DialogFooter>
+              </>
+            ) : null}
+          </div>
+        )}
+
+        {/* Step 4: SSH with embedded terminal */}
+        {step === 'ssh' && preparedDevbox && sshSpawnInfo && (
           <div className="space-y-4">
             <div className="space-y-1">
               <p className="text-sm font-medium">Authenticate via SSH</p>
               <p className="text-xs text-muted-foreground">
-                SSH into the devbox and authenticate Claude Code. When done, come back here and click "Create Snapshot".
+                Run <code className="font-mono">claude</code> to launch Claude Code and complete browser authentication. When done, click Save Snapshot.
               </p>
             </div>
 
-            <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-              <code className="text-sm flex-1 font-mono">
-                thopter ssh {machine === 'existing' ? devboxName : '<devbox-name>'}
-              </code>
-              <Button variant="ghost" size="icon-xs" onClick={handleCopyCommand}>
-                {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-              </Button>
-            </div>
-
-            {machine === 'existing' && devboxName && (
-              <Button variant="outline" size="sm" className="w-full" onClick={handleOpenTerminal}>
-                <Terminal className="size-4" />
-                Open Terminal
-              </Button>
-            )}
-
-            <div className="rounded-md border border-border/50 bg-muted/30 p-3 space-y-1">
-              <p className="text-xs font-medium">In the SSH session:</p>
-              <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-0.5">
-                <li>Run <code className="font-mono">claude</code> to launch Claude Code</li>
-                <li>Complete the browser-based authentication</li>
-                <li>Verify Claude Code works, then exit</li>
-                <li>Exit the SSH session</li>
-              </ol>
+            <div className="h-[400px] flex rounded-md overflow-hidden border border-border/50">
+              <LiveTerminalView
+                name={preparedDevbox.devboxName}
+                spawnInfo={sshSpawnInfo}
+              />
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setStep('snapshot-name')}>
-                Back
-              </Button>
-              <Button onClick={() => setStep('finalize')}>
-                Create Snapshot
+              <Button onClick={() => setShowConfirm(true)}>
+                Save Snapshot
               </Button>
             </DialogFooter>
           </div>
         )}
 
-        {/* Step 4: Finalize */}
+        {/* Step 5: Finalize */}
         {step === 'finalize' && (
           <div className="space-y-4">
             {isDone ? (
@@ -273,7 +342,7 @@ export function ReauthModal() {
                   <div className="text-center space-y-1">
                     <p className="text-sm font-medium">Re-authentication complete</p>
                     <p className="text-xs text-muted-foreground">
-                      Snapshot "{snapshotName}" saved as the new default.
+                      Snapshot &ldquo;{effectiveSnapshotName}&rdquo; saved as the new default.
                     </p>
                   </div>
                 </div>
@@ -281,44 +350,34 @@ export function ReauthModal() {
                   <Button onClick={handleClose}>Done</Button>
                 </DialogFooter>
               </>
-            ) : (
+            ) : isWorking ? (
+              <div className="flex flex-col items-center gap-3 py-6">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Saving snapshot &ldquo;{effectiveSnapshotName}&rdquo;...</p>
+              </div>
+            ) : error ? (
               <>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Review & Finalize</p>
-                  <p className="text-xs text-muted-foreground">
-                    This will snapshot the devbox and set it as the default.
-                  </p>
-                </div>
-
-                <div className="rounded-md border p-3 space-y-1.5 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Machine</span>
-                    <span>
-                      {machine === 'existing' ? devboxName : machine === 'snapshot' ? 'From snapshot' : 'Fresh'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Snapshot name</span>
-                    <span>{snapshotName}</span>
-                  </div>
-                </div>
-
-                {error && <p className="text-sm text-destructive">{error}</p>}
-
+                <p className="text-sm text-destructive">{error}</p>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => { setError(null); setStep('ssh') }} disabled={isWorking}>
+                  <Button variant="outline" onClick={() => { setError(null); setStep('ssh') }}>
                     Back
-                  </Button>
-                  <Button onClick={handleFinalize} disabled={isWorking}>
-                    {isWorking && <Loader2 className="size-4 animate-spin" />}
-                    {isWorking ? 'Creating Snapshot...' : 'Create Snapshot & Save as Default'}
                   </Button>
                 </DialogFooter>
               </>
-            )}
+            ) : null}
           </div>
         )}
       </DialogContent>
+
+      {/* Confirmation dialog before snapshotting */}
+      <ConfirmDialog
+        open={showConfirm}
+        title="Save Snapshot"
+        description={`Have you finished authenticating? This will close the SSH session and save snapshot "${effectiveSnapshotName}".`}
+        confirmLabel="Save Snapshot"
+        onConfirm={handleFinalize}
+        onCancel={() => setShowConfirm(false)}
+      />
     </Dialog>
   )
 }
