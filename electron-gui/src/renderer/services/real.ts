@@ -387,6 +387,19 @@ export class RealThopterService implements ThopterService {
   }
 
   /**
+   * Fetch the latest tmux screen capture from Redis.
+   */
+  async getScreenDump(name: string): Promise<string | null> {
+    const redis = createRedis();
+    await redis.connect();
+    try {
+      return await redis.get(`thopter:${name}:screen_dump`);
+    } finally {
+      redis.disconnect();
+    }
+  }
+
+  /**
    * Send a message to a running Claude session via CLI.
    */
   async tellThopter(name: string, message: string, interrupt?: boolean): Promise<void> {

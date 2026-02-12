@@ -1,13 +1,17 @@
 import { useEffect } from 'react'
 import { useStore } from '@/store'
+import { cn } from '@/lib/utils'
 import { StatusPanel } from './StatusPanel'
 import { TranscriptView } from './TranscriptView'
+import { TerminalView } from './TerminalView'
 import { ActionBar } from './ActionBar'
 
 export function ThopterDetail() {
   const activeTab = useStore((s) => s.activeTab)
   const thopter = useStore((s) => s.thopters[s.activeTab])
   const claudeReady = useStore((s) => s.claudeReady[s.activeTab])
+  const viewMode = useStore((s) => s.detailViewMode[s.activeTab] ?? 'transcript')
+  const setDetailViewMode = useStore((s) => s.setDetailViewMode)
   const fetchTranscript = useStore((s) => s.fetchTranscript)
   const subscribeTranscript = useStore((s) => s.subscribeTranscript)
   const unsubscribeTranscript = useStore((s) => s.unsubscribeTranscript)
@@ -40,7 +44,39 @@ export function ThopterDetail() {
   return (
     <div className="flex flex-col h-full">
       <StatusPanel thopter={thopter} />
-      <TranscriptView name={thopter.name} />
+
+      {/* View mode toggle */}
+      <div className="flex items-center gap-1 px-4 py-1.5 border-b border-border bg-muted/30">
+        <button
+          onClick={() => setDetailViewMode(activeTab, 'transcript')}
+          className={cn(
+            'px-2.5 py-1 text-xs rounded font-medium transition-colors',
+            viewMode === 'transcript'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+          )}
+        >
+          Transcript
+        </button>
+        <button
+          onClick={() => setDetailViewMode(activeTab, 'terminal')}
+          className={cn(
+            'px-2.5 py-1 text-xs rounded font-medium transition-colors',
+            viewMode === 'terminal'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+          )}
+        >
+          Terminal
+        </button>
+      </div>
+
+      {viewMode === 'transcript' ? (
+        <TranscriptView name={thopter.name} />
+      ) : (
+        <TerminalView name={thopter.name} />
+      )}
+
       <ActionBar name={thopter.name} status={thopter.status} devboxStatus={thopter.devboxStatus} claudeReady={claudeReady} />
     </div>
   )

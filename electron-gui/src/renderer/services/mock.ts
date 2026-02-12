@@ -258,6 +258,31 @@ export class MockThopterService implements ThopterService {
     return { tmux: true, claude: info.claudeRunning };
   }
 
+  async getScreenDump(name: string): Promise<string | null> {
+    await delay(100);
+    const info = this.thopters.get(name);
+    if (!info || info.devboxStatus === 'suspended') return null;
+    return [
+      `user@${name} ~/project (main) $ claude`,
+      '',
+      '╭──────────────────────────────────────────────────────────╮',
+      '│  Claude Code                                    v1.0.30 │',
+      '╰──────────────────────────────────────────────────────────╯',
+      '',
+      `> ${info.task ?? 'Working...'}`,
+      '',
+      '  I\'ll start by reading the existing code to understand',
+      '  the current implementation.',
+      '',
+      '  Read: src/auth/middleware.ts',
+      '  Edit: src/routes/api.ts (12 lines changed)',
+      '  Bash: npm test -- --grep "auth" (12 passed)',
+      '',
+      `  ${info.status === 'waiting' ? '? What would you like me to do next?' : '⠋ Working...'}`,
+      '',
+    ].join('\n');
+  }
+
   async tellThopter(name: string, message: string, _interrupt?: boolean): Promise<void> {
     await delay(500);
     const info = this.thopters.get(name);

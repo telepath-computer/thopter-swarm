@@ -105,6 +105,7 @@ export interface ThopterService {
   listRepos(): Promise<RepoConfig[]>;
   getConfig(): Promise<AppConfig>;
   checkClaude(name: string): Promise<ClaudeReadyStatus>;
+  getScreenDump(name: string): Promise<string | null>;
 
   // Mutations
   runThopter(opts: RunThopterOpts): Promise<{ name: string }>;

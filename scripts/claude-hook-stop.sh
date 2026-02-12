@@ -12,6 +12,9 @@ thopter-status waiting "Claude stopped, waiting for input" 2>/dev/null || true
 # Stream transcript entries to Redis for thopter tail (also updates last_message)
 [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" 2>/dev/null || true
 
+# Capture tmux screen and push to Redis for GUI terminal view
+tmux capture-pane -t claude -p 2>/dev/null | redis-cli --tls -u "$THOPTER_REDIS_URL" -x SETEX "thopter:${THOPTER_NAME}:screen_dump" 120 >/dev/null 2>&1 || true
+
 # Send ntfy notification (enabled by default; set THOPTER_STOP_NOTIFY=0 to disable)
 # Suppress if there's a recent user message (user is actively engaged)
 if [ -n "${THOPTER_NTFY_CHANNEL:-}" ] && [ "${THOPTER_STOP_NOTIFY:-1}" != "0" ]; then

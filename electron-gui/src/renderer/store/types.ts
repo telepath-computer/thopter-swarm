@@ -20,6 +20,8 @@ export interface StoreState {
   connectionStatus: 'connected' | 'error' | 'loading'
   refreshing: boolean
   claudeReady: Record<string, ClaudeReadyStatus>
+  screenDumps: Record<string, string | null>
+  detailViewMode: Record<string, 'transcript' | 'terminal'>
   draftMessages: Record<string, string>
 
   // Display state (UI layer)
@@ -50,6 +52,10 @@ export interface StoreActions {
   suspendThopter(name: string): Promise<void>
   resumeThopter(name: string): Promise<void>
   attachThopter(name: string): void
+
+  // Screen dump
+  fetchScreenDump(name: string): Promise<void>
+  setDetailViewMode(name: string, mode: 'transcript' | 'terminal'): void
 
   // UI actions
   setActiveTab(tab: string): void

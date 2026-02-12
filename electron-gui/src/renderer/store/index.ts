@@ -16,6 +16,8 @@ export const useStore = create<Store>((set, get) => ({
   connectionStatus: 'loading',
   refreshing: false,
   claudeReady: {},
+  screenDumps: {},
+  detailViewMode: {},
   draftMessages: {},
 
   // Display state
@@ -134,6 +136,21 @@ export const useStore = create<Store>((set, get) => ({
   attachThopter: (name) => {
     const service = getService()
     service.attachThopter(name)
+  },
+
+  // Screen dump
+  fetchScreenDump: async (name) => {
+    const service = getService()
+    try {
+      const dump = await service.getScreenDump(name)
+      set((s) => ({ screenDumps: { ...s.screenDumps, [name]: dump } }))
+    } catch {
+      // Ignore transient Redis errors
+    }
+  },
+
+  setDetailViewMode: (name, mode) => {
+    set((s) => ({ detailViewMode: { ...s.detailViewMode, [name]: mode } }))
   },
 
   // UI actions
