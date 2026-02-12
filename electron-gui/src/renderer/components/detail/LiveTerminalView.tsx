@@ -21,6 +21,7 @@ export function LiveTerminalView({ name }: Props) {
   const fitAddonRef = useRef<FitAddon | null>(null)
   const ptyRef = useRef<ReturnType<typeof pty.spawn> | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
+  const resizePulseRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [state, setState] = useState<ViewState>('connecting')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -118,20 +119,25 @@ export function LiveTerminalView({ name }: Props) {
     ptyRef.current = ptyProcess
 
     // Wire data: pty → terminal
-    // On first data received, re-fit and send resize so tmux sees the correct size
-    let firstData = true
     ptyProcess.onData((data: string) => {
       term.write(data)
-      if (firstData) {
-        firstData = false
-        requestAnimationFrame(() => {
-          if (fitAddonRef.current && termRef.current && ptyRef.current) {
-            fitAddonRef.current.fit()
-            ptyRef.current.resize(termRef.current.cols, termRef.current.rows)
-          }
-        })
-      }
     })
+
+    // Repeatedly fit + resize during the first few seconds so tmux picks up
+    // the correct size once SSH connects and the session attaches.
+    if (resizePulseRef.current) clearInterval(resizePulseRef.current)
+    resizePulseRef.current = setInterval(() => {
+      if (fitAddonRef.current && termRef.current && ptyRef.current) {
+        fitAddonRef.current.fit()
+        ptyRef.current.resize(termRef.current.cols, termRef.current.rows)
+      }
+    }, 500)
+    setTimeout(() => {
+      if (resizePulseRef.current) {
+        clearInterval(resizePulseRef.current)
+        resizePulseRef.current = null
+      }
+    }, 5_000)
 
     // Wire data: terminal → pty
     term.onData((data: string) => {
@@ -178,6 +184,10 @@ export function LiveTerminalView({ name }: Props) {
         termRef.current = null
       }
       fitAddonRef.current = null
+      if (resizePulseRef.current) {
+        clearInterval(resizePulseRef.current)
+        resizePulseRef.current = null
+      }
       if (observerRef.current) {
         observerRef.current.disconnect()
         observerRef.current = null
