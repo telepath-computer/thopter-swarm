@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { StatusPanel } from './StatusPanel'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from './TerminalView'
+import { LiveTerminalView } from './LiveTerminalView'
 import { ActionBar } from './ActionBar'
 
 export function ThopterDetail() {
@@ -78,12 +79,25 @@ export function ThopterDetail() {
         >
           Terminal
         </button>
+        <button
+          onClick={() => setDetailViewMode(activeTab, 'live')}
+          className={cn(
+            'px-2.5 py-1 text-xs rounded font-medium transition-colors',
+            viewMode === 'live'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+          )}
+        >
+          Live
+        </button>
       </div>
 
       {viewMode === 'transcript' ? (
         <TranscriptView name={thopter.name} />
-      ) : (
+      ) : viewMode === 'terminal' ? (
         <TerminalView name={thopter.name} />
+      ) : (
+        <LiveTerminalView name={thopter.name} />
       )}
 
       <ActionBar name={thopter.name} status={thopter.status} devboxStatus={thopter.devboxStatus} claudeReady={claudeReady} />

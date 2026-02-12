@@ -283,6 +283,11 @@ export class MockThopterService implements ThopterService {
     ].join('\n');
   }
 
+  async getSSHSpawn(_name: string): Promise<{ command: string; args: string[] }> {
+    await delay(200);
+    return { command: '/bin/bash', args: ['-l'] };
+  }
+
   async tellThopter(name: string, message: string, _interrupt?: boolean): Promise<void> {
     await delay(500);
     const info = this.thopters.get(name);

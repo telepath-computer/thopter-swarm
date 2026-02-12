@@ -400,6 +400,41 @@ export class RealThopterService implements ThopterService {
   }
 
   /**
+   * Get SSH spawn command + args to connect to a thopter's tmux session.
+   * Parses `rli devbox ssh --config-only <id>` output (same as src/devbox.ts).
+   */
+  async getSSHSpawn(name: string): Promise<{ command: string; args: string[] }> {
+    // Resolve devbox ID from status
+    const status = await this.getThopterStatus(name);
+    if (!status.id) throw new Error(`No devbox ID for thopter '${name}'`);
+
+    const { stdout: configOutput } = await execFileAsync('rli', ['devbox', 'ssh', '--config-only', status.id], {
+      encoding: 'utf-8',
+      timeout: 15_000,
+    });
+
+    const hostname = configOutput.match(/Hostname\s+(.+)/)?.[1]?.trim();
+    const identityFile = configOutput.match(/IdentityFile\s+(.+)/)?.[1]?.trim();
+    const proxyCommand = configOutput.match(/ProxyCommand\s+(.+)/)?.[1]?.trim();
+
+    if (!hostname || !identityFile || !proxyCommand) {
+      throw new Error('Failed to parse SSH config from rli');
+    }
+
+    return {
+      command: 'ssh',
+      args: [
+        '-tt',
+        '-o', 'StrictHostKeyChecking=no',
+        '-o', `ProxyCommand=${proxyCommand}`,
+        '-i', identityFile,
+        `user@${hostname}`,
+        'tmux a -t claude || bash -l',
+      ],
+    };
+  }
+
+  /**
    * Send a message to a running Claude session via CLI.
    */
   async tellThopter(name: string, message: string, interrupt?: boolean): Promise<void> {

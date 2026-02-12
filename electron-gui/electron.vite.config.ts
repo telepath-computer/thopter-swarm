@@ -9,6 +9,7 @@ import { builtinModules } from 'module'
 const nodeExternals = [
   'electron',
   'ioredis',
+  'node-pty',
   ...builtinModules,
   ...builtinModules.map((m) => `node:${m}`),
 ]
@@ -27,7 +28,7 @@ export default defineConfig({
     optimizeDeps: {
       // Prevent Vite dev server from pre-bundling Node.js packages as browser ESM.
       // real.ts uses window.require to bypass Vite, but this is extra insurance.
-      exclude: ['ioredis'],
+      exclude: ['ioredis', 'node-pty'],
     },
     define: {
       // Electron merged context has real process.env — don't replace it
