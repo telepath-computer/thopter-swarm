@@ -110,12 +110,13 @@ export async function tellThopter(
     process.exit(1);
   }
 
-  // Sanitize message: strip newlines (which would submit prematurely),
-  // but preserve literal \n sequences by converting them to real newlines.
+  // Sanitize message: strip bare newlines (which would submit prematurely).
+  // Preserve \n sequences — Claude Code interprets backslash+newline as a
+  // line break within the input rather than a submission.
   const sanitized = message
-    .replace(/\\n/g, "\x00")       // stash literal \n
-    .replace(/[\r\n]+/g, " ")      // collapse real newlines to spaces
-    .replace(/\x00/g, "\n")        // restore literal \n as real newlines
+    .replace(/\\n/g, "\x00")       // stash \n sequences
+    .replace(/[\r\n]+/g, " ")      // collapse bare newlines to spaces
+    .replace(/\x00/g, "\\\n")      // restore as literal backslash + newline
     .trim();
 
   // Write sanitized message to a temp file on the devbox (avoids shell escaping issues)
