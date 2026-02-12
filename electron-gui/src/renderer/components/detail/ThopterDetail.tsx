@@ -100,7 +100,7 @@ export function ThopterDetail({ tabName }: Props) {
       </div>
 
       {/* Content area */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 flex flex-col relative overflow-hidden">
         {/* Transcript and Screen unmount when not active (stateless) */}
         {viewMode === 'transcript' && <TranscriptView name={thopter.name} />}
         {viewMode === 'terminal' && <TerminalView name={thopter.name} />}
