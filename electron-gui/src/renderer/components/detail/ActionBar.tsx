@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Send, TerminalSquare, Zap, AlertTriangle } from 'lucide-react'
+import { Send, TerminalSquare, Zap, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -61,6 +61,15 @@ export function ActionBar({ name, devboxStatus, claudeReady }: Props) {
           <AlertTriangle className="size-3.5 shrink-0" />
           <span>{unavailableReason}</span>
           <span className="text-muted-foreground ml-1">SSH in to start Claude: <code className="font-mono text-[11px]">thopter ssh {name}</code></span>
+          {devboxStatus === 'running' && (
+            <button
+              onClick={() => checkClaudeFn(name)}
+              className="ml-auto shrink-0 text-amber-400 hover:text-amber-300 transition-colors p-0.5"
+              title="Re-check tmux/Claude status"
+            >
+              <RefreshCw className="size-3.5" />
+            </button>
+          )}
         </div>
       )}
 

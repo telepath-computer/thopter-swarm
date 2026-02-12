@@ -25,13 +25,22 @@ export function ThopterDetail() {
     return () => unsubscribeTranscript(activeTab)
   }, [activeTab, fetchTranscript, subscribeTranscript, unsubscribeTranscript])
 
-  // Check tmux/Claude readiness when tab opens (only for running devboxes)
+  // Check tmux/Claude readiness when tab opens (only for running devboxes).
+  // If not ready, poll every 5s until it is.
   useEffect(() => {
     if (activeTab === 'dashboard') return
-    if (thopter?.devboxStatus === 'running') {
-      checkClaude(activeTab)
-    }
+    if (thopter?.devboxStatus !== 'running') return
+    checkClaude(activeTab)
   }, [activeTab, thopter?.devboxStatus, checkClaude])
+
+  const isClaudeReady = claudeReady?.tmux && claudeReady?.claude
+  useEffect(() => {
+    if (activeTab === 'dashboard') return
+    if (thopter?.devboxStatus !== 'running') return
+    if (isClaudeReady) return
+    const interval = setInterval(() => checkClaude(activeTab), 5_000)
+    return () => clearInterval(interval)
+  }, [activeTab, thopter?.devboxStatus, isClaudeReady, checkClaude])
 
   if (!thopter) {
     return (
