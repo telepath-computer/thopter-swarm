@@ -21,7 +21,6 @@ export function LiveTerminalView({ name }: Props) {
   const fitAddonRef = useRef<FitAddon | null>(null)
   const ptyRef = useRef<ReturnType<typeof pty.spawn> | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
-  const resizePulseRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [state, setState] = useState<ViewState>('connecting')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -107,14 +106,6 @@ export function LiveTerminalView({ name }: Props) {
 
     // Re-fit right before spawning in case layout shifted during the async call
     fitAddon.fit()
-    const rect = container.getBoundingClientRect()
-    const proposed = fitAddon.proposeDimensions()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dims = (term as any)._core._renderService?.dimensions
-    console.log('[LiveTerminal] container px:', Math.round(rect.width), 'x', Math.round(rect.height))
-    console.log('[LiveTerminal] proposed:', proposed?.cols, 'x', proposed?.rows)
-    console.log('[LiveTerminal] actual term:', term.cols, 'x', term.rows)
-    console.log('[LiveTerminal] cell px:', dims?.css?.cell?.width?.toFixed(1), 'x', dims?.css?.cell?.height?.toFixed(1))
 
     // Spawn PTY
     const ptyProcess = pty.spawn(spawnInfo.command, spawnInfo.args, {
@@ -130,23 +121,6 @@ export function LiveTerminalView({ name }: Props) {
     ptyProcess.onData((data: string) => {
       term.write(data)
     })
-
-    // Repeatedly fit + resize during the first few seconds so tmux picks up
-    // the correct size once SSH connects and the session attaches.
-    if (resizePulseRef.current) clearInterval(resizePulseRef.current)
-    resizePulseRef.current = setInterval(() => {
-      if (fitAddonRef.current && termRef.current && ptyRef.current) {
-        fitAddonRef.current.fit()
-        console.log('[LiveTerminal] pulse resize:', termRef.current.cols, 'x', termRef.current.rows)
-        ptyRef.current.resize(termRef.current.cols, termRef.current.rows)
-      }
-    }, 500)
-    setTimeout(() => {
-      if (resizePulseRef.current) {
-        clearInterval(resizePulseRef.current)
-        resizePulseRef.current = null
-      }
-    }, 5_000)
 
     // Wire data: terminal → pty
     term.onData((data: string) => {
@@ -193,10 +167,6 @@ export function LiveTerminalView({ name }: Props) {
         termRef.current = null
       }
       fitAddonRef.current = null
-      if (resizePulseRef.current) {
-        clearInterval(resizePulseRef.current)
-        resizePulseRef.current = null
-      }
       if (observerRef.current) {
         observerRef.current.disconnect()
         observerRef.current = null
