@@ -48,8 +48,10 @@ export interface RepoConfig {
 }
 
 export interface RunThopterOpts {
-  repo: string;
+  homeDir?: boolean;
+  repo?: string;        // required when !homeDir
   branch?: string;
+  checkouts?: Array<{ repo: string; branch?: string }>;
   prompt: string;
   name?: string;
   snapshotId?: string;

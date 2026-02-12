@@ -358,8 +358,21 @@ export class RealThopterService implements ThopterService {
    * CLI prints: "Thopter 'name' running."
    */
   async runThopter(opts: RunThopterOpts): Promise<{ name: string }> {
-    const args = ['run', opts.prompt, '--repo', opts.repo];
-    if (opts.branch) args.push('--branch', opts.branch);
+    const args = ['run', opts.prompt];
+
+    if (opts.homeDir) {
+      args.push('--home');
+      if (opts.checkouts) {
+        for (const c of opts.checkouts) {
+          const checkoutArg = c.branch ? `${c.repo}:${c.branch}` : c.repo;
+          args.push('--checkout', checkoutArg);
+        }
+      }
+    } else if (opts.repo) {
+      args.push('--repo', opts.repo);
+      if (opts.branch) args.push('--branch', opts.branch);
+    }
+
     if (opts.name) args.push('--name', opts.name);
     if (opts.snapshotId) args.push('--snapshot', opts.snapshotId);
     if (opts.keepAliveMinutes) args.push('--keep-alive', String(opts.keepAliveMinutes));

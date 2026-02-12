@@ -7,7 +7,20 @@ import { createDevbox } from "./devbox.js";
 import { getClient } from "./client.js";
 import { getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getRepos } from "./config.js";
 import { generateName } from "./names.js";
-import { chooseRepo } from "./repos.js";
+import { chooseMode } from "./repos.js";
+
+// --- Types ---
+
+export interface RepoCheckout {
+  repo: string;
+  branch: string;
+}
+
+export type RunMode =
+  | { kind: "repo"; checkout: RepoCheckout }
+  | { kind: "home"; checkouts: RepoCheckout[] };
+
+// --- Prompt builders ---
 
 function buildRunPrompt(opts: {
   repo: string;
@@ -28,6 +41,28 @@ Your task:
 ${opts.userPrompt}`;
 }
 
+function buildHomeDirPrompt(opts: {
+  checkouts: RepoCheckout[];
+  userPrompt: string;
+}): string {
+  let repoInfo = "";
+  if (opts.checkouts.length > 0) {
+    const repoList = opts.checkouts
+      .map((c) => `- \`${c.repo}\` (branch: \`${c.branch}\`) — cloned to \`/home/user/${c.repo.split("/")[1]}\``)
+      .join("\n");
+    repoInfo = `\n\nThe following repositories have been pre-checked out:\n${repoList}`;
+  }
+
+  return `You are running on a thopter devbox. Your working directory is \`/home/user\`.${repoInfo}
+
+IMPORTANT: You can only push to branches prefixed with \`thopter/\`. Create a \`thopter/\` branch for your work. You cannot push to \`main\` or \`master\` directly. If you want to propose changes, push to a \`thopter/\` branch and create a pull request.
+
+Your task:
+${opts.userPrompt}`;
+}
+
+// --- Validation ---
+
 const REPO_PATTERN = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const BRANCH_PATTERN = /^[A-Za-z0-9/_.-]+$/;
 
@@ -47,16 +82,99 @@ function validateBranch(branch: string): void {
   }
 }
 
+// --- Helpers ---
+
 function ask(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
   return new Promise((resolve) => {
     rl.question(question, (answer) => resolve(answer.trim()));
   });
 }
 
+/**
+ * Parse a `--checkout` arg in "owner/repo" or "owner/repo:branch" format.
+ */
+export function parseCheckoutArg(arg: string): RepoCheckout {
+  const colonIdx = arg.indexOf(":");
+  if (colonIdx === -1) {
+    return { repo: arg, branch: "main" };
+  }
+  return { repo: arg.slice(0, colonIdx), branch: arg.slice(colonIdx + 1) };
+}
+
+/**
+ * Resolve CLI flags into a RunMode, or null if interactive prompting is needed.
+ */
+function resolveMode(opts: {
+  repo?: string;
+  branch?: string;
+  homeDir?: boolean;
+  checkout?: string[];
+}): RunMode | null {
+  if (opts.homeDir && opts.repo) {
+    console.error("Error: --home and --repo are mutually exclusive.");
+    process.exit(1);
+  }
+
+  if (opts.homeDir) {
+    const checkouts = (opts.checkout ?? []).map(parseCheckoutArg);
+    return { kind: "home", checkouts };
+  }
+
+  if (opts.repo) {
+    return {
+      kind: "repo",
+      checkout: { repo: opts.repo, branch: opts.branch ?? "main" },
+    };
+  }
+
+  // No explicit flags — need interactive prompting
+  return null;
+}
+
+// --- Clone helper ---
+
+async function cloneRepos(
+  devboxId: string,
+  checkouts: RepoCheckout[],
+  thopterName: string,
+): Promise<void> {
+  const client = getClient();
+  for (const checkout of checkouts) {
+    const repo = validateRepo(checkout.repo);
+    validateBranch(checkout.branch);
+    const repoName = repo.split("/")[1];
+
+    const cloneScript = [
+      `cd /home/user`,
+      `if [ ! -d "${repoName}" ]; then git clone "https://github.com/${repo}.git"; fi`,
+      `cd "${repoName}"`,
+      `git fetch origin`,
+      `git checkout "${checkout.branch}"`,
+      `git reset --hard "origin/${checkout.branch}"`,
+    ].join(" && ");
+
+    console.log(`Cloning ${repo}...`);
+    const cloneExec = await client.devboxes.executeAsync(devboxId, { command: cloneScript });
+    const cloneResult = await client.devboxes.executions.awaitCompleted(devboxId, cloneExec.execution_id);
+    if (cloneResult.stdout) process.stdout.write(cloneResult.stdout);
+    if (cloneResult.stderr) process.stderr.write(cloneResult.stderr);
+
+    if (cloneResult.exit_status && cloneResult.exit_status !== 0) {
+      console.error(`\nError: Repository setup failed for ${repo} (exit ${cloneResult.exit_status}).`);
+      console.error(`  The devbox '${thopterName}' is still running. Debug with: thopter ssh ${thopterName}`);
+      process.exit(1);
+    }
+  }
+}
+
+// --- Main entry point ---
+
 export async function runThopter(opts: {
   prompt: string;
   repo?: string;
   branch?: string;
+  homeDir?: boolean;
+  checkout?: string[];
   name?: string;
   snapshot?: string;
   keepAlive?: number;
@@ -70,18 +188,22 @@ export async function runThopter(opts: {
     process.exit(1);
   }
 
-  // Interactive prompting if --repo not given
-  let repo = opts.repo;
-  let branch = opts.branch;
-  if (!repo) {
+  // Resolve mode from flags or interactive prompt
+  let mode = resolveMode(opts);
+
+  if (!mode) {
     const repos = getRepos();
     if (repos.length > 0) {
-      // Use the numbered repo chooser
+      // Use the mode chooser (home dir + predefined repos + custom)
       const rl = createInterface({ input: process.stdin, output: process.stdout });
-      const chosen = await chooseRepo(rl);
+      const chosen = await chooseMode(rl);
       rl.close();
-      repo = chosen.repo;
-      if (!branch) branch = chosen.branch;
+
+      if (chosen.kind === "home") {
+        mode = { kind: "home", checkouts: chosen.checkouts };
+      } else {
+        mode = { kind: "repo", checkout: { repo: chosen.repo, branch: chosen.branch } };
+      }
     } else {
       // Fall back to defaultRepo/defaultBranch for existing users without repos list
       const configDefaultRepo = getDefaultRepo();
@@ -90,7 +212,7 @@ export async function runThopter(opts: {
       const repoPrompt = configDefaultRepo
         ? `Repository (owner/repo) [${configDefaultRepo}]: `
         : "Repository (owner/repo): ";
-      repo = await ask(rl, repoPrompt);
+      let repo = await ask(rl, repoPrompt);
       if (!repo && configDefaultRepo) {
         repo = configDefaultRepo;
         console.log(`  Using default repo: ${repo}`);
@@ -101,6 +223,7 @@ export async function runThopter(opts: {
         console.error("  Tip: set a default with: thopter config set defaultRepo owner/repo");
         process.exit(1);
       }
+      let branch = opts.branch;
       if (!branch) {
         const branchPrompt = configDefaultBranch
           ? `Branch [${configDefaultBranch}]: `
@@ -114,17 +237,18 @@ export async function runThopter(opts: {
         }
       }
       rl.close();
+      if (!branch) branch = "main";
+      mode = { kind: "repo", checkout: { repo, branch } };
     }
   }
 
-  // Default branch to main if still unset
-  if (!branch) branch = "main";
+  // Validate all checkouts
+  const allCheckouts = mode.kind === "repo" ? [mode.checkout] : mode.checkouts;
+  for (const c of allCheckouts) {
+    c.repo = validateRepo(c.repo);
+    validateBranch(c.branch);
+  }
 
-  // Validate repo and branch to prevent shell injection
-  repo = validateRepo(repo);
-  if (branch) validateBranch(branch);
-
-  const repoName = repo.split("/")[1];
   const thopterName = opts.name ?? generateName();
 
   // Step 1: Create devbox from snapshot
@@ -134,32 +258,32 @@ export async function runThopter(opts: {
     keepAlive: opts.keepAlive ? opts.keepAlive * 60 : undefined,
   });
 
-  const client = getClient();
-
-  // Step 2: Clone repo and checkout branch (always fetch + reset to remote HEAD)
-  const cloneScript = [
-    `cd /home/user`,
-    `if [ ! -d "${repoName}" ]; then git clone "https://github.com/${repo}.git"; fi`,
-    `cd "${repoName}"`,
-    `git fetch origin`,
-    `git checkout "${branch}"`,
-    `git reset --hard "origin/${branch}"`,
-  ].join(" && ");
-
-  console.log(`Cloning ${repo}...`);
-  const cloneExec = await client.devboxes.executeAsync(devboxId, { command: cloneScript });
-  const cloneResult = await client.devboxes.executions.awaitCompleted(devboxId, cloneExec.execution_id);
-  if (cloneResult.stdout) process.stdout.write(cloneResult.stdout);
-  if (cloneResult.stderr) process.stderr.write(cloneResult.stderr);
-
-  if (cloneResult.exit_status && cloneResult.exit_status !== 0) {
-    console.error(`\nError: Repository setup failed (exit ${cloneResult.exit_status}).`);
-    console.error(`  The devbox '${thopterName}' is still running. Debug with: thopter ssh ${thopterName}`);
-    process.exit(1);
+  // Step 2: Clone repos
+  if (allCheckouts.length > 0) {
+    await cloneRepos(devboxId, allCheckouts, thopterName);
   }
 
   // Step 3: Write prompt file and launch Claude in tmux
-  const fullPrompt = buildRunPrompt({ repo, branch, userPrompt: opts.prompt });
+  const client = getClient();
+  let fullPrompt: string;
+  let workingDir: string;
+
+  if (mode.kind === "repo") {
+    const repoName = mode.checkout.repo.split("/")[1];
+    workingDir = `/home/user/${repoName}`;
+    fullPrompt = buildRunPrompt({
+      repo: mode.checkout.repo,
+      branch: mode.checkout.branch,
+      userPrompt: opts.prompt,
+    });
+  } else {
+    workingDir = "/home/user";
+    fullPrompt = buildHomeDirPrompt({
+      checkouts: mode.checkouts,
+      userPrompt: opts.prompt,
+    });
+  }
+
   const promptPath = "/home/user/thopter-run-prompt.txt";
   await client.devboxes.writeFileContents(devboxId, {
     file_path: promptPath,
@@ -174,7 +298,7 @@ export async function runThopter(opts: {
     file_path: launcherPath,
     contents: [
       `#!/bin/bash -l`,
-      `cd /home/user/${repoName}`,
+      `cd ${workingDir}`,
       `claude --dangerously-skip-permissions "Read the file ${promptPath}. Print a brief summary of the instructions you read, then proceed to follow them."`,
       `exec bash -l`,
     ].join("\n"),
@@ -185,7 +309,16 @@ export async function runThopter(opts: {
 
   // Step 4: Print summary
   console.log(`\nThopter '${thopterName}' running.`);
-  console.log(`  Repo:    ${repo}${branch ? ` (branch: ${branch})` : ""}`);
+  if (mode.kind === "repo") {
+    console.log(`  Repo:    ${mode.checkout.repo} (branch: ${mode.checkout.branch})`);
+  } else {
+    console.log(`  Mode:    Home directory`);
+    if (mode.checkouts.length > 0) {
+      for (const c of mode.checkouts) {
+        console.log(`  Repo:    ${c.repo} (branch: ${c.branch})`);
+      }
+    }
+  }
   let promptPreview = opts.prompt;
   if (promptPreview.length > 80) promptPreview = promptPreview.slice(0, 77) + "...";
   console.log(`  Prompt:  ${promptPreview}`);

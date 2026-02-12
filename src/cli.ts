@@ -165,18 +165,24 @@ program
   });
 
 // --- run ---
+function collect(value: string, previous: string[]): string[] {
+  return previous.concat([value]);
+}
+
 program
   .command("run")
   .description("Create a thopter and run Claude with a prompt")
   .argument("<prompt>", "The task/prompt to give Claude")
   .option("--repo <owner/repo>", "GitHub repository to clone")
   .option("--branch <name>", "Git branch to start from")
+  .option("--home", "Use home directory as working directory (no single repo)")
+  .option("--checkout <repo[:branch]>", "Pre-checkout a repo (repeatable, use with --home)", collect, [])
   .option("--name <name>", "Thopter name (auto-generated if omitted)")
   .option("--snapshot <id>", "Snapshot to use")
   .option("--keep-alive <minutes>", "Keep-alive time in minutes", parseInt)
-  .action(async (prompt: string, opts: { repo?: string; branch?: string; name?: string; snapshot?: string; keepAlive?: number }) => {
+  .action(async (prompt: string, opts: { repo?: string; branch?: string; home?: boolean; checkout?: string[]; name?: string; snapshot?: string; keepAlive?: number }) => {
     const { runThopter } = await import("./run.js");
-    await runThopter({ prompt, ...opts });
+    await runThopter({ prompt, homeDir: opts.home, checkout: opts.checkout, ...opts });
   });
 
 // --- reauth ---
