@@ -108,8 +108,13 @@ export function LiveTerminalView({ name }: Props) {
     // Re-fit right before spawning in case layout shifted during the async call
     fitAddon.fit()
     const rect = container.getBoundingClientRect()
-    console.log('[LiveTerminal] container size:', Math.round(rect.width), 'x', Math.round(rect.height))
-    console.log('[LiveTerminal] term cols/rows:', term.cols, 'x', term.rows)
+    const proposed = fitAddon.proposeDimensions()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dims = (term as any)._core._renderService?.dimensions
+    console.log('[LiveTerminal] container px:', Math.round(rect.width), 'x', Math.round(rect.height))
+    console.log('[LiveTerminal] proposed:', proposed?.cols, 'x', proposed?.rows)
+    console.log('[LiveTerminal] actual term:', term.cols, 'x', term.rows)
+    console.log('[LiveTerminal] cell px:', dims?.css?.cell?.width?.toFixed(1), 'x', dims?.css?.cell?.height?.toFixed(1))
 
     // Spawn PTY
     const ptyProcess = pty.spawn(spawnInfo.command, spawnInfo.args, {
