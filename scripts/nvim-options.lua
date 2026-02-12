@@ -1,3 +1,5 @@
+require "nvchad.options"
+
 -- Neovim options for thopter dev environments
 
 -- OSC 52 clipboard: lets neovim yank/paste reach the host system clipboard
