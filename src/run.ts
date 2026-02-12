@@ -166,7 +166,21 @@ export async function runThopter(opts: {
     contents: fullPrompt,
   });
 
-  const launchCmd = `tmux kill-server 2>/dev/null || true; cd /home/user/${repoName} && tmux new-session -d 'claude --dangerously-skip-permissions "Read the file ${promptPath}. Print a brief summary of the instructions you read, then proceed to follow them."'`;
+  // Write a launcher script that runs claude under bash. When claude exits,
+  // `exec bash -l` replaces the script process with a fresh login shell so the
+  // tmux session stays alive (see issue #137).
+  const launcherPath = "/home/user/thopter-launch.sh";
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: launcherPath,
+    contents: [
+      `#!/bin/bash -l`,
+      `cd /home/user/${repoName}`,
+      `claude --dangerously-skip-permissions "Read the file ${promptPath}. Print a brief summary of the instructions you read, then proceed to follow them."`,
+      `exec bash -l`,
+    ].join("\n"),
+  });
+
+  const launchCmd = `tmux kill-server 2>/dev/null || true; chmod +x ${launcherPath} && tmux new-session -d ${launcherPath}`;
   await client.devboxes.executeAsync(devboxId, { command: launchCmd });
 
   // Step 4: Print summary
