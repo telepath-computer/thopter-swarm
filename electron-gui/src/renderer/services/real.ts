@@ -429,7 +429,7 @@ export class RealThopterService implements ThopterService {
         '-o', `ProxyCommand=${proxyCommand}`,
         '-i', identityFile,
         `user@${hostname}`,
-        'tmux set -g window-size latest 2>/dev/null; tmux a -d -t claude || bash -l',
+        'tmux set -g window-size latest 2>/dev/null; tmux a -d || bash -l',
       ],
     };
   }

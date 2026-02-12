@@ -22,7 +22,7 @@ for i in 1 2 3 4 5 6; do
     /usr/local/bin/thopter-status heartbeat >/dev/null 2>&1
 
     # Capture tmux screen and push to Redis for GUI terminal view
-    tmux capture-pane -t claude -p 2>/dev/null | redis-cli --tls -u "$THOPTER_REDIS_URL" -x SETEX "thopter:${THOPTER_NAME}:screen_dump" 120 >/dev/null 2>&1 || true
+    tmux capture-pane -p 2>/dev/null | redis-cli --tls -u "$THOPTER_REDIS_URL" -x SETEX "thopter:${THOPTER_NAME}:screen_dump" 120 >/dev/null 2>&1 || true
 
     [ "$i" -lt 6 ] && sleep 10
 done
