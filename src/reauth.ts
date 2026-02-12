@@ -25,7 +25,11 @@ import {
 
 // --- readline helpers (same pattern as setup.ts) ---
 
-const rl = createInterface({ input: process.stdin, output: process.stdout });
+let rl = createInterface({ input: process.stdin, output: process.stdout });
+
+function resetReadline() {
+  rl = createInterface({ input: process.stdin, output: process.stdout });
+}
 
 function ask(prompt: string): Promise<string> {
   return new Promise((resolve) => {
@@ -196,10 +200,18 @@ export async function runReauth(): Promise<void> {
   console.log();
   await ask("  Press Enter to connect...");
 
+  // Close readline so SSH gets clean access to the terminal.
+  // Without this, readline holds listeners on stdin that conflict with
+  // SSH's PTY handling, breaking terminal control (issue #132).
+  rl.close();
+
   console.log(`  Connecting to ${devboxName} (${devboxId})...`);
   await sshAndWait(devboxId);
   console.log();
   console.log("  SSH session ended.");
+
+  // Recreate readline for remaining wizard steps.
+  resetReadline();
 
   // --- Step 4: Snapshot + save as default ---
   console.log();
