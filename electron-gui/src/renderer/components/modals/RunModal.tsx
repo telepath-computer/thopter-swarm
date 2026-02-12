@@ -15,9 +15,15 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { ChevronDown, ChevronUp, ChevronRight, Loader2, Check, Rocket } from 'lucide-react'
+import { ChevronDown, ChevronUp, ChevronRight, Loader2, Check, Rocket, X, Plus, Home, GitBranch } from 'lucide-react'
 
-type Step = 'repo' | 'prompt' | 'options' | 'review'
+type WorkMode = 'repo' | 'home'
+type Step = 'mode' | 'repos' | 'prompt' | 'review'
+
+interface CheckoutEntry {
+  repo: string
+  branch: string
+}
 
 export function RunModal() {
   const isOpen = useStore((s) => s.isRunModalOpen)
@@ -25,14 +31,20 @@ export function RunModal() {
   const runThopter = useStore((s) => s.runThopter)
   const openTab = useStore((s) => s.openTab)
 
-  const [step, setStep] = useState<Step>('repo')
+  const [step, setStep] = useState<Step>('mode')
   const [repos, setRepos] = useState<RepoConfig[]>([])
   const [snapshots, setSnapshots] = useState<SnapshotInfo[]>([])
 
   // Form state
+  const [mode, setMode] = useState<WorkMode>('repo')
   const [repo, setRepo] = useState('')
   const [customRepo, setCustomRepo] = useState('')
   const [branch, setBranch] = useState('')
+  const [checkouts, setCheckouts] = useState<CheckoutEntry[]>([])
+  const [addingRepo, setAddingRepo] = useState(false)
+  const [newCheckoutRepo, setNewCheckoutRepo] = useState('')
+  const [newCheckoutCustomRepo, setNewCheckoutCustomRepo] = useState('')
+  const [newCheckoutBranch, setNewCheckoutBranch] = useState('')
   const [prompt, setPrompt] = useState('')
   const [customName, setCustomName] = useState('')
   const [snapshotId, setSnapshotId] = useState('')
@@ -78,10 +90,16 @@ export function RunModal() {
   }
 
   function resetForm() {
-    setStep('repo')
+    setStep('mode')
+    setMode('repo')
     setRepo('')
     setCustomRepo('')
     setBranch('')
+    setCheckouts([])
+    setAddingRepo(false)
+    setNewCheckoutRepo('')
+    setNewCheckoutCustomRepo('')
+    setNewCheckoutBranch('')
     setPrompt('')
     setCustomName('')
     setSnapshotId('')
@@ -93,8 +111,14 @@ export function RunModal() {
     setError(null)
   }
 
-  function handleNextFromRepo() {
-    if (!effectiveRepo) {
+  function handleSelectMode(m: WorkMode) {
+    setMode(m)
+    setError(null)
+    setStep('repos')
+  }
+
+  function handleNextFromRepos() {
+    if (mode === 'repo' && !effectiveRepo) {
       setError('Please select or enter a repository')
       return
     }
@@ -111,18 +135,47 @@ export function RunModal() {
     setStep('review')
   }
 
+  function handleAddCheckout() {
+    const checkoutRepo = newCheckoutRepo === '__custom__' ? newCheckoutCustomRepo : newCheckoutRepo
+    if (!checkoutRepo) return
+    const checkoutBranch = newCheckoutBranch || 'main'
+    setCheckouts([...checkouts, { repo: checkoutRepo, branch: checkoutBranch }])
+    setNewCheckoutRepo('')
+    setNewCheckoutCustomRepo('')
+    setNewCheckoutBranch('')
+    setAddingRepo(false)
+  }
+
+  function handleRemoveCheckout(idx: number) {
+    setCheckouts(checkouts.filter((_, i) => i !== idx))
+  }
+
   async function handleLaunch() {
     setIsLaunching(true)
     setError(null)
     try {
-      const name = await runThopter({
-        repo: effectiveRepo,
-        branch: branch || undefined,
-        prompt: prompt.trim(),
-        name: customName || undefined,
-        snapshotId: snapshotId || undefined,
-        keepAliveMinutes: keepAlive ? parseInt(keepAlive, 10) : undefined,
-      })
+      let name: string
+      if (mode === 'home') {
+        name = await runThopter({
+          homeDir: true,
+          checkouts: checkouts.length > 0
+            ? checkouts.map((c) => ({ repo: c.repo, branch: c.branch || undefined }))
+            : undefined,
+          prompt: prompt.trim(),
+          name: customName || undefined,
+          snapshotId: snapshotId || undefined,
+          keepAliveMinutes: keepAlive ? parseInt(keepAlive, 10) : undefined,
+        })
+      } else {
+        name = await runThopter({
+          repo: effectiveRepo,
+          branch: branch || undefined,
+          prompt: prompt.trim(),
+          name: customName || undefined,
+          snapshotId: snapshotId || undefined,
+          keepAliveMinutes: keepAlive ? parseInt(keepAlive, 10) : undefined,
+        })
+      }
       setLaunchedName(name)
       setIsDone(true)
     } catch (err) {
@@ -136,6 +189,13 @@ export function RunModal() {
     if (launchedName) openTab(launchedName)
     handleClose()
   }
+
+  const STEP_LABELS: { key: Step; label: string }[] = [
+    { key: 'mode', label: 'Mode' },
+    { key: 'repos', label: mode === 'home' ? 'Checkouts' : 'Repository' },
+    { key: 'prompt', label: 'Task' },
+    { key: 'review', label: 'Launch' },
+  ]
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -153,16 +213,52 @@ export function RunModal() {
         {/* Step indicators */}
         {!isDone && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className={step === 'repo' ? 'text-primary font-medium' : ''}>Repository</span>
-            <ChevronRight className="size-3" />
-            <span className={step === 'prompt' ? 'text-primary font-medium' : ''}>Task</span>
-            <ChevronRight className="size-3" />
-            <span className={step === 'review' ? 'text-primary font-medium' : ''}>Launch</span>
+            {STEP_LABELS.map((s, i) => (
+              <span key={s.key} className="flex items-center gap-1.5">
+                {i > 0 && <ChevronRight className="size-3" />}
+                <span className={step === s.key ? 'text-primary font-medium' : ''}>{s.label}</span>
+              </span>
+            ))}
           </div>
         )}
 
-        {/* Step 1: Repository & Branch */}
-        {step === 'repo' && (
+        {/* Step 1: Mode selection */}
+        {step === 'mode' && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Choose how Claude should work on this task.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className="flex flex-col items-center gap-2 rounded-lg border-2 border-border p-4 text-center transition-colors hover:border-primary hover:bg-accent"
+                onClick={() => handleSelectMode('repo')}
+              >
+                <GitBranch className="size-6 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Single Repository</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Clone and work in one repo</p>
+                </div>
+              </button>
+              <button
+                className="flex flex-col items-center gap-2 rounded-lg border-2 border-border p-4 text-center transition-colors hover:border-primary hover:bg-accent"
+                onClick={() => handleSelectMode('home')}
+              >
+                <Home className="size-6 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Home Directory</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Work from /home/user with optional repos</p>
+                </div>
+              </button>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {/* Step 2: Repository / Checkouts */}
+        {step === 'repos' && mode === 'repo' && (
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Repository</Label>
@@ -205,13 +301,120 @@ export function RunModal() {
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <DialogFooter>
-              <Button variant="outline" onClick={handleClose}>Cancel</Button>
-              <Button onClick={handleNextFromRepo}>Next</Button>
+              <Button variant="outline" onClick={() => { setError(null); setStep('mode') }}>Back</Button>
+              <Button onClick={handleNextFromRepos}>Next</Button>
             </DialogFooter>
           </div>
         )}
 
-        {/* Step 2: Task prompt */}
+        {step === 'repos' && mode === 'home' && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Pre-checkout Repositories</Label>
+              <p className="text-xs text-muted-foreground">
+                Optionally clone repositories before starting. Claude will work from /home/user.
+              </p>
+            </div>
+
+            {/* Checkout list */}
+            {checkouts.length > 0 && (
+              <div className="space-y-2">
+                {checkouts.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                    <span className="font-mono text-xs">
+                      {c.repo} <span className="text-muted-foreground">({c.branch})</span>
+                    </span>
+                    <button
+                      onClick={() => handleRemoveCheckout(i)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add repo inline form */}
+            {addingRepo ? (
+              <div className="space-y-2 rounded-md border p-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Repository</Label>
+                  <select
+                    value={newCheckoutRepo}
+                    onChange={(e) => setNewCheckoutRepo(e.target.value)}
+                    className={selectClass}
+                    autoFocus
+                  >
+                    <option value="">Select a repository...</option>
+                    {repos.map((r) => (
+                      <option key={r.repo} value={r.repo}>
+                        {r.repo} {r.branch ? `(${r.branch})` : ''}
+                      </option>
+                    ))}
+                    <option value="__custom__">Custom repository...</option>
+                  </select>
+                </div>
+
+                {newCheckoutRepo === '__custom__' && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Custom repo (owner/name)</Label>
+                    <Input
+                      value={newCheckoutCustomRepo}
+                      onChange={(e) => setNewCheckoutCustomRepo(e.target.value)}
+                      placeholder="owner/repo"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Branch</Label>
+                  <Input
+                    value={newCheckoutBranch}
+                    onChange={(e) => setNewCheckoutBranch(e.target.value)}
+                    placeholder="main (default)"
+                    className="h-8 text-xs"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setAddingRepo(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleAddCheckout}
+                    disabled={!(newCheckoutRepo === '__custom__' ? newCheckoutCustomRepo : newCheckoutRepo)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAddingRepo(true)}
+                className="gap-1.5"
+              >
+                <Plus className="size-3.5" />
+                Add Repository
+              </Button>
+            )}
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setError(null); setStep('mode') }}>Back</Button>
+              <Button onClick={handleNextFromRepos}>
+                {checkouts.length === 0 ? 'Skip' : 'Next'}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {/* Step 3: Task prompt */}
         {step === 'prompt' && (
           <div className="space-y-4">
             <div className="space-y-2">
@@ -224,7 +427,7 @@ export function RunModal() {
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Implement the user authentication feature..."
                 rows={6}
-                className="font-mono text-sm"
+                className="font-mono text-sm max-h-[40vh] overflow-y-auto [field-sizing:fixed]"
                 autoFocus
               />
             </div>
@@ -282,24 +485,42 @@ export function RunModal() {
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => { setError(null); setStep('repo') }}>Back</Button>
+              <Button variant="outline" onClick={() => { setError(null); setStep('repos') }}>Back</Button>
               <Button onClick={handleNextFromPrompt}>Next</Button>
             </DialogFooter>
           </div>
         )}
 
-        {/* Step 3: Review & Launch */}
+        {/* Step 4: Review & Launch */}
         {step === 'review' && !isDone && (
           <div className="space-y-4">
             <div className="rounded-md border p-3 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Repository</span>
-                <span className="font-mono text-xs">{effectiveRepo}</span>
+                <span className="text-muted-foreground">Mode</span>
+                <span className="text-xs">{mode === 'home' ? 'Home directory' : 'Single repository'}</span>
               </div>
-              {branch && (
+              {mode === 'repo' && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Repository</span>
+                  <span className="font-mono text-xs">{effectiveRepo}</span>
+                </div>
+              )}
+              {mode === 'repo' && branch && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Branch</span>
                   <span className="font-mono text-xs">{branch}</span>
+                </div>
+              )}
+              {mode === 'home' && checkouts.length > 0 && (
+                <div>
+                  <span className="text-muted-foreground">Checkouts</span>
+                  <div className="mt-1 space-y-0.5">
+                    {checkouts.map((c, i) => (
+                      <p key={i} className="font-mono text-xs text-muted-foreground">
+                        {c.repo} ({c.branch})
+                      </p>
+                    ))}
+                  </div>
                 </div>
               )}
               <Separator />
