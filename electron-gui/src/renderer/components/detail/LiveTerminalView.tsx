@@ -2,12 +2,18 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { getService } from '@/services'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
+import iosevkaRegular from '@/assets/fonts/IosevkaTermNerdFont-Regular.ttf'
+import iosevkaBold from '@/assets/fonts/IosevkaTermNerdFont-Bold.ttf'
+import iosevkaItalic from '@/assets/fonts/IosevkaTermNerdFont-Italic.ttf'
+import iosevkaBoldItalic from '@/assets/fonts/IosevkaTermNerdFont-BoldItalic.ttf'
 
 // node-pty loaded via Electron's native require (nodeIntegration: true)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const nodeRequire = (window as any).require as NodeRequire
 const pty = nodeRequire('node-pty')
+const { shell } = nodeRequire('electron') as typeof import('electron')
 
 interface Props {
   name: string
@@ -54,11 +60,25 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     // Clear container
     container.innerHTML = ''
 
+    // Load bundled IosevkaTerm Nerd Font before creating the terminal.
+    // xterm.js measures cell dimensions on creation, so the font must be
+    // ready first or the metrics will be wrong.
+    const fontName = 'IosevkaTerm Nerd Font'
+    if (!document.fonts.check(`14px "${fontName}"`)) {
+      const faces = [
+        new FontFace(fontName, `url(${iosevkaRegular})`, { weight: '400', style: 'normal' }),
+        new FontFace(fontName, `url(${iosevkaBold})`, { weight: '700', style: 'normal' }),
+        new FontFace(fontName, `url(${iosevkaItalic})`, { weight: '400', style: 'italic' }),
+        new FontFace(fontName, `url(${iosevkaBoldItalic})`, { weight: '700', style: 'italic' }),
+      ]
+      await Promise.all(faces.map(f => f.load().then(loaded => document.fonts.add(loaded))))
+    }
+
     // Create xterm.js terminal
     const term = new Terminal({
       cursorBlink: true,
-      fontSize: 13,
-      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+      fontSize: 14,
+      fontFamily: "'IosevkaTerm Nerd Font', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
       theme: {
         background: '#0d1117',
         foreground: '#c9d1d9',
@@ -84,6 +104,11 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     })
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
+    term.loadAddon(new WebLinksAddon((event, uri) => {
+      if (event.metaKey || event.ctrlKey) {
+        shell.openExternal(uri)
+      }
+    }))
     term.open(container)
 
     termRef.current = term
@@ -128,6 +153,26 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     // Wire data: terminal → pty (keyboard input + SGR mouse events)
     term.onData((data: string) => {
       ptyProcess.write(data)
+    })
+
+    // Handle OSC 52 clipboard sequences from tmux/neovim.
+    // When tmux copies text in copy-mode (with set-clipboard on), it emits
+    // OSC 52: \e]52;c;BASE64\a — xterm.js doesn't handle this by default.
+    // We decode the base64 payload and write to the system clipboard.
+    term.parser.registerOscHandler(52, (data: string) => {
+      // Format: "c;BASE64" or "p;BASE64" (c=clipboard, p=primary selection)
+      const idx = data.indexOf(';')
+      if (idx === -1) return false
+      const b64 = data.slice(idx + 1)
+      if (b64 === '?') return false // query request, ignore
+      try {
+        // Decode base64 → bytes → UTF-8 text
+        const text = new TextDecoder().decode(
+          Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+        )
+        navigator.clipboard.writeText(text)
+      } catch { /* ignore decode errors */ }
+      return true // signal we handled it
     })
 
     // Wire binary data: terminal → pty (non-SGR mouse events)
@@ -258,7 +303,7 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
 
   return (
     <div className="flex-1 relative bg-[#0d1117]">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="absolute inset-0" style={{ WebkitFontSmoothing: 'antialiased' }} />
 
       {/* Connecting overlay */}
       {state === 'connecting' && (
