@@ -130,6 +130,26 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
       ptyProcess.write(data)
     })
 
+    // Handle OSC 52 clipboard sequences from tmux/neovim.
+    // When tmux copies text in copy-mode (with set-clipboard on), it emits
+    // OSC 52: \e]52;c;BASE64\a — xterm.js doesn't handle this by default.
+    // We decode the base64 payload and write to the system clipboard.
+    term.parser.registerOscHandler(52, (data: string) => {
+      // Format: "c;BASE64" or "p;BASE64" (c=clipboard, p=primary selection)
+      const idx = data.indexOf(';')
+      if (idx === -1) return false
+      const b64 = data.slice(idx + 1)
+      if (b64 === '?') return false // query request, ignore
+      try {
+        // Decode base64 → bytes → UTF-8 text
+        const text = new TextDecoder().decode(
+          Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+        )
+        navigator.clipboard.writeText(text)
+      } catch { /* ignore decode errors */ }
+      return true // signal we handled it
+    })
+
     // Wire binary data: terminal → pty (non-SGR mouse events)
     // Some mouse protocols encode button/coordinate bytes > 0x7F which xterm.js
     // emits through onBinary instead of onData.
