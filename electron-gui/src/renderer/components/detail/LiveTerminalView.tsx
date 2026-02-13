@@ -60,7 +60,7 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 13,
-      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+      fontFamily: "'IosevkaTerm Nerd Font', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
       theme: {
         background: '#0d1117',
         foreground: '#c9d1d9',
