@@ -159,7 +159,19 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
       if (!currentTerm || !currentPty) return
 
       const inAltBuffer = currentTerm.buffer.active === currentTerm.buffer.alternate
-      console.log('[LiveTerm] wheel:', { deltaY: e.deltaY, altBuffer: inAltBuffer })
+      console.log('[LiveTerm] wheel:', { deltaY: e.deltaY, altBuffer: inAltBuffer, shiftKey: e.shiftKey })
+
+      // DIAGNOSTIC: Shift+scroll writes a visible character to verify the
+      // ptyRef.current.write() path works at all from a wheel event handler.
+      // If 'Z' appears in the terminal, the write path works and the issue
+      // is specific to the SGR mouse sequence format/handling.
+      if (e.shiftKey) {
+        console.log('[LiveTerm] SHIFT+SCROLL TEST: writing "Z" to PTY')
+        currentPty.write('Z')
+        e.preventDefault()
+        return
+      }
+
       if (!inAltBuffer) return
 
       // Convert pixel position to 1-based terminal cell coordinates.
@@ -172,12 +184,13 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
 
       const lines = Math.max(1, Math.round(Math.abs(e.deltaY) / 25))
       const button = e.deltaY < 0 ? 64 : 65 // 64=scroll-up, 65=scroll-down
+      const seq = `\x1b[<${button};${col};${row}M`
+      console.log('[LiveTerm] writing SGR scroll:', JSON.stringify(seq), { button, col, row, lines })
       for (let i = 0; i < lines; i++) {
-        currentPty.write(`\x1b[<${button};${col};${row}M`)
+        currentPty.write(seq)
       }
       e.preventDefault()
       e.stopPropagation()
-      console.log('[LiveTerm] sent SGR scroll:', { button, col, row, lines })
     }
     // Clean up any previous wheel handler before attaching new one
     if (wheelCleanupRef.current) {
