@@ -22,6 +22,7 @@ import {
   getUploads,
   getStopNotifications,
   getStopNotificationQuietPeriod,
+  getSyncthingConfig,
 } from "./config.js";
 
 /** Tool installation script that runs inside the devbox on first create. */
@@ -233,15 +234,6 @@ export async function resolveDevbox(
   );
 }
 
-/**
- * Public wrapper for resolveDevbox (used by sync commands).
- */
-export async function resolveDevboxPublic(
-  nameOrId: string,
-): Promise<{ id: string; name?: string }> {
-  return resolveDevbox(nameOrId);
-}
-
 export async function createDevbox(opts: {
   name: string;
   snapshotId?: string;
@@ -374,7 +366,6 @@ export async function createDevbox(opts: {
 
     // Install SyncThing if configured in ~/.thopter.json
     if (!opts.noSync) {
-      const { getSyncthingConfig } = await import("./config.js");
       const syncConfig = getSyncthingConfig();
       if (syncConfig) {
         try {

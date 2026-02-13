@@ -610,9 +610,9 @@ syncCmd
       process.exit(1);
     }
 
-    const { resolveDevboxPublic } = await import("./devbox.js");
+    const { resolveDevbox } = await import("./devbox.js");
     const { installSyncthingOnDevbox, getDevboxDeviceId, pairDeviceLocally } = await import("./sync.js");
-    const { id, name } = await resolveDevboxPublic(devbox);
+    const { id, name } = await resolveDevbox(resolveThopterName(devbox));
 
     // Check if SyncThing is already installed
     let deviceId = await getDevboxDeviceId(id);
@@ -634,9 +634,9 @@ syncCmd
   .description("Show a devbox's SyncThing device ID")
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
-    const { resolveDevboxPublic } = await import("./devbox.js");
+    const { resolveDevbox } = await import("./devbox.js");
     const { getDevboxDeviceId } = await import("./sync.js");
-    const { id } = await resolveDevboxPublic(devbox);
+    const { id } = await resolveDevbox(resolveThopterName(devbox));
 
     const deviceId = await getDevboxDeviceId(id);
     if (deviceId) {
@@ -653,9 +653,9 @@ syncCmd
   .description("Remove a devbox from the laptop's SyncThing")
   .argument("<devbox>", "Devbox name or ID")
   .action(async (devbox: string) => {
-    const { resolveDevboxPublic } = await import("./devbox.js");
+    const { resolveDevbox } = await import("./devbox.js");
     const { getDevboxDeviceId, unpairDeviceLocally } = await import("./sync.js");
-    const { id } = await resolveDevboxPublic(devbox);
+    const { id } = await resolveDevbox(resolveThopterName(devbox));
 
     const deviceId = await getDevboxDeviceId(id);
     if (!deviceId) {
