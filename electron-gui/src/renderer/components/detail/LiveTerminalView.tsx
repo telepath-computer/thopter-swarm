@@ -2,12 +2,14 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { getService } from '@/services'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 
 // node-pty loaded via Electron's native require (nodeIntegration: true)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const nodeRequire = (window as any).require as NodeRequire
 const pty = nodeRequire('node-pty')
+const { shell } = nodeRequire('electron') as typeof import('electron')
 
 interface Props {
   name: string
@@ -84,6 +86,9 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     })
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
+    term.loadAddon(new WebLinksAddon((_event, uri) => {
+      shell.openExternal(uri)
+    }))
     term.open(container)
 
     termRef.current = term
