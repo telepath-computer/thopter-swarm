@@ -232,11 +232,21 @@ async function resolveDevbox(
   );
 }
 
+/**
+ * Public wrapper for resolveDevbox (used by sync commands).
+ */
+export async function resolveDevboxPublic(
+  nameOrId: string,
+): Promise<{ id: string; name?: string }> {
+  return resolveDevbox(nameOrId);
+}
+
 export async function createDevbox(opts: {
   name: string;
   snapshotId?: string;
   fresh?: boolean;
   idleTimeout?: number;
+  noSync?: boolean;
 }): Promise<string> {
   const client = getClient();
 
@@ -334,6 +344,26 @@ export async function createDevbox(opts: {
     // Upload and install thopter-status scripts + cron
     console.log("Installing thopter scripts...");
     await installThopterScripts(devbox.id, opts.name);
+
+    // Install SyncThing if configured in ~/.thopter.json
+    if (!opts.noSync) {
+      const { getSyncthingConfig } = await import("./config.js");
+      const syncConfig = getSyncthingConfig();
+      if (syncConfig) {
+        try {
+          const { installSyncthingOnDevbox, pairDeviceLocally } = await import("./sync.js");
+          const devboxDeviceId = await installSyncthingOnDevbox(devbox.id, syncConfig);
+          if (devboxDeviceId) {
+            await pairDeviceLocally(devboxDeviceId, opts.name);
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.log(`WARNING: SyncThing setup failed: ${msg}`);
+          console.log("  Devbox is ready, but file sync is not configured.");
+          console.log("  To set up later: thopter sync pair " + opts.name);
+        }
+      }
+    }
 
     return devbox.id;
   } catch (e) {

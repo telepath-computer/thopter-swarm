@@ -33,11 +33,23 @@ export async function getSecretMappings(): Promise<Record<string, string>> {
 
 // --- Local config (default snapshot only) ---
 
+export interface SyncthingConfig {
+  /** This laptop's SyncThing device ID. */
+  deviceId: string;
+  /** SyncThing folder ID (must match on both sides). */
+  folderId: string;
+  /** Path on the laptop (local). */
+  localPath: string;
+  /** Path on devboxes (remote). */
+  remotePath: string;
+}
+
 interface LocalConfig {
   runloopApiKey?: string;
   redisUrl?: string;
   defaultSnapshotId?: string;
   ntfyChannel?: string;
+  syncthing?: SyncthingConfig;
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -96,6 +108,22 @@ export function getRedisUrl(): string | undefined {
 export function setRedisUrl(url: string): void {
   const config = loadLocalConfig();
   config.redisUrl = url;
+  saveLocalConfig(config);
+}
+
+export function getSyncthingConfig(): SyncthingConfig | undefined {
+  return loadLocalConfig().syncthing;
+}
+
+export function setSyncthingConfig(syncthing: SyncthingConfig): void {
+  const config = loadLocalConfig();
+  config.syncthing = syncthing;
+  saveLocalConfig(config);
+}
+
+export function clearSyncthingConfig(): void {
+  const config = loadLocalConfig();
+  delete config.syncthing;
   saveLocalConfig(config);
 }
 

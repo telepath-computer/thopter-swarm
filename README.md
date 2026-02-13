@@ -68,6 +68,52 @@ thopter create worker-1
 thopter create worker-2
 ```
 
+### File Sync (SyncThing)
+
+Sync a folder in real-time between your laptop and all your devboxes. Agents write files, they appear on your machine instantly. You edit a file, the agent sees it immediately. Uses [SyncThing](https://syncthing.net) — peer-to-peer, encrypted, no cloud accounts.
+
+**How it works:** Your laptop is the hub. Each devbox syncs with your laptop. If your laptop is offline, agents keep working — changes sync when you reconnect. No port forwarding needed; SyncThing handles NAT traversal automatically.
+
+**Setup (one-time, on your laptop):**
+
+```bash
+# 1. Install SyncThing
+brew install syncthing          # macOS
+# or: sudo apt install syncthing  # Linux
+
+# 2. Start it (runs on login after this)
+brew services start syncthing   # macOS
+# or: sudo systemctl enable --now syncthing@$USER  # Linux
+
+# 3. Create your sync folder
+mkdir -p ~/jw-artifact-stash    # or any name you want
+
+# 4. Configure thopter (auto-detects your SyncThing device ID)
+thopter sync init
+# You'll be prompted for:
+#   Device ID    — auto-detected if SyncThing is running
+#   Folder ID    — e.g. "jw-artifact-stash" (must match both sides)
+#   Local path   — e.g. ~/jw-artifact-stash
+#   Remote path  — e.g. ~/jw-artifact-stash (path on devboxes)
+```
+
+That's it. From now on, `thopter create` automatically installs SyncThing on each new devbox and pairs it with your laptop. The sync folder can be anything — a git repo, a plain directory, whatever you want.
+
+```bash
+# Pair an existing devbox manually
+thopter sync pair my-thopter
+
+# Skip sync on create
+thopter create my-thopter --no-sync
+
+# Check what's configured
+thopter sync show
+```
+
+**For multiple developers:** Each person runs `thopter sync init` with their own folder name and paths. The config lives in `~/.thopter.json` — per-developer, no conflicts.
+
+See [docs/syncthing-artifact-sync.md](docs/syncthing-artifact-sync.md) for the full design doc.
+
 ## CLI Reference
 
 ### Lifecycle
@@ -106,6 +152,17 @@ thopter create worker-2
 | `thopter snapshot destroy <name>` | Delete a snapshot |
 | `thopter snapshot default [name]` | View or set default snapshot |
 | `thopter snapshot default --clear` | Clear default snapshot |
+
+### File Sync
+
+| Command | Description |
+|---------|-------------|
+| `thopter sync init` | Configure SyncThing sync (run on your laptop) |
+| `thopter sync show` | Show current sync config |
+| `thopter sync pair <name>` | Install SyncThing on a devbox and pair it |
+| `thopter sync unpair <name>` | Remove a devbox from sync |
+| `thopter sync device-id <name>` | Show a devbox's SyncThing device ID |
+| `thopter sync clear` | Remove sync config |
 
 ### Secrets
 
@@ -147,6 +204,7 @@ Each thopter devbox gets:
 - Git configured with PAT credentials from Runloop secrets
 - Heartbeat cron reporting to Redis
 - Claude Code hooks for status reporting
+- SyncThing file sync (if configured via `thopter sync init`)
 
 ### Scripts
 
@@ -162,6 +220,8 @@ Each thopter devbox gets:
 | `starship.toml` | Starship prompt config (shows thopter name) |
 | `tmux.conf` | tmux config (Ctrl-a prefix) |
 | `nvim-options.lua` | Neovim options (OSC 52 clipboard) |
+| `install-syncthing.sh` | Installs and configures SyncThing on a devbox |
+| `laptop-syncthing-setup.sh` | One-time SyncThing setup helper for developer laptops |
 
 ## Configuration
 
@@ -187,6 +247,7 @@ The devbox init script specifically checks for `GITHUB_PAT` to configure git cre
 | `redisUrl` | Upstash Redis URL for status reporting (required) |
 | `defaultSnapshotId` | Default snapshot for `create` (set via `snapshot default`) |
 | `ntfyChannel` | ntfy.sh channel for push notifications (set via `config set`) |
+| `syncthing` | SyncThing file sync config (set via `thopter sync init`) |
 
 ### Notifications (ntfy.sh)
 
