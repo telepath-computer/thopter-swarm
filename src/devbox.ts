@@ -97,10 +97,16 @@ async function installThopterScripts(
     contents: readScript("thopter-cron-install.sh"),
   });
 
-  // Neovim options (OSC 52 clipboard, etc.)
+  // Neovim options (OSC 52 clipboard, tab/indent, wrapping, keybindings, etc.)
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/home/user/.config/nvim/lua/options.lua",
     contents: readScript("nvim-options.lua"),
+  });
+
+  // Neovim plugins (gitsigns, scrollview)
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/home/user/.config/nvim/lua/plugins/thopter.lua",
+    contents: readScript("nvim-plugins.lua"),
   });
 
   // Starship prompt config
