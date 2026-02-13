@@ -12,7 +12,7 @@
 if [ -f /tmp/thopter-active ] && [ "$(find /tmp/thopter-active -mmin -1 2>/dev/null)" ]; then
     /usr/local/bin/thopter-status running >/dev/null 2>&1 || true
 else
-    CURRENT_STATUS=$(redis-cli --tls -u "$REDIS_URL" GET "thopter:${THOPTER_NAME}:status" 2>/dev/null || true)
+    CURRENT_STATUS=$(redis-cli --tls -u "$THOPTER_REDIS_URL" GET "thopter:${THOPTER_NAME}:status" 2>/dev/null || true)
     if [ "$CURRENT_STATUS" = "running" ]; then
         /usr/local/bin/thopter-status inactive >/dev/null 2>&1 || true
     fi
@@ -21,12 +21,8 @@ fi
 for i in 1 2 3 4 5 6; do
     /usr/local/bin/thopter-status heartbeat >/dev/null 2>&1
 
-    # Update last message from active Claude transcript.
-    # /tmp/thopter-active contains the transcript path (written by hooks).
-    TRANSCRIPT=$(cat /tmp/thopter-active 2>/dev/null | tr -d '\n')
-    if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
-        node /usr/local/bin/thopter-last-message "$TRANSCRIPT" | /usr/local/bin/thopter-status message 2>/dev/null || true
-    fi
+    # Capture tmux screen and push to Redis for GUI terminal view
+    tmux capture-pane -p 2>/dev/null | redis-cli --tls -u "$THOPTER_REDIS_URL" -x SETEX "thopter:${THOPTER_NAME}:screen_dump" 120 >/dev/null 2>&1 || true
 
     [ "$i" -lt 6 ] && sleep 10
 done

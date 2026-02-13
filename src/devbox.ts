@@ -3,7 +3,7 @@
  */
 
 import { execSync, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getClient } from "./client.js";
@@ -14,31 +14,22 @@ import {
   NAME_KEY,
   OWNER_KEY,
   DEFAULT_RESOURCE_SIZE,
-  DEFAULT_IDLE_TIMEOUT_SECONDS,
-  getSecretMappings,
+  DEFAULT_KEEP_ALIVE_SECONDS,
+  getEnvVars,
+  escapeEnvValue,
   getDefaultSnapshot,
-  getNtfyChannel,
+  getClaudeMdPath,
+  getUploads,
+  getStopNotifications,
+  getStopNotificationQuietPeriod,
 } from "./config.js";
 
-/** Git setup script that runs inside the devbox on first create. */
+/** Tool installation script that runs inside the devbox on first create. */
 const INIT_SCRIPT = `
 set -e
 
-# Configure git credentials using PAT from environment
-if [ -n "$GITHUB_PAT" ]; then
-    git config --global credential.helper store
-    echo "https://thopterbot:\${GITHUB_PAT}@github.com" > ~/.git-credentials
-    # Rewrite SSH-style URLs to HTTPS so the PAT credential is used automatically
-    git config --global url."https://github.com/".insteadOf "git@github.com:"
-    git config --global user.name "ThopterBot"
-    git config --global user.email "thopterbot@telepath.computer"
-    echo "Git configured with PAT credentials"
-else
-    echo "WARNING: GITHUB_PAT not set, git push/pull to private repos won't work"
-fi
-
 # Install essential tools
-sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 > /dev/null
+sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 xvfb xauth > /dev/null
 sudo /usr/sbin/cron 2>/dev/null || true
 
 # Install Neovim (latest stable, NvChad requires 0.10+)
@@ -106,10 +97,16 @@ async function installThopterScripts(
     contents: readScript("thopter-cron-install.sh"),
   });
 
-  // Neovim options (OSC 52 clipboard, etc.)
+  // Neovim options (OSC 52 clipboard, tab/indent, wrapping, keybindings, etc.)
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/home/user/.config/nvim/lua/options.lua",
     contents: readScript("nvim-options.lua"),
+  });
+
+  // Neovim plugins (gitsigns, scrollview)
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/home/user/.config/nvim/lua/plugins/thopter.lua",
+    contents: readScript("nvim-plugins.lua"),
   });
 
   // Starship prompt config
@@ -124,10 +121,14 @@ async function installThopterScripts(
     contents: readScript("tmux.conf"),
   });
 
-  // CLAUDE.md — instructions for Claude Code running inside the devbox
+  // CLAUDE.md — use custom path if configured, otherwise default
+  const claudeMdPath = getClaudeMdPath();
+  const claudeMdContents = claudeMdPath
+    ? readFileSync(claudeMdPath, "utf-8")
+    : readScript("thopter-claude-md.md");
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/home/user/.claude/CLAUDE.md",
-    contents: readScript("thopter-claude-md.md"),
+    contents: claudeMdContents,
   });
 
   // Claude Code hooks for redis status updates
@@ -145,10 +146,10 @@ async function installThopterScripts(
       contents: readScript(src),
     });
   }
-  // Transcript parser for Stop hook (extracts last assistant message)
+  // Transcript push script for thopter tail (streams entries to Redis, updates last_message)
   await client.devboxes.writeFileContents(devboxId, {
-    file_path: "/tmp/thopter-last-message.mjs",
-    contents: readScript("thopter-last-message.mjs"),
+    file_path: "/tmp/thopter-transcript-push.mjs",
+    contents: readScript("thopter-transcript-push.mjs"),
   });
 
   // Installer merges hooks into existing settings.json (idempotent)
@@ -159,7 +160,7 @@ async function installThopterScripts(
 
   // Install scripts to /usr/local/bin, make hooks executable, register hooks, set up cron
   await client.devboxes.executeAsync(devboxId, {
-    command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-last-message.mjs /usr/local/bin/thopter-last-message && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
+    command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
   });
 }
 
@@ -204,7 +205,7 @@ async function resolveSnapshotId(nameOrId: string): Promise<string> {
 /**
  * Resolve a devbox by name or ID. Searches our managed devboxes by metadata.
  */
-async function resolveDevbox(
+export async function resolveDevbox(
   nameOrId: string,
 ): Promise<{ id: string; name?: string }> {
   const client = getClient();
@@ -245,7 +246,7 @@ export async function createDevbox(opts: {
   name: string;
   snapshotId?: string;
   fresh?: boolean;
-  idleTimeout?: number;
+  keepAlive?: number;
   noSync?: boolean;
 }): Promise<string> {
   const client = getClient();
@@ -261,6 +262,18 @@ export async function createDevbox(opts: {
     throw new Error(
       "Git user.name not configured. Set it with: git config --global user.name 'Your Name'",
     );
+  }
+
+  // Validate local files exist before creating anything
+  const claudeMdPath = getClaudeMdPath();
+  if (claudeMdPath && !existsSync(claudeMdPath)) {
+    throw new Error(`Custom CLAUDE.md not found: ${claudeMdPath}`);
+  }
+  const uploads = getUploads();
+  for (const entry of uploads) {
+    if (!existsSync(entry.local)) {
+      throw new Error(`Upload file not found: ${entry.local}`);
+    }
   }
 
   // Determine snapshot (resolve name → ID if needed)
@@ -289,19 +302,13 @@ export async function createDevbox(opts: {
     [OWNER_KEY]: ownerName,
   };
 
-  const secrets = await getSecretMappings();
-
   const createParams = {
     name: opts.name,
     snapshot_id: snapshotId,
     metadata,
-    secrets,
     launch_parameters: {
       resource_size_request: DEFAULT_RESOURCE_SIZE,
-      after_idle: {
-        idle_time_seconds: opts.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_SECONDS,
-        on_idle: "suspend" as const,
-      },
+      keep_alive_time_seconds: opts.keepAlive ?? DEFAULT_KEEP_ALIVE_SECONDS,
       launch_commands: snapshotId ? undefined : [INIT_SCRIPT],
     },
   };
@@ -318,32 +325,52 @@ export async function createDevbox(opts: {
     console.log(`Devbox created: ${devbox.id}`);
     console.log("Devbox is running.");
 
-    // Write thopter identity and secrets to ~/.thopter-env (overwritten on each create).
-    // Runloop injects secrets as process env vars, so interactive shells already have
-    // them — but cron runs in a minimal environment without Runloop's injected vars.
-    // This file is sourced from .bashrc so the heartbeat cron (which needs REDIS_URL,
-    // THOPTER_NAME, THOPTER_ID) gets them via: cron → heartbeat → .bashrc → .thopter-env.
-    // On snapshot creates, this overwrites stale values from the previous devbox identity.
-    let thopterEnv = `export THOPTER_NAME="${opts.name}"\nexport THOPTER_ID="${devbox.id}"\nexport THOPTER_OWNER="${ownerName}"\n`;
-    const ntfyChannel = getNtfyChannel();
-    if (ntfyChannel) {
-      thopterEnv += `export THOPTER_NTFY_CHANNEL="${ntfyChannel}"\n`;
+    // Write ~/.thopter-env with all env vars from config + identity vars.
+    // This is the single source of truth for devbox environment.
+    // Sourced from .bashrc so interactive shells + cron both get these vars.
+    // On snapshot creates, this overwrites stale values from the previous devbox.
+    const envVars = getEnvVars();
+    const envLines: string[] = [];
+    // Identity vars (safe — generated by us, no user-controlled shell metacharacters)
+    envLines.push(`export THOPTER_NAME="${escapeEnvValue(opts.name)}"`);
+    envLines.push(`export THOPTER_ID="${escapeEnvValue(devbox.id)}"`);
+    envLines.push(`export THOPTER_OWNER="${escapeEnvValue(ownerName)}"`);
+    if (!getStopNotifications()) {
+      envLines.push(`export THOPTER_STOP_NOTIFY=0`);
+    }
+    const quietPeriod = getStopNotificationQuietPeriod();
+    envLines.push(`export THOPTER_STOP_NOTIFY_QUIET_PERIOD="${quietPeriod}"`);
+    // User-configured env vars from ~/.thopter.json envVars section
+    for (const [key, value] of Object.entries(envVars)) {
+      envLines.push(`export ${key}="${escapeEnvValue(value)}"`);
     }
     await client.devboxes.writeFileContents(devbox.id, {
       file_path: "/home/user/.thopter-env",
-      contents: thopterEnv,
+      contents: envLines.join("\n") + "\n",
     });
-    // REDIS_URL must be captured inside the devbox (we don't have it operator-side).
-    // GH_TOKEN is the env var the gh CLI expects for authentication — we derive it
-    // from our GITHUB_PAT secret so both git and gh work without extra config.
-    // Also ensure .bashrc sources the env file (idempotent — skips if already present).
-    await client.devboxes.executeAsync(devbox.id, {
-      command: `echo "export REDIS_URL=\\"$REDIS_URL\\"" >> ~/.thopter-env && echo "export GH_TOKEN=\\"$GITHUB_PAT\\"" >> ~/.thopter-env && grep -q 'source.*thopter-env' ~/.bashrc || echo '. ~/.thopter-env' >> ~/.bashrc`,
-    });
+
+    // Configure git credentials using GH_TOKEN (post-boot, after env file is written)
+    if (envVars.GH_TOKEN) {
+      console.log("Configuring git credentials...");
+      await client.devboxes.executeAsync(devbox.id, {
+        command: `source ~/.thopter-env && git config --global credential.helper store && echo "https://thopterbot:\${GH_TOKEN}@github.com" > ~/.git-credentials && git config --global url."https://github.com/".insteadOf "git@github.com:" && git config --global user.name "ThopterBot" && git config --global user.email "thopterbot@telepath.computer"`,
+      });
+    }
 
     // Upload and install thopter-status scripts + cron
     console.log("Installing thopter scripts...");
     await installThopterScripts(devbox.id, opts.name);
+
+    // Upload custom files from config (last, so user files override defaults)
+    if (uploads.length > 0) {
+      console.log(`Uploading ${uploads.length} custom file${uploads.length === 1 ? "" : "s"}...`);
+      for (const entry of uploads) {
+        await client.devboxes.writeFileContents(devbox.id, {
+          file_path: entry.remote,
+          contents: readFileSync(entry.local, "utf-8"),
+        });
+      }
+    }
 
     // Install SyncThing if configured in ~/.thopter.json
     if (!opts.noSync) {
@@ -384,26 +411,232 @@ export async function createDevbox(opts: {
   }
 }
 
-export async function listDevboxes(): Promise<void> {
+/**
+ * Fetch live thopters from Runloop API + Redis, returning structured data.
+ * This is the single source of truth — Runloop determines which devboxes are
+ * alive, Redis provides agent annotations (status, task, heartbeat, etc.).
+ */
+export async function fetchThopters(): Promise<{
+  name: string; owner: string; id: string; devboxStatus: string;
+  status: string | null; task: string | null; heartbeat: string | null;
+  alive: boolean; claudeRunning: boolean; lastMessage: string | null;
+}[]> {
   const client = getClient();
+  const { getRedisInfoForNames } = await import("./status.js");
 
-  console.log("Devboxes:");
-  const rows: string[][] = [];
-  const liveStatuses = ["provisioning", "initializing", "running", "suspending", "suspended", "resuming"] as const;
+  const devboxes: { name: string; owner: string; id: string; status: string }[] = [];
+  const liveStatuses = ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const;
   for (const status of liveStatuses) {
     for await (const db of client.devboxes.list({ status, limit: 100 })) {
       const meta = db.metadata ?? {};
       if (meta[MANAGED_BY_KEY] !== MANAGED_BY_VALUE) continue;
-      const name = meta[NAME_KEY] ?? "";
-      const owner = meta[OWNER_KEY] ?? "";
-      const created = db.create_time_ms
-        ? new Date(db.create_time_ms).toLocaleString()
-        : "";
-      rows.push([name, owner, db.id, db.status, created]);
+      devboxes.push({
+        name: meta[NAME_KEY] ?? "",
+        owner: meta[OWNER_KEY] ?? "",
+        id: db.id,
+        status: db.status,
+      });
     }
   }
 
-  printTable(["NAME", "OWNER", "ID", "STATUS", "CREATED"], rows);
+  const redisMap = await getRedisInfoForNames(devboxes.map((db) => db.name));
+
+  return devboxes.map((db) => {
+    const redis = redisMap.get(db.name);
+    return {
+      name: db.name,
+      owner: db.owner,
+      id: db.id,
+      devboxStatus: db.status,
+      status: redis?.status ?? null,
+      task: redis?.task ?? null,
+      heartbeat: redis?.heartbeat ?? null,
+      alive: redis?.alive ?? false,
+      claudeRunning: redis?.claudeRunning === "1",
+      lastMessage: redis?.lastMessage ?? null,
+    };
+  });
+}
+
+export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "narrow"; json?: boolean }): Promise<void> {
+  if (opts?.json) {
+    const thopters = await fetchThopters();
+    process.stdout.write(JSON.stringify(thopters) + "\n");
+    return;
+  }
+
+  const client = getClient();
+  const { getRedisInfoForNames, relativeTime } = await import("./status.js");
+  const { formatTable } = await import("./output.js");
+
+  function toInitials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 3);
+    return parts.map((p) => p[0]).join("").toUpperCase();
+  }
+
+  const SHORT_STATUS: Record<string, string> = {
+    running: "run",
+    suspended: "susp",
+    provisioning: "prov",
+    initializing: "init",
+    suspending: "susp…",
+    resuming: "res…",
+  };
+
+  async function fetchAndRender(): Promise<string> {
+    const devboxes: { name: string; owner: string; id: string; status: string }[] = [];
+    const liveStatuses = ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const;
+    for (const status of liveStatuses) {
+      for await (const db of client.devboxes.list({ status, limit: 100 })) {
+        const meta = db.metadata ?? {};
+        if (meta[MANAGED_BY_KEY] !== MANAGED_BY_VALUE) continue;
+        devboxes.push({
+          name: meta[NAME_KEY] ?? "",
+          owner: meta[OWNER_KEY] ?? "",
+          id: db.id,
+          status: db.status,
+        });
+      }
+    }
+
+    if (devboxes.length === 0) {
+      return "No managed devboxes found.\n";
+    }
+
+    // Fetch Redis annotations for all devboxes using a single connection
+    const redisMap = await getRedisInfoForNames(devboxes.map((db) => db.name));
+    const cols = process.stdout.columns || 120;
+
+    // Compute fixed-column width needed in wide mode (everything except TASK and LAST MSG)
+    const wideFixedData = devboxes.map((db) => {
+      const redis = redisMap.get(db.name);
+      const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
+      const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat) : "-";
+      return [db.name, db.owner, db.status, redis?.status ?? "-", claude, heartbeat];
+    });
+    const wideFixedHeaders = ["NAME", "OWNER", "DEVBOX", "AGENT", "CLAUDE", "HEARTBEAT"];
+    const wideFixedWidth = wideFixedHeaders.reduce((sum, h, i) => {
+      const maxCell = Math.max(0, ...wideFixedData.map((r) => r[i].length));
+      return sum + Math.max(h.length, maxCell);
+    }, 0);
+    // gaps between all 8 columns (7 × 2) + fixed cols width
+    const wideOverhead = 7 * 2 + wideFixedWidth;
+    // Explicit flag overrides auto-detection; otherwise need 60 chars for flex columns
+    const tight = opts?.layout === "narrow" ? true
+      : opts?.layout === "wide" ? false
+      : wideOverhead > cols - 60;
+
+    // Gray out suspended rows
+    const DIM = "\x1b[90m";
+
+    const collapse = (s: string) => s.replace(/\s+/g, " ").trim();
+    const truncate = (s: string, max: number) => {
+      if (s.length <= max) return s;
+      return max <= 3 ? s.slice(0, max) : s.slice(0, max - 3) + "...";
+    };
+
+    if (tight) {
+      // Multi-line layout: fixed columns, then indented Task/Last message lines
+      const indent = "  ";
+      const taskPrefix = "Task: ";
+      const msgPrefix = "Last message: ";
+      const taskMax = cols - indent.length - taskPrefix.length;
+      const msgMax = cols - indent.length - msgPrefix.length;
+
+      const fixedRows = devboxes.map((db) => {
+        const redis = redisMap.get(db.name);
+        const claude = redis ? (redis.claudeRunning === "1" ? "y" : redis.claudeRunning === "0" ? "n" : "-") : "-";
+        const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat).replace(/ ago$/, "") : "-";
+        return [
+          db.name,
+          toInitials(db.owner),
+          SHORT_STATUS[db.status] ?? db.status,
+          redis?.status ?? "-",
+          claude,
+          heartbeat,
+        ];
+      });
+
+      // Compute fixed column widths
+      const numFixed = fixedRows[0].length;
+      const fixedWidths = Array.from({ length: numFixed }, (_, i) =>
+        Math.max(0, ...fixedRows.map((r) => r[i].length)),
+      );
+
+      const lines: string[] = [];
+      for (let r = 0; r < devboxes.length; r++) {
+        const db = devboxes[r];
+        const redis = redisMap.get(db.name);
+        const style = db.status === "suspended" ? DIM : null;
+        const reset = style ? "\x1b[0m" : "";
+
+        // Fixed columns line
+        const fixedLine = fixedRows[r]
+          .map((cell, i) => cell.padEnd(fixedWidths[i]))
+          .join("  ");
+        lines.push(style ? `${style}${fixedLine}${reset}` : fixedLine);
+
+        // Task line (only if there's actual content)
+        const task = collapse(redis?.task ?? "");
+        if (task && task !== "-") {
+          const taskLine = `${indent}${taskPrefix}${truncate(task, taskMax)}`;
+          lines.push(style ? `${style}${taskLine}${reset}` : taskLine);
+        }
+
+        // Last message line (only if there's actual content)
+        const msg = collapse(redis?.lastMessage ?? "");
+        if (msg && msg !== "-") {
+          const msgLine = `${indent}${msgPrefix}${truncate(msg, msgMax)}`;
+          lines.push(style ? `${style}${msgLine}${reset}` : msgLine);
+        }
+
+        // Blank line between devboxes
+        if (r < devboxes.length - 1) lines.push("");
+      }
+      return lines.join("\n") + "\n";
+    } else {
+      const rowStyles = devboxes.map((db) =>
+        db.status === "suspended" ? DIM : null,
+      );
+      const rows: string[][] = devboxes.map((db) => {
+        const redis = redisMap.get(db.name);
+        const task = collapse(redis?.task ?? "-");
+        const msg = collapse(redis?.lastMessage ?? "-");
+        const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
+        const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat) : "-";
+        return [
+          db.name,
+          db.owner,
+          db.status,
+          redis?.status ?? "-",
+          task,
+          claude,
+          heartbeat,
+          msg,
+        ];
+      });
+      return formatTable(
+        ["NAME", "OWNER", "DEVBOX", "AGENT", "TASK", "CLAUDE", "HEARTBEAT", "LAST MSG"],
+        rows,
+        { maxWidth: cols, flexColumns: [4, 7], rowStyles },
+      );
+    }
+  }
+
+  if (opts?.follow) {
+    const interval = opts.follow;
+    // Loop until Ctrl+C — compute output first, then clear and redraw
+    while (true) {
+      const output = await fetchAndRender();
+      process.stdout.write("\x1b[2J\x1b[H");
+      process.stdout.write(`Refreshing every ${interval}s — Ctrl+C to exit  (${new Date().toLocaleTimeString()})\n\n`);
+      process.stdout.write(output);
+      await new Promise((r) => setTimeout(r, interval * 1000));
+    }
+  } else {
+    process.stdout.write(await fetchAndRender());
+  }
 }
 
 export async function listSnapshotsCmd(): Promise<void> {
@@ -475,7 +708,7 @@ export async function keepaliveDevbox(nameOrId: string): Promise<void> {
 
   console.log(`Sending keepalive for ${nameOrId} (${id})...`);
   await client.devboxes.keepAlive(id);
-  console.log("Done. Idle timer reset.");
+  console.log("Done. Keep-alive timer reset.");
 }
 
 export async function sshDevbox(nameOrId: string): Promise<void> {
