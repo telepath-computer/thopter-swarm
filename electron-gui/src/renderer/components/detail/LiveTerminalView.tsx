@@ -64,7 +64,7 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     // xterm.js measures cell dimensions on creation, so the font must be
     // ready first or the metrics will be wrong.
     const fontName = 'IosevkaTerm Nerd Font'
-    if (!document.fonts.check(`13px "${fontName}"`)) {
+    if (!document.fonts.check(`14px "${fontName}"`)) {
       const faces = [
         new FontFace(fontName, `url(${iosevkaRegular})`, { weight: '400', style: 'normal' }),
         new FontFace(fontName, `url(${iosevkaBold})`, { weight: '700', style: 'normal' }),
