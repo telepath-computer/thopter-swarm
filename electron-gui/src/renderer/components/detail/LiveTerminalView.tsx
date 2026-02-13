@@ -303,7 +303,7 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
 
   return (
     <div className="flex-1 relative bg-[#0d1117]">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="absolute inset-0" style={{ WebkitFontSmoothing: 'antialiased' }} />
 
       {/* Connecting overlay */}
       {state === 'connecting' && (
