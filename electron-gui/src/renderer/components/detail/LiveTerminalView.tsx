@@ -124,9 +124,20 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
       term.write(data)
     })
 
-    // Wire data: terminal → pty
+    // Wire data: terminal → pty (keyboard input + SGR mouse events)
     term.onData((data: string) => {
       ptyProcess.write(data)
+    })
+
+    // Wire binary data: terminal → pty (non-SGR mouse events including scroll)
+    // Without this, mouse scroll events are silently dropped when tmux uses
+    // the basic mouse protocol (bytes > 0x7F go through onBinary, not onData).
+    term.onBinary((data: string) => {
+      const bytes = new Uint8Array(data.length)
+      for (let i = 0; i < data.length; i++) {
+        bytes[i] = data.charCodeAt(i) & 0xff
+      }
+      ptyProcess.write(Buffer.from(bytes))
     })
 
     // Handle exit
