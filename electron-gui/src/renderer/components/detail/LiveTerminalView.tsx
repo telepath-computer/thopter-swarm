@@ -126,19 +126,60 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
 
     // Wire data: terminal → pty (keyboard input + SGR mouse events)
     term.onData((data: string) => {
+      // DEBUG: log mouse-related escape sequences
+      if (data.includes('\x1b[<') || data.includes('\x1b[M')) {
+        console.log('[LiveTerm] onData MOUSE:', JSON.stringify(data))
+      }
       ptyProcess.write(data)
     })
 
     // Wire binary data: terminal → pty (non-SGR mouse events including scroll)
-    // Without this, mouse scroll events are silently dropped when tmux uses
-    // the basic mouse protocol (bytes > 0x7F go through onBinary, not onData).
     term.onBinary((data: string) => {
+      console.log('[LiveTerm] onBinary:', data.length, 'bytes')
       const bytes = new Uint8Array(data.length)
       for (let i = 0; i < data.length; i++) {
         bytes[i] = data.charCodeAt(i) & 0xff
       }
       ptyProcess.write(Buffer.from(bytes))
     })
+
+    // DEBUG: Listen for wheel events directly on the xterm container to see
+    // if they fire at all, and whether xterm.js is preventDefault-ing them.
+    const xtermScreen = container.querySelector('.xterm-screen') as HTMLElement | null
+    const wheelTarget = xtermScreen || container
+    wheelTarget.addEventListener('wheel', (e: WheelEvent) => {
+      console.log('[LiveTerm] wheel event:', {
+        deltaY: e.deltaY,
+        defaultPrevented: e.defaultPrevented,
+        target: (e.target as HTMLElement)?.className,
+      })
+    }, { passive: true })
+
+    // EXPERIMENTAL: Custom wheel → mouse escape sequence handler.
+    // xterm.js's Viewport handles wheel events but doesn't forward them to
+    // the CoreMouseService for mouse protocol reporting. This listener
+    // intercepts wheel events and writes SGR mouse scroll sequences directly.
+    container.addEventListener('wheel', (e: WheelEvent) => {
+      if (!ptyRef.current) return
+      // Only act when the terminal has mouse tracking enabled.
+      // We detect this by checking if xterm is NOT sending arrow keys
+      // (i.e., the alternate screen is active with mouse tracking).
+      // A reliable proxy: check if the terminal is in the alternate buffer.
+      // xterm.js exposes this via term.buffer.active === term.buffer.alternate.
+      const inAltBuffer = term.buffer.active === term.buffer.alternate
+      if (!inAltBuffer) return
+
+      const lines = Math.max(1, Math.round(Math.abs(e.deltaY) / 25))
+      const button = e.deltaY < 0 ? 64 : 65 // 64=scroll-up, 65=scroll-down
+      // Send multiple scroll events for larger deltaY (like real terminals do)
+      for (let i = 0; i < lines; i++) {
+        // SGR mouse encoding: \e[<button;col;rowM
+        ptyRef.current.write(`\x1b[<${button};1;1M`)
+      }
+      e.preventDefault()
+      e.stopPropagation()
+      console.log('[LiveTerm] custom wheel→SGR:', { button, lines, deltaY: e.deltaY })
+    }, { passive: false })
 
     // Handle exit
     ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
