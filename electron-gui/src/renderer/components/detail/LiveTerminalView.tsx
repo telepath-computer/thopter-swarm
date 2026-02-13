@@ -186,8 +186,20 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
       const button = e.deltaY < 0 ? 64 : 65 // 64=scroll-up, 65=scroll-down
       const seq = `\x1b[<${button};${col};${row}M`
       console.log('[LiveTerm] writing SGR scroll:', JSON.stringify(seq), { button, col, row, lines })
+
+      // Route through xterm.js's internal data event — the exact same path that
+      // working click events use (CoreMouseService → triggerDataEvent → onData → pty.write).
+      // This tests whether the issue is with direct pty.write() vs xterm.js's event path.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const core = (currentTerm as any)._core
       for (let i = 0; i < lines; i++) {
-        currentPty.write(seq)
+        if (core?.coreService?.triggerDataEvent) {
+          core.coreService.triggerDataEvent(seq, true)
+          console.log('[LiveTerm] routed through triggerDataEvent')
+        } else {
+          currentPty.write(seq)
+          console.log('[LiveTerm] fallback: direct pty.write()')
+        }
       }
       e.preventDefault()
       e.stopPropagation()
