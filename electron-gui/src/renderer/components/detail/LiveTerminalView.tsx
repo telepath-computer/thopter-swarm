@@ -4,7 +4,10 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
-import '@/assets/fonts/iosevka-term-nerd-font.css'
+import iosevkaRegular from '@/assets/fonts/IosevkaTermNerdFont-Regular.ttf'
+import iosevkaBold from '@/assets/fonts/IosevkaTermNerdFont-Bold.ttf'
+import iosevkaItalic from '@/assets/fonts/IosevkaTermNerdFont-Italic.ttf'
+import iosevkaBoldItalic from '@/assets/fonts/IosevkaTermNerdFont-BoldItalic.ttf'
 
 // node-pty loaded via Electron's native require (nodeIntegration: true)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,6 +59,20 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
 
     // Clear container
     container.innerHTML = ''
+
+    // Load bundled IosevkaTerm Nerd Font before creating the terminal.
+    // xterm.js measures cell dimensions on creation, so the font must be
+    // ready first or the metrics will be wrong.
+    const fontName = 'IosevkaTerm Nerd Font'
+    if (!document.fonts.check(`13px "${fontName}"`)) {
+      const faces = [
+        new FontFace(fontName, `url(${iosevkaRegular})`, { weight: '400', style: 'normal' }),
+        new FontFace(fontName, `url(${iosevkaBold})`, { weight: '700', style: 'normal' }),
+        new FontFace(fontName, `url(${iosevkaItalic})`, { weight: '400', style: 'italic' }),
+        new FontFace(fontName, `url(${iosevkaBoldItalic})`, { weight: '700', style: 'italic' }),
+      ]
+      await Promise.all(faces.map(f => f.load().then(loaded => document.fonts.add(loaded))))
+    }
 
     // Create xterm.js terminal
     const term = new Terminal({
