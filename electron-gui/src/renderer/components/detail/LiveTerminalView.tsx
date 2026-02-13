@@ -77,7 +77,7 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     // Create xterm.js terminal
     const term = new Terminal({
       cursorBlink: true,
-      fontSize: 13,
+      fontSize: 14,
       fontFamily: "'IosevkaTerm Nerd Font', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
       theme: {
         background: '#0d1117',
