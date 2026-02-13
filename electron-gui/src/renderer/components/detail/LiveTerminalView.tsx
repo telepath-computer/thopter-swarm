@@ -23,6 +23,7 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
   const fitAddonRef = useRef<FitAddon | null>(null)
   const ptyRef = useRef<ReturnType<typeof pty.spawn> | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
+  const wheelCleanupRef = useRef<(() => void) | null>(null)
   const [state, setState] = useState<ViewState>('connecting')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -144,38 +145,50 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     })
 
     // Custom wheel → mouse escape sequence handler.
-    // xterm.js's Viewport/CoreMouseService does NOT generate mouse protocol
-    // events for wheel/scroll — confirmed by testing. Clicks work (they go
-    // through CoreMouseService on .xterm-screen), but wheel events are silently
-    // consumed with no output. This handler intercepts wheel events on the
-    // .xterm-screen element (where they actually fire) and writes SGR mouse
-    // scroll sequences directly to the PTY.
+    // xterm.js's CoreMouseService handles clicks but NOT wheel events — wheel
+    // events are consumed by the Viewport with no mouse protocol output.
+    // Confirmed: onData shows SGR sequences for clicks, nothing for scroll.
+    // This handler intercepts wheel on .xterm-screen (where events fire) and
+    // writes SGR mouse scroll sequences directly to the PTY with proper
+    // cell coordinates so tmux targets the correct pane.
     const xtermScreen = container.querySelector('.xterm-screen') as HTMLElement | null
-    if (xtermScreen) {
-      xtermScreen.addEventListener('wheel', (e: WheelEvent) => {
-        console.log('[LiveTerm] wheel handler:', {
-          deltaY: e.deltaY,
-          hasPty: !!ptyRef.current,
-          altBuffer: term.buffer.active === term.buffer.alternate,
-        })
-        if (!ptyRef.current) return
-        // Only inject scroll events when in the alternate buffer (tmux, etc.)
-        // In normal buffer, let xterm.js handle scrollback naturally.
-        const inAltBuffer = term.buffer.active === term.buffer.alternate
-        if (!inAltBuffer) return
+    const wheelHandler = (e: WheelEvent) => {
+      // Use refs for everything to avoid stale closures from React double-mount
+      const currentTerm = termRef.current
+      const currentPty = ptyRef.current
+      if (!currentTerm || !currentPty) return
 
-        const lines = Math.max(1, Math.round(Math.abs(e.deltaY) / 25))
-        const button = e.deltaY < 0 ? 64 : 65 // 64=scroll-up, 65=scroll-down
-        for (let i = 0; i < lines; i++) {
-          // SGR mouse encoding: \e[<button;col;rowM
-          ptyRef.current.write(`\x1b[<${button};1;1M`)
-        }
-        e.preventDefault()
-        e.stopPropagation()
-        console.log('[LiveTerm] sent SGR scroll:', { button, lines, deltaY: e.deltaY })
-      }, { passive: false })
+      const inAltBuffer = currentTerm.buffer.active === currentTerm.buffer.alternate
+      console.log('[LiveTerm] wheel:', { deltaY: e.deltaY, altBuffer: inAltBuffer })
+      if (!inAltBuffer) return
+
+      // Convert pixel position to 1-based terminal cell coordinates.
+      // tmux uses these to determine which pane the scroll targets.
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      const cellWidth = rect.width / currentTerm.cols
+      const cellHeight = rect.height / currentTerm.rows
+      const col = Math.min(currentTerm.cols, Math.max(1, Math.floor((e.clientX - rect.left) / cellWidth) + 1))
+      const row = Math.min(currentTerm.rows, Math.max(1, Math.floor((e.clientY - rect.top) / cellHeight) + 1))
+
+      const lines = Math.max(1, Math.round(Math.abs(e.deltaY) / 25))
+      const button = e.deltaY < 0 ? 64 : 65 // 64=scroll-up, 65=scroll-down
+      for (let i = 0; i < lines; i++) {
+        currentPty.write(`\x1b[<${button};${col};${row}M`)
+      }
+      e.preventDefault()
+      e.stopPropagation()
+      console.log('[LiveTerm] sent SGR scroll:', { button, col, row, lines })
+    }
+    // Clean up any previous wheel handler before attaching new one
+    if (wheelCleanupRef.current) {
+      wheelCleanupRef.current()
+      wheelCleanupRef.current = null
+    }
+    if (xtermScreen) {
+      xtermScreen.addEventListener('wheel', wheelHandler, { passive: false })
+      wheelCleanupRef.current = () => xtermScreen.removeEventListener('wheel', wheelHandler)
     } else {
-      console.warn('[LiveTerm] .xterm-screen not found, custom wheel handler not attached')
+      console.warn('[LiveTerm] .xterm-screen not found, custom wheel handler skipped')
     }
 
     // Handle exit
@@ -224,6 +237,10 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     connect()
 
     return () => {
+      if (wheelCleanupRef.current) {
+        wheelCleanupRef.current()
+        wheelCleanupRef.current = null
+      }
       if (ptyRef.current) {
         try { ptyRef.current.kill() } catch { /* ignore */ }
         ptyRef.current = null
