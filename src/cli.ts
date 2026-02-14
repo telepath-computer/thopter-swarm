@@ -549,10 +549,17 @@ syncCmd
     // Auto-detect device ID from local SyncThing if running
     let detectedId = opts.deviceId ?? "";
     if (!detectedId) {
-      try {
-        const { execSync } = await import("node:child_process");
-        detectedId = execSync("syncthing --device-id 2>/dev/null", { encoding: "utf-8" }).trim();
-      } catch { /* not installed or not running */ }
+      const { execSync } = await import("node:child_process");
+      // Try the running daemon's REST API first, then fall back to direct command
+      for (const cmd of [
+        "syncthing cli show system 2>/dev/null | jq -r .myID",
+        "syncthing --device-id 2>/dev/null",
+      ]) {
+        try {
+          const result = execSync(cmd, { encoding: "utf-8" }).trim();
+          if (result && result !== "null") { detectedId = result; break; }
+        } catch { /* try next */ }
+      }
     }
 
     console.log("SyncThing sync configuration");
