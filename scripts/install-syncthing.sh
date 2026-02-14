@@ -160,15 +160,17 @@ syncthing cli --home="$ST_HOME" config devices "$LAPTOP_DEVICE_ID" auto-accept-f
 
 echo "Laptop peer configured."
 
-# ── 8. Install systemd service for auto-start ───────────────────────────────
+# ── 8. Ensure SyncThing runs persistently ─────────────────────────────────
 
-# Stop the temp daemon — systemd will manage it
+# Try systemd user service first; fall back to cron @reboot if systemd isn't available
+# (Runloop devboxes don't have D-Bus, so systemd --user may not work)
 kill $ST_PID 2>/dev/null || true
 wait $ST_PID 2>/dev/null || true
 
-# Create a simple systemd user service
-mkdir -p "$HOME/.config/systemd/user"
-cat > "$HOME/.config/systemd/user/syncthing.service" << SYSTEMD
+SYSTEMD_OK=false
+if systemctl --user daemon-reload 2>/dev/null; then
+    mkdir -p "$HOME/.config/systemd/user"
+    cat > "$HOME/.config/systemd/user/syncthing.service" << SYSTEMD
 [Unit]
 Description=Syncthing File Synchronization
 After=network.target
@@ -182,15 +184,23 @@ RestartSec=10
 WantedBy=default.target
 SYSTEMD
 
-# Enable lingering so user services run without login
-sudo loginctl enable-linger user 2>/dev/null || true
+    sudo loginctl enable-linger user 2>/dev/null || true
+    systemctl --user enable syncthing.service 2>/dev/null && \
+    systemctl --user start syncthing.service 2>/dev/null && \
+    SYSTEMD_OK=true
+fi
 
-# Enable and start
-systemctl --user daemon-reload
-systemctl --user enable syncthing.service
-systemctl --user start syncthing.service
-
-echo "SyncThing systemd service installed and started."
+if [ "$SYSTEMD_OK" = true ]; then
+    echo "SyncThing running via systemd."
+else
+    echo "systemd not available, using cron + nohup fallback."
+    # Add @reboot cron entry (idempotent)
+    CRON_CMD="@reboot /usr/local/bin/syncthing serve --home=$ST_HOME --no-browser --no-upgrade > /dev/null 2>&1"
+    ( crontab -l 2>/dev/null | grep -v "syncthing serve" ; echo "$CRON_CMD" ) | crontab -
+    # Start now
+    nohup syncthing serve --home="$ST_HOME" --no-browser --no-upgrade > "$ST_HOME/syncthing.log" 2>&1 &
+    echo "SyncThing started in background (cron @reboot for persistence)."
+fi
 
 # ── 9. Output device ID (last line — captured by caller) ────────────────────
 
