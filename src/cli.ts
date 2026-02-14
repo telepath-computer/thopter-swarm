@@ -42,6 +42,10 @@ examples:
   thopter ssh .                          SSH into the default thopter
   thopter run --repo owner/repo "prompt"  Launch Claude with a task
   thopter reauth                         Re-authenticate and update snapshot
+  thopter sync setup                      Set up SyncThing config (run on laptop)
+  thopter sync show                      Show current SyncThing config
+  thopter sync pair dev                  Install SyncThing on devbox & pair
+  thopter sync unpair dev                Remove devbox from laptop SyncThing
   thopter status                         Unified view of all thopters
   thopter status dev                     Detailed status + logs for a thopter
   thopter tail dev                       Show last 20 transcript entries
@@ -75,8 +79,9 @@ program
   .option("--snapshot <id>", "Snapshot ID or label to restore from")
   .option("--fresh", "Create a fresh devbox, ignoring the default snapshot")
   .option("--keep-alive <minutes>", "Keep-alive time in minutes before shutdown (default: 720)", parseInt)
+  .option("--no-sync", "Skip SyncThing artifact sync setup")
   .option("-a, --attach", "SSH into the devbox after creation")
-  .action(async (name: string | undefined, opts: { snapshot?: string; fresh?: boolean; keepAlive?: number; attach?: boolean }) => {
+  .action(async (name: string | undefined, opts: { snapshot?: string; fresh?: boolean; keepAlive?: number; noSync?: boolean; attach?: boolean }) => {
     const { createDevbox, sshDevbox } = await import("./devbox.js");
     const { generateName } = await import("./names.js");
     const resolvedName = name ?? generateName();
@@ -85,6 +90,7 @@ program
       snapshotId: opts.snapshot,
       fresh: opts.fresh,
       keepAlive: opts.keepAlive ? opts.keepAlive * 60 : undefined,
+      noSync: opts.noSync,
     });
     if (opts.attach) {
       await sshDevbox(resolvedName);
@@ -466,7 +472,7 @@ configCmd
   .description("Get a config value")
   .argument("[key]", "Config key (omit to show all)")
   .action(async (key?: string) => {
-    const { getRunloopApiKey, getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars, getDefaultThopter, getRepos } = await import("./config.js");
+    const { getRunloopApiKey, getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars, getDefaultThopter, getRepos, getSyncthingConfig } = await import("./config.js");
     if (!key) {
       console.log(`runloopApiKey:                  ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
       console.log(`defaultSnapshotName:             ${getDefaultSnapshot() ?? "(not set)"}`);
@@ -477,10 +483,12 @@ configCmd
       console.log(`defaultThopter:                 ${getDefaultThopter() ?? "(not set)"}`);
       const repos = getRepos();
       console.log(`repos:                          ${repos.length > 0 ? `${repos.length} configured (see: thopter repos list)` : "(none)"}`);
-
       const envVars = getEnvVars();
       const envCount = Object.keys(envVars).length;
       console.log(`envVars:                        ${envCount > 0 ? `${envCount} configured (see: thopter env list)` : "(none)"}`);
+      const st = getSyncthingConfig();
+      console.log(`syncthing:                      ${st ? `~/${st.folderName}` : "(not set)"}`);
+
     } else {
       switch (key) {
         case "runloopApiKey":
@@ -512,6 +520,193 @@ configCmd
           process.exit(1);
       }
     }
+  });
+
+// --- sync ---
+const syncCmd = program
+  .command("sync")
+  .description("Manage SyncThing file sync between laptop and devboxes");
+
+syncCmd
+  .command("setup")
+  .description("Set up SyncThing file sync (run on laptop)")
+  .option("--device-id <id>", "SyncThing device ID (auto-detected if SyncThing is running)")
+  .option("--folder-name <name>", "Sync folder name (used as ~/name on all machines)")
+  .action(async (opts: { deviceId?: string; folderName?: string }) => {
+    const { createInterface } = await import("node:readline");
+    const { existsSync, mkdirSync } = await import("node:fs");
+    const { homedir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { getSyncthingConfig, setSyncthingConfig } = await import("./config.js");
+    const { registerFolderLocally } = await import("./sync.js");
+
+    const existing = getSyncthingConfig();
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const ask = (q: string, def?: string): Promise<string> =>
+      new Promise((resolve) => {
+        const prompt = def ? `${q} [${def}]: ` : `${q}: `;
+        rl.question(prompt, (answer) => resolve(answer.trim() || def || ""));
+      });
+
+    // Auto-detect device ID from local SyncThing if running
+    let detectedId = opts.deviceId ?? "";
+    if (!detectedId) {
+      const { execSync } = await import("node:child_process");
+      for (const cmd of [
+        "syncthing cli show system 2>/dev/null | jq -r .myID",
+        "syncthing device-id 2>/dev/null",
+      ]) {
+        try {
+          const result = execSync(cmd, { encoding: "utf-8" }).trim();
+          if (result && result !== "null") { detectedId = result; break; }
+        } catch { /* try next */ }
+      }
+    }
+
+    console.log("SyncThing file sync setup");
+    console.log("This sets up real-time file sync between your laptop and your thopters.\n");
+
+    const deviceId = await ask("Your laptop's SyncThing device ID", detectedId || existing?.deviceId);
+    if (!deviceId) {
+      console.error("Device ID is required. Install and start SyncThing first.");
+      rl.close();
+      process.exit(1);
+    }
+
+    console.log("\nChoose a folder name. This will be a directory in your home folder (~/<name>)");
+    console.log("and in the home directory of every thopter. Files sync in real time between them.\n");
+    const folderName = opts.folderName ?? await ask("Folder name", existing?.folderName);
+    if (!folderName) {
+      console.error("Folder name is required.");
+      rl.close();
+      process.exit(1);
+    }
+
+    rl.close();
+
+    // Warn if changing folders
+    if (existing?.folderName && existing.folderName !== folderName) {
+      console.log(`\nWARNING: Changing folder from '${existing.folderName}' to '${folderName}'.`);
+      console.log(`  The old folder '${existing.folderName}' is still registered with SyncThing.`);
+      console.log(`  To remove it: open http://localhost:8384 and remove the folder,`);
+      console.log(`  or run: syncthing cli config folders ${existing.folderName} delete`);
+    }
+
+    // Save config
+    setSyncthingConfig({ deviceId, folderName });
+    console.log("\nSaved config to ~/.thopter.json.");
+
+    // Create local folder
+    const folderPath = join(homedir(), folderName);
+    if (existsSync(folderPath)) {
+      console.log(`Folder exists: ${folderPath}`);
+    } else {
+      mkdirSync(folderPath, { recursive: true });
+      console.log(`Created folder: ${folderPath}`);
+    }
+
+    // Register with local SyncThing
+    await registerFolderLocally(folderName, folderPath);
+
+    console.log(`\nDone. New thopters created with 'thopter create' will sync ~/${folderName} automatically.`);
+    console.log("To pair an existing thopter: thopter sync pair <name>");
+  });
+
+syncCmd
+  .command("show")
+  .description("Show current SyncThing config from ~/.thopter.json")
+  .action(async () => {
+    const { getSyncthingConfig } = await import("./config.js");
+    const config = getSyncthingConfig();
+    if (!config) {
+      console.log("No SyncThing config set. Run: thopter sync setup");
+    } else {
+      console.log(`deviceId:    ${config.deviceId}`);
+      console.log(`folderName:  ${config.folderName}`);
+      console.log(`syncs to:    ~/${config.folderName}`);
+    }
+  });
+
+syncCmd
+  .command("pair")
+  .description("Install SyncThing on a devbox and pair with the laptop")
+  .argument("<devbox>", "Devbox name or ID")
+  .action(async (devbox: string) => {
+    const { getSyncthingConfig } = await import("./config.js");
+    const syncConfig = getSyncthingConfig();
+    if (!syncConfig) {
+      console.error("No SyncThing config. Run: thopter sync setup");
+      process.exit(1);
+    }
+
+    const { resolveDevbox } = await import("./devbox.js");
+    const { installSyncthingOnDevbox, getDevboxDeviceId, ensurePeerOnDevbox, pairDeviceLocally } = await import("./sync.js");
+    const { id, name } = await resolveDevbox(resolveThopterName(devbox));
+
+    // Check if SyncThing is already installed
+    let deviceId = await getDevboxDeviceId(id);
+    if (deviceId) {
+      console.log(`SyncThing already installed. Device ID: ${deviceId}`);
+    } else {
+      deviceId = await installSyncthingOnDevbox(id, syncConfig);
+      if (!deviceId) {
+        console.error("Failed to install SyncThing on devbox.");
+        process.exit(1);
+      }
+    }
+
+    // Always ensure the laptop is configured as a peer on the devbox
+    // (handles re-pairing after failed attempts or config changes)
+    console.log("Configuring laptop as peer on devbox...");
+    await ensurePeerOnDevbox(id, syncConfig);
+
+    await pairDeviceLocally(deviceId, name ?? devbox);
+  });
+
+syncCmd
+  .command("device-id")
+  .description("Show a devbox's SyncThing device ID")
+  .argument("<devbox>", "Devbox name or ID")
+  .action(async (devbox: string) => {
+    const { resolveDevbox } = await import("./devbox.js");
+    const { getDevboxDeviceId } = await import("./sync.js");
+    const { id } = await resolveDevbox(resolveThopterName(devbox));
+
+    const deviceId = await getDevboxDeviceId(id);
+    if (deviceId) {
+      console.log(deviceId);
+    } else {
+      console.error("SyncThing is not installed on this devbox.");
+      console.error("  Install it with: thopter sync pair " + devbox);
+      process.exit(1);
+    }
+  });
+
+syncCmd
+  .command("unpair")
+  .description("Remove a devbox from the laptop's SyncThing")
+  .argument("<devbox>", "Devbox name or ID")
+  .action(async (devbox: string) => {
+    const { resolveDevbox } = await import("./devbox.js");
+    const { getDevboxDeviceId, unpairDeviceLocally } = await import("./sync.js");
+    const { id } = await resolveDevbox(resolveThopterName(devbox));
+
+    const deviceId = await getDevboxDeviceId(id);
+    if (!deviceId) {
+      console.error("Could not get SyncThing device ID for this devbox.");
+      process.exit(1);
+    }
+
+    await unpairDeviceLocally(deviceId);
+  });
+
+syncCmd
+  .command("clear")
+  .description("Remove SyncThing config from ~/.thopter.json")
+  .action(async () => {
+    const { clearSyncthingConfig } = await import("./config.js");
+    clearSyncthingConfig();
+    console.log("SyncThing config removed from ~/.thopter.json.");
   });
 
 // --- env ---

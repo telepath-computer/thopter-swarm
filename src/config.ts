@@ -33,6 +33,13 @@ export interface RepoConfig {
   branch?: string;  // Pinned branch. If omitted → prompt at run time (default: main)
 }
 
+export interface SyncthingConfig {
+  /** This laptop's SyncThing device ID. */
+  deviceId: string;
+  /** Folder name — used as SyncThing folder ID and ~/folderName on all machines. */
+  folderName: string;
+}
+
 interface LocalConfig {
   runloopApiKey?: string;
   defaultSnapshotName?: string;
@@ -46,6 +53,7 @@ interface LocalConfig {
   envVars?: Record<string, string>;
   defaultThopter?: string;
   repos?: RepoConfig[];
+  syncthing?: SyncthingConfig;
 }
 
 function loadLocalConfig(): LocalConfig {
@@ -241,6 +249,23 @@ export function getUploads(): UploadEntry[] {
   return loadLocalConfig().uploads ?? [];
 }
 
+// --- SyncThing ---
+
+export function getSyncthingConfig(): SyncthingConfig | undefined {
+  return loadLocalConfig().syncthing;
+}
+
+export function setSyncthingConfig(syncthing: SyncthingConfig): void {
+  const config = loadLocalConfig();
+  config.syncthing = syncthing;
+  saveLocalConfig(config);
+}
+
+export function clearSyncthingConfig(): void {
+  const config = loadLocalConfig();
+  delete config.syncthing;
+  saveLocalConfig(config);
+}
 /**
  * Load config values into process.env so downstream code (client.ts, status.ts)
  * can read them without changes. Config values don't override existing env vars.

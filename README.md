@@ -118,6 +118,44 @@ thopter keepalive my-thopter  # reset 12 hour auto-suspend countdown timer
 thopter destroy my-thopter    # done for good
 ```
 
+### File Sync (SyncThing)
+
+Sync a folder in real-time between your laptop and all your devboxes. Agents write files, they appear on your machine instantly. You edit a file, the agent sees it immediately. Uses [SyncThing](https://syncthing.net) — peer-to-peer, encrypted, no cloud accounts.
+
+**How it works:** Your laptop is the hub. Each devbox syncs with your laptop. If your laptop is offline, agents keep working — changes sync when you reconnect. No port forwarding needed; SyncThing handles NAT traversal automatically.
+
+**Setup (one-time, on your laptop):**
+
+```bash
+# 1. Install SyncThing
+brew install syncthing          # macOS
+# or: sudo apt install syncthing  # Linux
+
+# 2. Start it (runs on login after this)
+brew services start syncthing   # macOS
+# or: sudo systemctl enable --now syncthing@$USER  # Linux
+
+# 3. Run setup (creates folder, registers with SyncThing, saves config)
+thopter sync setup
+```
+
+That's it. From now on, `thopter create` automatically installs SyncThing on each new devbox and pairs it with your laptop. The sync folder can be anything — a git repo, a plain directory, whatever you want.
+
+```bash
+# Pair an existing devbox manually
+thopter sync pair my-thopter
+
+# Skip sync on create
+thopter create my-thopter --no-sync
+
+# Check what's configured
+thopter sync show
+```
+
+**For multiple developers:** Each person runs `thopter sync setup` with their own folder name and paths. The config lives in `~/.thopter.json` — per-developer, no conflicts.
+
+See [docs/syncthing-artifact-sync.md](docs/syncthing-artifact-sync.md) for the full design doc.
+
 ## CLI Reference
 
 The CLI has commands for dispatching work (`run`, `tell`), managing lifecycle (`create`, `suspend`, `resume`, `keepalive`, `destroy`), connecting (`ssh`, `attach`, `exec`), monitoring (`status`, `tail`), snapshots, env vars, and configuration.
@@ -139,6 +177,7 @@ See [docs/architecture.md](docs/architecture.md) for details on the stack, how p
 ## More
 
 - [Clipboard setup](docs/clipboard.md) (Neovim + tmux + iTerm2 OSC 52)
+- [SyncThing file sync design](docs/syncthing-artifact-sync.md)
 - [Design docs and ideas](docs/)
 
 ## Electron GUI (Experimental)
