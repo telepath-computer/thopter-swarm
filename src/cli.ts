@@ -560,8 +560,7 @@ syncCmd
     }
 
     console.log("SyncThing sync configuration");
-    console.log("This configures ~/.thopter.json so devboxes know how to sync with your laptop.");
-    console.log("The folder will live at ~/<name> on your laptop and all devboxes.\n");
+    console.log("This configures ~/.thopter.json so devboxes know how to sync with your laptop.\n");
 
     const deviceId = await ask("Your laptop's SyncThing device ID", detectedId || existing?.deviceId);
     if (!deviceId) {
@@ -570,7 +569,9 @@ syncCmd
       process.exit(1);
     }
 
-    const folderName = opts.folderName ?? await ask("Sync folder name", existing?.folderName);
+    console.log("Choose a folder name. This will be a directory in your home folder (~/<name>)");
+    console.log("and in the home directory of every thopter. Files sync in real time between them.\n");
+    const folderName = opts.folderName ?? await ask("Folder name", existing?.folderName);
     if (!folderName) {
       console.error("Folder name is required.");
       rl.close();
