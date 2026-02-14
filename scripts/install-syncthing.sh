@@ -55,7 +55,7 @@ fi
 
 if [ ! -f "$SYNCTHING_CONFIG_DIR/config.xml" ]; then
     echo "Generating SyncThing config..."
-    syncthing generate --config="$SYNCTHING_CONFIG_DIR" --skip-port-probing
+    syncthing generate --config="$SYNCTHING_CONFIG_DIR" --no-port-probing
 else
     echo "SyncThing config already exists."
 fi
