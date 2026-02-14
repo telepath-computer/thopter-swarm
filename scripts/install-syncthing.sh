@@ -138,6 +138,11 @@ syncthing cli --home="$ST_HOME" config folders add \
     syncthing cli --home="$ST_HOME" config folders "$SYNC_FOLDER_ID" path set "$SYNC_FOLDER_PATH"
 }
 
+# Enable filesystem watcher for near-instant change detection (inotify)
+syncthing cli --home="$ST_HOME" config folders "$SYNC_FOLDER_ID" fswatcher-enabled set true 2>/dev/null || true
+syncthing cli --home="$ST_HOME" config folders "$SYNC_FOLDER_ID" fswatcher-delays set 1 2>/dev/null || true
+syncthing cli --home="$ST_HOME" config folders "$SYNC_FOLDER_ID" rescan-intervals set 30 2>/dev/null || true
+
 # ── 7. Add laptop as peer ───────────────────────────────────────────────────
 
 echo "Adding laptop device: $LAPTOP_DEVICE_ID"

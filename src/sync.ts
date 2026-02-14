@@ -214,7 +214,9 @@ export async function registerFolderLocally(
         label: folderName,
         path: folderPath,
         devices: [],
-        rescanIntervalS: 10,
+        rescanIntervalS: 30,
+        fsWatcherEnabled: true,
+        fsWatcherDelayS: 1,
       }),
     });
 
