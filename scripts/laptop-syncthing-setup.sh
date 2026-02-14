@@ -73,7 +73,7 @@ echo "SyncThing API is ready."
 
 # ── 3. Get laptop device ID ─────────────────────────────────────────────────
 
-LAPTOP_DEVICE_ID=$(syncthing cli show system | jq -r .myID 2>/dev/null || syncthing --device-id 2>/dev/null)
+LAPTOP_DEVICE_ID=$(syncthing cli show system | jq -r .myID 2>/dev/null || syncthing device-id 2>/dev/null)
 
 if [ -z "$LAPTOP_DEVICE_ID" ]; then
     echo "ERROR: Could not determine SyncThing device ID"

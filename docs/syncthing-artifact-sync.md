@@ -220,7 +220,7 @@ After the devbox is running and SyncThing is started:
 
 If the `thopter` CLI is NOT running on the laptop (e.g., running from another
 devbox), pairing must be done manually:
-- Get the devbox device ID: `thopter exec <name> syncthing --device-id`
+- Get the devbox device ID: `thopter sync device-id <name>`
 - Add it in the laptop's SyncThing web UI at `http://localhost:8384`
 
 ### 4. Golden Snapshot

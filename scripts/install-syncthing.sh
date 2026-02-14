@@ -20,7 +20,7 @@ SYNC_FOLDER_PATH="${3:?Missing folder path}"
 # Expand ~ in path
 SYNC_FOLDER_PATH="${SYNC_FOLDER_PATH/#\~/$HOME}"
 
-SYNCTHING_CONFIG_DIR="$HOME/.local/state/syncthing"
+ST_HOME="$HOME/.local/state/syncthing"
 
 # ── 1. Install SyncThing ────────────────────────────────────────────────────
 
@@ -53,15 +53,15 @@ fi
 
 # ── 2. Generate config (if not already present) ─────────────────────────────
 
-if [ ! -f "$SYNCTHING_CONFIG_DIR/config.xml" ]; then
+if [ ! -f "$ST_HOME/config.xml" ]; then
     echo "Generating SyncThing config..."
-    syncthing generate --config="$SYNCTHING_CONFIG_DIR" --no-port-probing
+    syncthing generate --home="$ST_HOME" --no-port-probing
 else
     echo "SyncThing config already exists."
 fi
 
 # Get this devbox's device ID
-DEVBOX_DEVICE_ID=$(syncthing --device-id 2>/dev/null || syncthing -device-id 2>/dev/null)
+DEVBOX_DEVICE_ID=$(syncthing device-id --home="$ST_HOME")
 echo "Devbox SyncThing device ID: $DEVBOX_DEVICE_ID"
 
 # ── 3. Create sync folder (if not already present) ──────────────────────────
@@ -103,20 +103,20 @@ fi
 
 # Start in background so we can configure via CLI
 echo "Starting SyncThing daemon..."
-syncthing serve --no-browser --no-upgrade --logfile="$HOME/.local/state/syncthing/syncthing.log" &
+syncthing serve --home="$ST_HOME" --no-browser --no-upgrade --logfile="$ST_HOME/syncthing.log" &
 ST_PID=$!
 
 # Wait for the REST API to become available
 echo "Waiting for SyncThing API..."
 for i in $(seq 1 30); do
-    if syncthing cli show system &>/dev/null 2>&1; then
+    if syncthing cli --home="$ST_HOME" show system &>/dev/null 2>&1; then
         break
     fi
     sleep 1
 done
 
 # Verify it's running
-if ! syncthing cli show system &>/dev/null 2>&1; then
+if ! syncthing cli --home="$ST_HOME" show system &>/dev/null 2>&1; then
     echo "ERROR: SyncThing API did not become available"
     exit 1
 fi
@@ -126,16 +126,16 @@ echo "SyncThing API is ready."
 # ── 6. Configure the shared folder ──────────────────────────────────────────
 
 # Remove the default folder if it exists (SyncThing creates one on first run)
-syncthing cli config folders default delete 2>/dev/null || true
+syncthing cli --home="$ST_HOME" config folders default delete 2>/dev/null || true
 
 # Add our sync folder
 echo "Configuring shared folder: $SYNC_FOLDER_ID at $SYNC_FOLDER_PATH"
-syncthing cli config folders add \
+syncthing cli --home="$ST_HOME" config folders add \
     --id "$SYNC_FOLDER_ID" \
     --label "$SYNC_FOLDER_ID" \
     --path "$SYNC_FOLDER_PATH" 2>/dev/null || {
     echo "Folder already configured, updating path..."
-    syncthing cli config folders "$SYNC_FOLDER_ID" path set "$SYNC_FOLDER_PATH"
+    syncthing cli --home="$ST_HOME" config folders "$SYNC_FOLDER_ID" path set "$SYNC_FOLDER_PATH"
 }
 
 # ── 7. Add laptop as peer ───────────────────────────────────────────────────
@@ -143,20 +143,20 @@ syncthing cli config folders add \
 echo "Adding laptop device: $LAPTOP_DEVICE_ID"
 
 # Add the laptop as a known device
-syncthing cli config devices add \
+syncthing cli --home="$ST_HOME" config devices add \
     --device-id "$LAPTOP_DEVICE_ID" \
     --name "laptop" 2>/dev/null || {
     echo "Laptop device already known, skipping."
 }
 
 # Share the folder with the laptop
-syncthing cli config folders "$SYNC_FOLDER_ID" devices add \
+syncthing cli --home="$ST_HOME" config folders "$SYNC_FOLDER_ID" devices add \
     --device-id "$LAPTOP_DEVICE_ID" 2>/dev/null || {
     echo "Laptop already in folder device list, skipping."
 }
 
 # Auto-accept folders from the laptop
-syncthing cli config devices "$LAPTOP_DEVICE_ID" auto-accept-folders set true 2>/dev/null || true
+syncthing cli --home="$ST_HOME" config devices "$LAPTOP_DEVICE_ID" auto-accept-folders set true 2>/dev/null || true
 
 echo "Laptop peer configured."
 
@@ -168,13 +168,13 @@ wait $ST_PID 2>/dev/null || true
 
 # Create a simple systemd user service
 mkdir -p "$HOME/.config/systemd/user"
-cat > "$HOME/.config/systemd/user/syncthing.service" << 'SYSTEMD'
+cat > "$HOME/.config/systemd/user/syncthing.service" << SYSTEMD
 [Unit]
 Description=Syncthing File Synchronization
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/syncthing serve --no-browser --no-upgrade
+ExecStart=/usr/local/bin/syncthing serve --home=$ST_HOME --no-browser --no-upgrade
 Restart=on-failure
 RestartSec=10
 

@@ -554,7 +554,7 @@ syncCmd
       const { execSync } = await import("node:child_process");
       for (const cmd of [
         "syncthing cli show system 2>/dev/null | jq -r .myID",
-        "syncthing --device-id 2>/dev/null",
+        "syncthing device-id 2>/dev/null",
       ]) {
         try {
           const result = execSync(cmd, { encoding: "utf-8" }).trim();

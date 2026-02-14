@@ -81,7 +81,7 @@ export async function installSyncthingOnDevbox(
 }
 
 /**
- * Get a devbox's SyncThing device ID by running syncthing --device-id.
+ * Get a devbox's SyncThing device ID by running syncthing device-id.
  */
 export async function getDevboxDeviceId(
   devboxId: string,
@@ -89,7 +89,7 @@ export async function getDevboxDeviceId(
   const client = getClient();
 
   const execution = await client.devboxes.executeAsync(devboxId, {
-    command: "syncthing --device-id 2>/dev/null",
+    command: "syncthing device-id 2>/dev/null",
   });
 
   const result = await client.devboxes.executions.awaitCompleted(
