@@ -144,12 +144,12 @@ echo ""
 echo "Saving SyncThing config to ~/.thopter.json..."
 
 if command -v thopter &>/dev/null; then
-    thopter sync init \
+    thopter sync setup \
         --device-id "$LAPTOP_DEVICE_ID" \
         --folder-name "$SYNC_FOLDER_ID"
 else
     echo "WARNING: thopter CLI not found. Save manually with:"
-    echo "  thopter sync init"
+    echo "  thopter sync setup"
 fi
 
 # ── 8. Summary ───────────────────────────────────────────────────────────────

@@ -42,7 +42,7 @@ examples:
   thopter ssh .                          SSH into the default thopter
   thopter run --repo owner/repo "prompt"  Launch Claude with a task
   thopter reauth                         Re-authenticate and update snapshot
-  thopter sync init                      Set up SyncThing config (run on laptop)
+  thopter sync setup                      Set up SyncThing config (run on laptop)
   thopter sync show                      Show current SyncThing config
   thopter sync pair dev                  Install SyncThing on devbox & pair
   thopter sync unpair dev                Remove devbox from laptop SyncThing
@@ -528,13 +528,17 @@ const syncCmd = program
   .description("Manage SyncThing file sync between laptop and devboxes");
 
 syncCmd
-  .command("init")
-  .description("Initialize SyncThing config (run on laptop)")
+  .command("setup")
+  .description("Set up SyncThing file sync (run on laptop)")
   .option("--device-id <id>", "SyncThing device ID (auto-detected if SyncThing is running)")
   .option("--folder-name <name>", "Sync folder name (used as ~/name on all machines)")
   .action(async (opts: { deviceId?: string; folderName?: string }) => {
     const { createInterface } = await import("node:readline");
+    const { existsSync, mkdirSync } = await import("node:fs");
+    const { homedir } = await import("node:os");
+    const { join } = await import("node:path");
     const { getSyncthingConfig, setSyncthingConfig } = await import("./config.js");
+    const { registerFolderLocally } = await import("./sync.js");
 
     const existing = getSyncthingConfig();
     const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -559,8 +563,8 @@ syncCmd
       }
     }
 
-    console.log("SyncThing sync configuration");
-    console.log("This configures ~/.thopter.json so devboxes know how to sync with your laptop.\n");
+    console.log("SyncThing file sync setup");
+    console.log("This sets up real-time file sync between your laptop and your thopters.\n");
 
     const deviceId = await ask("Your laptop's SyncThing device ID", detectedId || existing?.deviceId);
     if (!deviceId) {
@@ -569,7 +573,7 @@ syncCmd
       process.exit(1);
     }
 
-    console.log("Choose a folder name. This will be a directory in your home folder (~/<name>)");
+    console.log("\nChoose a folder name. This will be a directory in your home folder (~/<name>)");
     console.log("and in the home directory of every thopter. Files sync in real time between them.\n");
     const folderName = opts.folderName ?? await ask("Folder name", existing?.folderName);
     if (!folderName) {
@@ -580,14 +584,32 @@ syncCmd
 
     rl.close();
 
-    setSyncthingConfig({ deviceId, folderName });
+    // Warn if changing folders
+    if (existing?.folderName && existing.folderName !== folderName) {
+      console.log(`\nWARNING: Changing folder from '${existing.folderName}' to '${folderName}'.`);
+      console.log(`  The old folder '${existing.folderName}' is still registered with SyncThing.`);
+      console.log(`  To remove it: open http://localhost:8384 and remove the folder,`);
+      console.log(`  or run: syncthing cli config folders ${existing.folderName} delete`);
+    }
 
-    console.log("\nSaved to ~/.thopter.json:");
-    console.log(`  deviceId:    ${deviceId}`);
-    console.log(`  folderName:  ${folderName}`);
-    console.log(`  syncs to:    ~/${folderName} (on all machines)`);
-    console.log("\nNew devboxes created with 'thopter create' will auto-configure SyncThing.");
-    console.log("To pair an existing devbox: thopter sync pair <name>");
+    // Save config
+    setSyncthingConfig({ deviceId, folderName });
+    console.log("\nSaved config to ~/.thopter.json.");
+
+    // Create local folder
+    const folderPath = join(homedir(), folderName);
+    if (existsSync(folderPath)) {
+      console.log(`Folder exists: ${folderPath}`);
+    } else {
+      mkdirSync(folderPath, { recursive: true });
+      console.log(`Created folder: ${folderPath}`);
+    }
+
+    // Register with local SyncThing
+    await registerFolderLocally(folderName, folderPath);
+
+    console.log(`\nDone. New thopters created with 'thopter create' will sync ~/${folderName} automatically.`);
+    console.log("To pair an existing thopter: thopter sync pair <name>");
   });
 
 syncCmd
@@ -597,7 +619,7 @@ syncCmd
     const { getSyncthingConfig } = await import("./config.js");
     const config = getSyncthingConfig();
     if (!config) {
-      console.log("No SyncThing config set. Run: thopter sync init");
+      console.log("No SyncThing config set. Run: thopter sync setup");
     } else {
       console.log(`deviceId:    ${config.deviceId}`);
       console.log(`folderName:  ${config.folderName}`);
@@ -613,7 +635,7 @@ syncCmd
     const { getSyncthingConfig } = await import("./config.js");
     const syncConfig = getSyncthingConfig();
     if (!syncConfig) {
-      console.error("No SyncThing config. Run: thopter sync init");
+      console.error("No SyncThing config. Run: thopter sync setup");
       process.exit(1);
     }
 

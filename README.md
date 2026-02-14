@@ -135,15 +135,8 @@ brew install syncthing          # macOS
 brew services start syncthing   # macOS
 # or: sudo systemctl enable --now syncthing@$USER  # Linux
 
-# 3. Configure thopter
-thopter sync init
-# You'll be prompted for:
-#   Device ID    — auto-detected if SyncThing is running
-#   Folder name  — a directory in your home folder (e.g. "my-sync")
-#                  that will also exist in ~/ on every thopter
-
-# 4. Create the folder
-mkdir -p ~/my-sync              # must match the folder name you chose
+# 3. Run setup (creates folder, registers with SyncThing, saves config)
+thopter sync setup
 ```
 
 That's it. From now on, `thopter create` automatically installs SyncThing on each new devbox and pairs it with your laptop. The sync folder can be anything — a git repo, a plain directory, whatever you want.
@@ -159,7 +152,7 @@ thopter create my-thopter --no-sync
 thopter sync show
 ```
 
-**For multiple developers:** Each person runs `thopter sync init` with their own folder name and paths. The config lives in `~/.thopter.json` — per-developer, no conflicts.
+**For multiple developers:** Each person runs `thopter sync setup` with their own folder name and paths. The config lives in `~/.thopter.json` — per-developer, no conflicts.
 
 See [docs/syncthing-artifact-sync.md](docs/syncthing-artifact-sync.md) for the full design doc.
 

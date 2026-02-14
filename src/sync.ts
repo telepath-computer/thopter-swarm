@@ -127,6 +127,77 @@ function getLocalApiKey(): string | null {
 }
 
 /**
+ * Register a sync folder with the local SyncThing instance.
+ * Idempotent — if the folder already exists, does nothing.
+ * Returns true if SyncThing was reachable and the folder is registered.
+ */
+export async function registerFolderLocally(
+  folderName: string,
+  folderPath: string,
+): Promise<boolean> {
+  const apiKey = getLocalApiKey();
+  if (!apiKey) {
+    console.log("WARNING: Could not find local SyncThing API key.");
+    console.log("  Is SyncThing running? Check http://localhost:8384");
+    return false;
+  }
+
+  const headers = {
+    "X-API-Key": apiKey,
+    "Content-Type": "application/json",
+  };
+
+  try {
+    // Check if SyncThing is reachable
+    const sysResp = await fetch(`${SYNCTHING_API}/rest/system/status`, { headers });
+    if (!sysResp.ok) {
+      throw new Error(`SyncThing API returned ${sysResp.status}`);
+    }
+
+    // Check if folder already exists
+    const folderResp = await fetch(
+      `${SYNCTHING_API}/rest/config/folders/${folderName}`,
+      { headers },
+    );
+    if (folderResp.ok) {
+      console.log(`Folder '${folderName}' already registered in SyncThing.`);
+      return true;
+    }
+
+    // Add the folder
+    const addResp = await fetch(`${SYNCTHING_API}/rest/config/folders`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: folderName,
+        label: folderName,
+        path: folderPath,
+        devices: [],
+        rescanIntervalS: 10,
+      }),
+    });
+
+    if (!addResp.ok) {
+      const body = await addResp.text();
+      console.log(`WARNING: Failed to register folder with SyncThing: ${body}`);
+      return false;
+    }
+
+    console.log(`Registered folder '${folderName}' with local SyncThing.`);
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
+      console.log("WARNING: Could not connect to local SyncThing.");
+      console.log("  Is SyncThing running? Start it with: brew services start syncthing");
+    } else {
+      console.log(`WARNING: SyncThing folder registration failed: ${msg}`);
+    }
+    return false;
+  }
+}
+
+/**
  * Add a device to the local laptop's SyncThing instance via REST API.
  * Reads the folder ID from ~/.thopter.json syncthing config.
  */
@@ -137,7 +208,7 @@ export async function pairDeviceLocally(
   const syncConfig = getSyncthingConfig();
   if (!syncConfig) {
     console.log("WARNING: No syncthing config in ~/.thopter.json.");
-    console.log("  Run: thopter sync init");
+    console.log("  Run: thopter sync setup");
     return false;
   }
 
@@ -213,7 +284,7 @@ export async function pairDeviceLocally(
       console.log(
         `WARNING: Folder '${syncConfig.folderName}' not found in local SyncThing.`,
       );
-      console.log("  Run: thopter sync init");
+      console.log("  Run: thopter sync setup");
       return false;
     }
 

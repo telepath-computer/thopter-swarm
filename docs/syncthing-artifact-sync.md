@@ -172,7 +172,7 @@ brew install syncthing && brew services start syncthing
 mkdir -p ~/my-sync-folder
 
 # 3. Configure thopter (auto-detects your SyncThing device ID)
-thopter sync init
+thopter sync setup
 # Prompts for: device ID, folder name
 
 # 4. Verify
@@ -242,7 +242,7 @@ laptop peer.
 
 ```bash
 # One-time: configure SyncThing in ~/.thopter.json
-thopter sync init
+thopter sync setup
 
 # Show current SyncThing config
 thopter sync show
