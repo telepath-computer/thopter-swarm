@@ -36,12 +36,8 @@ export interface RepoConfig {
 export interface SyncthingConfig {
   /** This laptop's SyncThing device ID. */
   deviceId: string;
-  /** SyncThing folder ID (must match on both sides). */
-  folderId: string;
-  /** Path on the laptop (local). */
-  localPath: string;
-  /** Path on devboxes (remote). */
-  remotePath: string;
+  /** Folder name — used as SyncThing folder ID and ~/folderName on all machines. */
+  folderName: string;
 }
 
 interface LocalConfig {

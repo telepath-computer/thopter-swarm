@@ -487,7 +487,7 @@ configCmd
       const envCount = Object.keys(envVars).length;
       console.log(`envVars:                        ${envCount > 0 ? `${envCount} configured (see: thopter env list)` : "(none)"}`);
       const st = getSyncthingConfig();
-      console.log(`syncthing:                      ${st ? `${st.folderId} → ${st.localPath}` : "(not set)"}`);
+      console.log(`syncthing:                      ${st ? `~/${st.folderName}` : "(not set)"}`);
 
     } else {
       switch (key) {
@@ -531,10 +531,8 @@ syncCmd
   .command("init")
   .description("Initialize SyncThing config (run on laptop)")
   .option("--device-id <id>", "SyncThing device ID (auto-detected if SyncThing is running)")
-  .option("--folder-id <id>", "SyncThing folder ID")
-  .option("--local-path <path>", "Path on the laptop")
-  .option("--remote-path <path>", "Path on devboxes")
-  .action(async (opts: { deviceId?: string; folderId?: string; localPath?: string; remotePath?: string }) => {
+  .option("--folder-name <name>", "Sync folder name (used as ~/name on all machines)")
+  .action(async (opts: { deviceId?: string; folderName?: string }) => {
     const { createInterface } = await import("node:readline");
     const { getSyncthingConfig, setSyncthingConfig } = await import("./config.js");
 
@@ -550,7 +548,6 @@ syncCmd
     let detectedId = opts.deviceId ?? "";
     if (!detectedId) {
       const { execSync } = await import("node:child_process");
-      // Try the running daemon's REST API first, then fall back to direct command
       for (const cmd of [
         "syncthing cli show system 2>/dev/null | jq -r .myID",
         "syncthing --device-id 2>/dev/null",
@@ -563,7 +560,8 @@ syncCmd
     }
 
     console.log("SyncThing sync configuration");
-    console.log("This configures ~/.thopter.json so devboxes know how to sync with your laptop.\n");
+    console.log("This configures ~/.thopter.json so devboxes know how to sync with your laptop.");
+    console.log("The folder will live at ~/<name> on your laptop and all devboxes.\n");
 
     const deviceId = await ask("Your laptop's SyncThing device ID", detectedId || existing?.deviceId);
     if (!deviceId) {
@@ -572,19 +570,21 @@ syncCmd
       process.exit(1);
     }
 
-    const folderId = opts.folderId ?? await ask("SyncThing folder ID", existing?.folderId || "jw-artifact-stash");
-    const localPath = opts.localPath ?? await ask("Local path (on your laptop)", existing?.localPath || `~/jw-artifact-stash`);
-    const remotePath = opts.remotePath ?? await ask("Remote path (on devboxes)", existing?.remotePath || localPath);
+    const folderName = opts.folderName ?? await ask("Sync folder name", existing?.folderName);
+    if (!folderName) {
+      console.error("Folder name is required.");
+      rl.close();
+      process.exit(1);
+    }
 
     rl.close();
 
-    setSyncthingConfig({ deviceId, folderId, localPath, remotePath });
+    setSyncthingConfig({ deviceId, folderName });
 
     console.log("\nSaved to ~/.thopter.json:");
-    console.log(`  deviceId:   ${deviceId}`);
-    console.log(`  folderId:   ${folderId}`);
-    console.log(`  localPath:  ${localPath}`);
-    console.log(`  remotePath: ${remotePath}`);
+    console.log(`  deviceId:    ${deviceId}`);
+    console.log(`  folderName:  ${folderName}`);
+    console.log(`  syncs to:    ~/${folderName} (on all machines)`);
     console.log("\nNew devboxes created with 'thopter create' will auto-configure SyncThing.");
     console.log("To pair an existing devbox: thopter sync pair <name>");
   });
@@ -598,10 +598,9 @@ syncCmd
     if (!config) {
       console.log("No SyncThing config set. Run: thopter sync init");
     } else {
-      console.log(`deviceId:   ${config.deviceId}`);
-      console.log(`folderId:   ${config.folderId}`);
-      console.log(`localPath:  ${config.localPath}`);
-      console.log(`remotePath: ${config.remotePath}`);
+      console.log(`deviceId:    ${config.deviceId}`);
+      console.log(`folderName:  ${config.folderName}`);
+      console.log(`syncs to:    ~/${config.folderName}`);
     }
   });
 

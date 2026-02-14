@@ -136,15 +136,13 @@ brew services start syncthing   # macOS
 # or: sudo systemctl enable --now syncthing@$USER  # Linux
 
 # 3. Create your sync folder
-mkdir -p ~/jw-artifact-stash    # or any name you want
+mkdir -p ~/my-sync-folder       # or any name you want
 
 # 4. Configure thopter (auto-detects your SyncThing device ID)
 thopter sync init
 # You'll be prompted for:
 #   Device ID    — auto-detected if SyncThing is running
-#   Folder ID    — e.g. "jw-artifact-stash" (must match both sides)
-#   Local path   — e.g. ~/jw-artifact-stash
-#   Remote path  — e.g. ~/jw-artifact-stash (path on devboxes)
+#   Folder name  — e.g. "my-sync-folder" (becomes ~/my-sync-folder everywhere)
 ```
 
 That's it. From now on, `thopter create` automatically installs SyncThing on each new devbox and pairs it with your laptop. The sync folder can be anything — a git repo, a plain directory, whatever you want.

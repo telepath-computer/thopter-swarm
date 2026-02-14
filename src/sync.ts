@@ -5,9 +5,7 @@
  *   {
  *     "syncthing": {
  *       "deviceId": "MFZWI3D-...",      // laptop's SyncThing device ID
- *       "folderId": "jw-artifacts",       // SyncThing folder ID (both sides)
- *       "localPath": "~/my-artifacts",    // path on laptop
- *       "remotePath": "~/my-artifacts"    // path on devboxes
+ *       "folderName": "my-sync-folder"   // ~/folderName on all machines
  *     }
  *   }
  */
@@ -49,8 +47,8 @@ export async function installSyncthingOnDevbox(
   const cmd = [
     "bash /tmp/install-syncthing.sh",
     JSON.stringify(syncConfig.deviceId),
-    JSON.stringify(syncConfig.folderId),
-    JSON.stringify(syncConfig.remotePath),
+    JSON.stringify(syncConfig.folderName),
+    JSON.stringify(`~/${syncConfig.folderName}`),
     "2>&1",
   ].join(" ");
 
@@ -187,7 +185,7 @@ export async function pairDeviceLocally(
 
     // Share the folder with the device
     const folderResp = await fetch(
-      `${SYNCTHING_API}/rest/config/folders/${syncConfig.folderId}`,
+      `${SYNCTHING_API}/rest/config/folders/${syncConfig.folderName}`,
       { headers },
     );
 
@@ -203,7 +201,7 @@ export async function pairDeviceLocally(
       if (!alreadyShared) {
         folder.devices = [...(folder.devices ?? []), { deviceID: deviceId }];
         await fetch(
-          `${SYNCTHING_API}/rest/config/folders/${syncConfig.folderId}`,
+          `${SYNCTHING_API}/rest/config/folders/${syncConfig.folderName}`,
           {
             method: "PUT",
             headers,
@@ -213,7 +211,7 @@ export async function pairDeviceLocally(
       }
     } else {
       console.log(
-        `WARNING: Folder '${syncConfig.folderId}' not found in local SyncThing.`,
+        `WARNING: Folder '${syncConfig.folderName}' not found in local SyncThing.`,
       );
       console.log("  Run: thopter sync init");
       return false;

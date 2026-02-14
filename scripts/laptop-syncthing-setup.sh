@@ -6,13 +6,12 @@
 #   - SyncThing installed (brew install syncthing / apt install syncthing)
 #   - thopter CLI configured (thopter setup)
 #
-# Usage: bash scripts/laptop-syncthing-setup.sh [folder-id] [local-path] [remote-path]
+# Usage: bash scripts/laptop-syncthing-setup.sh <folder-name>
 
 set -euo pipefail
 
-SYNC_FOLDER_ID="${1:-jw-artifact-stash}"
-SYNC_FOLDER_PATH="${2:-$HOME/$SYNC_FOLDER_ID}"
-REMOTE_PATH="${3:-~/$SYNC_FOLDER_ID}"
+SYNC_FOLDER_ID="${1:?Usage: laptop-syncthing-setup.sh <folder-name>}"
+SYNC_FOLDER_PATH="$HOME/$SYNC_FOLDER_ID"
 
 echo "=== SyncThing Laptop Setup for Thopter File Sync ==="
 echo ""
@@ -147,9 +146,7 @@ echo "Saving SyncThing config to ~/.thopter.json..."
 if command -v thopter &>/dev/null; then
     thopter sync init \
         --device-id "$LAPTOP_DEVICE_ID" \
-        --folder-id "$SYNC_FOLDER_ID" \
-        --local-path "$SYNC_FOLDER_PATH" \
-        --remote-path "$REMOTE_PATH"
+        --folder-name "$SYNC_FOLDER_ID"
 else
     echo "WARNING: thopter CLI not found. Save manually with:"
     echo "  thopter sync init"
@@ -161,9 +158,7 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "  SyncThing device ID: $LAPTOP_DEVICE_ID"
-echo "  Sync folder:         $SYNC_FOLDER_PATH"
-echo "  SyncThing folder ID: $SYNC_FOLDER_ID"
-echo "  Remote path:         $REMOTE_PATH"
+echo "  Sync folder:         ~/$SYNC_FOLDER_ID (on all machines)"
 echo "  SyncThing Web UI:    http://localhost:8384"
 echo ""
 echo "Next steps:"

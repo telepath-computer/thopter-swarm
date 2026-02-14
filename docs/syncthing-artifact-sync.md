@@ -103,9 +103,7 @@ All SyncThing config lives in `~/.thopter.json` under the `syncthing` key:
 {
   "syncthing": {
     "deviceId": "MFZWI3D-BONSEZ7-...",
-    "folderId": "jw-artifact-stash",
-    "localPath": "~/jw-artifact-stash",
-    "remotePath": "~/jw-artifact-stash"
+    "folderName": "my-sync-folder"
   }
 }
 ```
@@ -113,14 +111,12 @@ All SyncThing config lives in `~/.thopter.json` under the `syncthing` key:
 | Field | Description |
 |-------|-------------|
 | `deviceId` | This laptop's SyncThing device ID (auto-detected) |
-| `folderId` | SyncThing folder ID — must match on both sides |
-| `localPath` | Where the folder lives on the laptop |
-| `remotePath` | Where the folder lives on devboxes |
+| `folderName` | Folder name — becomes `~/folderName` on all machines, and the SyncThing folder ID |
 
 Each developer has their own `~/.thopter.json`, so each can have their own
-folder. For example, JW uses `jw-artifact-stash`, another developer could use
-`ab-workspace`. The folder can be anything — a git repo, a plain directory,
-a collection of markdown docs. Git is optional, not required.
+folder name. The folder lives at `~/folderName` on the laptop and all devboxes.
+It can be anything — a git repo, a plain directory, a collection of markdown
+docs. Git is optional, not required.
 
 ## .stignore
 
@@ -163,9 +159,7 @@ brew install syncthing          # macOS
 # or: sudo apt install syncthing  # Linux
 
 # Run the setup script
-bash scripts/laptop-syncthing-setup.sh
-# or with custom folder:
-bash scripts/laptop-syncthing-setup.sh my-workspace ~/my-workspace ~/my-workspace
+bash scripts/laptop-syncthing-setup.sh my-sync-folder
 ```
 
 **Option B: Manual / step-by-step:**
@@ -175,12 +169,11 @@ bash scripts/laptop-syncthing-setup.sh my-workspace ~/my-workspace ~/my-workspac
 brew install syncthing && brew services start syncthing
 
 # 2. Create your sync folder (can be a git repo or just a directory)
-mkdir -p ~/jw-artifact-stash
-# or: git clone https://github.com/org/artifact-stash ~/jw-artifact-stash
+mkdir -p ~/my-sync-folder
 
 # 3. Configure thopter (auto-detects your SyncThing device ID)
 thopter sync init
-# Prompts for: device ID, folder ID, local path, remote path
+# Prompts for: device ID, folder name
 
 # 4. Verify
 thopter sync show
@@ -209,7 +202,7 @@ What the script does:
 1. Downloads the SyncThing binary
 2. Generates config and keys
 3. Adds the laptop as a known device (device ID from `~/.thopter.json`)
-4. Configures the shared folder at the `remotePath` from config
+4. Configures the shared folder at `~/folderName`
 5. Creates the folder directory
 6. Starts SyncThing as a systemd user service
 7. Outputs the devbox's device ID for pairing
