@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 
 function createWindow(): void {
@@ -9,6 +9,20 @@ function createWindow(): void {
       nodeIntegration: true,
       contextIsolation: false,
     },
+  })
+
+  // Prevent any in-app navigation — open links in the external browser instead.
+  // Without this, clicking a link (e.g. an auth URL in the terminal) replaces
+  // the entire Electron UI with that page.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    event.preventDefault()
+    shell.openExternal(url)
+  })
+
+  // Handle window.open() calls the same way
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {

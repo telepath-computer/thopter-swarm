@@ -104,10 +104,8 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     })
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
-    term.loadAddon(new WebLinksAddon((event, uri) => {
-      if (event.metaKey || event.ctrlKey) {
-        shell.openExternal(uri)
-      }
+    term.loadAddon(new WebLinksAddon((_event, uri) => {
+      shell.openExternal(uri)
     }))
     term.open(container)
 
