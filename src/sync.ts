@@ -80,6 +80,9 @@ export async function installSyncthingOnDevbox(
   return null;
 }
 
+/** SyncThing device IDs are 7 groups of 7 uppercase alphanumeric chars separated by dashes. */
+const DEVICE_ID_RE = /^[A-Z0-9]{7}(-[A-Z0-9]{7}){7}$/;
+
 /**
  * Get a devbox's SyncThing device ID by running syncthing device-id.
  */
@@ -89,7 +92,7 @@ export async function getDevboxDeviceId(
   const client = getClient();
 
   const execution = await client.devboxes.executeAsync(devboxId, {
-    command: "syncthing device-id 2>/dev/null",
+    command: "syncthing device-id --home=$(echo ~)/.local/state/syncthing 2>&1",
   });
 
   const result = await client.devboxes.executions.awaitCompleted(
@@ -98,7 +101,8 @@ export async function getDevboxDeviceId(
   );
 
   const id = (result.stdout ?? "").trim();
-  return id || null;
+  // Validate it looks like a real device ID, not an error message
+  return DEVICE_ID_RE.test(id) ? id : null;
 }
 
 /**
