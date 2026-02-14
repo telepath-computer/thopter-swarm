@@ -83,6 +83,43 @@ export async function installSyncthingOnDevbox(
 /** SyncThing device IDs are 7 groups of 7 uppercase alphanumeric chars separated by dashes. */
 const DEVICE_ID_RE = /^[A-Z0-9]{7}(-[A-Z0-9]{7}){7}$/;
 
+const ST_HOME_EXPR = "$(echo ~)/.local/state/syncthing";
+
+/**
+ * Ensure the laptop is configured as a peer on the devbox.
+ * Runs the SyncThing CLI commands to add the laptop device and share the folder.
+ * Idempotent — safe to run even if already configured.
+ */
+export async function ensurePeerOnDevbox(
+  devboxId: string,
+  syncConfig: SyncthingConfig,
+): Promise<void> {
+  const client = getClient();
+
+  const cmds = [
+    // Add laptop device (ignore "already exists" errors)
+    `syncthing cli --home="${ST_HOME_EXPR}" config devices add --device-id "${syncConfig.deviceId}" --name "laptop" 2>/dev/null || true`,
+    // Share folder with laptop
+    `syncthing cli --home="${ST_HOME_EXPR}" config folders "${syncConfig.folderName}" devices add --device-id "${syncConfig.deviceId}" 2>/dev/null || true`,
+    // Auto-accept folders from laptop
+    `syncthing cli --home="${ST_HOME_EXPR}" config devices "${syncConfig.deviceId}" auto-accept-folders set true 2>/dev/null || true`,
+  ];
+
+  const execution = await client.devboxes.executeAsync(devboxId, {
+    command: cmds.join(" && "),
+  });
+
+  const result = await client.devboxes.executions.awaitCompleted(
+    devboxId,
+    execution.execution_id,
+  );
+
+  if (result.exit_status && result.exit_status !== 0) {
+    console.log("WARNING: Could not configure laptop peer on devbox.");
+    if (result.stderr) process.stderr.write(result.stderr);
+  }
+}
+
 /**
  * Get a devbox's SyncThing device ID by running syncthing device-id.
  */

@@ -640,7 +640,7 @@ syncCmd
     }
 
     const { resolveDevbox } = await import("./devbox.js");
-    const { installSyncthingOnDevbox, getDevboxDeviceId, pairDeviceLocally } = await import("./sync.js");
+    const { installSyncthingOnDevbox, getDevboxDeviceId, ensurePeerOnDevbox, pairDeviceLocally } = await import("./sync.js");
     const { id, name } = await resolveDevbox(resolveThopterName(devbox));
 
     // Check if SyncThing is already installed
@@ -654,6 +654,11 @@ syncCmd
         process.exit(1);
       }
     }
+
+    // Always ensure the laptop is configured as a peer on the devbox
+    // (handles re-pairing after failed attempts or config changes)
+    console.log("Configuring laptop as peer on devbox...");
+    await ensurePeerOnDevbox(id, syncConfig);
 
     await pairDeviceLocally(deviceId, name ?? devbox);
   });
