@@ -189,23 +189,6 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
     }
   }, [name, devboxId, spawnInfoProp])
 
-  // Re-fit when becoming visible
-  useEffect(() => {
-    if (!visible) return
-    // Trigger a resize event so terminals re-fit
-    requestAnimationFrame(() => {
-      const container = containerRef.current
-      if (container) {
-        // ResizeObserver inside createTmuxTerminal handles fitting
-        // Just trigger a layout recalc
-        container.style.display = 'none'
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-        container.offsetHeight // force reflow
-        container.style.display = ''
-      }
-    })
-  }, [visible])
-
   // Connect on mount, clean up on unmount
   useEffect(() => {
     connect()
