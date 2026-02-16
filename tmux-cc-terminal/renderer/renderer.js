@@ -13,6 +13,9 @@
  * @param {Object} [options.theme] - xterm.js theme override
  * @param {string} [options.fontFamily] - font family override
  * @param {number} [options.fontSize] - font size override
+ * @param {Object} [options.linkHandler] - xterm.js linkHandler for OSC 8 hyperlinks ({ activate(event, uri) })
+ * @param {Object} [options.WebLinksAddon] - WebLinksAddon module (with .WebLinksAddon property or class itself)
+ * @param {Function} [options.onWebLinkClick] - callback for plain-text URL clicks: (event, uri) => void
  * @returns {Object} Control interface: { destroy(), newWindow(), ... }
  */
 function createTmuxTerminal(container, adapter, options = {}) {
@@ -68,6 +71,14 @@ function createTmuxTerminal(container, adapter, options = {}) {
   };
   const termFontFamily = options.fontFamily || "'IosevkaTerm Nerd Font Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace";
   const termFontSize = options.fontSize || 14;
+  const termLinkHandler = options.linkHandler || undefined;
+
+  // WebLinksAddon for plain-text URL detection (lower priority than OSC 8 links)
+  const WebLinksAddonModule = options.WebLinksAddon || null;
+  const WebLinksAddonClass = WebLinksAddonModule
+    ? (WebLinksAddonModule.WebLinksAddon || WebLinksAddonModule)
+    : null;
+  const onWebLinkClick = options.onWebLinkClick || null;
 
   // ── Helpers ──
 
@@ -131,17 +142,27 @@ function createTmuxTerminal(container, adapter, options = {}) {
   }
 
   function createTerminalPane(paneId, windowId, name) {
-    const term = new TerminalClass({
+    const termOpts = {
       cursorBlink: true,
       fontSize: termFontSize,
       fontFamily: termFontFamily,
       theme: termTheme,
       scrollback: 5000,
       allowProposedApi: true,
-    });
+    };
+    if (termLinkHandler) termOpts.linkHandler = termLinkHandler;
+    const term = new TerminalClass(termOpts);
 
     const fitAddon = new FitAddonClass();
     term.loadAddon(fitAddon);
+
+    // Load WebLinksAddon for plain-text URL detection (won't fire on OSC 8 links)
+    if (WebLinksAddonClass) {
+      const webLinksAddon = onWebLinkClick
+        ? new WebLinksAddonClass(onWebLinkClick)
+        : new WebLinksAddonClass();
+      term.loadAddon(webLinksAddon);
+    }
 
     let tab = tabs.get(windowId);
     let windowWrapper;

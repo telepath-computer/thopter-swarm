@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { getService } from '@/services'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import iosevkaRegular from '@/assets/fonts/IosevkaTermNerdFont-Regular.ttf'
 import iosevkaBold from '@/assets/fonts/IosevkaTermNerdFont-Bold.ttf'
@@ -15,6 +16,7 @@ import iosevkaBoldItalic from '@/assets/fonts/IosevkaTermNerdFont-BoldItalic.ttf
 const nodeRequire = (window as any).require as NodeRequire
 const nodePath = nodeRequire('path') as typeof import('path')
 const tmuxCCRoot = nodePath.resolve(process.cwd(), '..', 'tmux-cc-terminal')
+const { shell } = nodeRequire('electron') as typeof import('electron')
 const { TmuxAdapter } = nodeRequire(nodePath.join(tmuxCCRoot, 'lib', 'tmux-adapter'))
 const { createTmuxTerminal } = nodeRequire(nodePath.join(tmuxCCRoot, 'renderer', 'renderer'))
 
@@ -128,6 +130,15 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
     const api = createTmuxTerminal(tmuxContainer, adapter, {
       Terminal,
       FitAddon: { FitAddon },
+      WebLinksAddon: { WebLinksAddon },
+      linkHandler: {
+        activate(_event: MouseEvent, uri: string) {
+          shell.openExternal(uri)
+        },
+      },
+      onWebLinkClick: (_event: MouseEvent, uri: string) => {
+        shell.openExternal(uri)
+      },
       theme: {
         background: '#0d1117',
         foreground: '#c9d1d9',
