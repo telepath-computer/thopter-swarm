@@ -111,7 +111,7 @@ export function ThopterDetail({ tabName }: Props) {
             className="absolute inset-0"
             style={{ display: liveVisible ? 'flex' : 'none' }}
           >
-            <TmuxLiveTerminalView name={thopter.name} visible={liveVisible} />
+            <TmuxLiveTerminalView name={thopter.name} devboxId={thopter.id} visible={liveVisible} />
           </div>
         )}
       </div>

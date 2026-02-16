@@ -20,13 +20,14 @@ const { createTmuxTerminal } = nodeRequire(nodePath.join(tmuxCCRoot, 'renderer',
 
 interface Props {
   name: string
+  devboxId?: string | null
   visible?: boolean
   spawnInfo?: { command: string; args: string[] }
 }
 
 type ViewState = 'connecting' | 'connected' | 'error' | 'exited'
 
-export function TmuxLiveTerminalView({ name, visible = true, spawnInfo: spawnInfoProp }: Props) {
+export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo: spawnInfoProp }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const adapterRef = useRef<InstanceType<typeof TmuxAdapter> | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,10 +67,18 @@ export function TmuxLiveTerminalView({ name, visible = true, spawnInfo: spawnInf
       await Promise.all(faces.map(f => f.load().then(loaded => document.fonts.add(loaded))))
     }
 
-    // Get SSH spawn info from prop or service
+    // Get SSH spawn info from prop, devbox ID, or name lookup.
+    // Prefer getSSHSpawnById (uses Runloop API directly) over getSSHSpawn
+    // (queries Redis, which may not have data for this thopter).
     let spawnInfo: { command: string; args: string[] }
     try {
-      spawnInfo = spawnInfoProp ?? await getService().getSSHSpawn(name)
+      if (spawnInfoProp) {
+        spawnInfo = spawnInfoProp
+      } else if (devboxId) {
+        spawnInfo = await getService().getSSHSpawnById(devboxId)
+      } else {
+        spawnInfo = await getService().getSSHSpawn(name)
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setErrorMsg(msg)
@@ -165,7 +174,7 @@ export function TmuxLiveTerminalView({ name, visible = true, spawnInfo: spawnInf
       setErrorMsg(msg)
       setState('error')
     }
-  }, [name, spawnInfoProp])
+  }, [name, devboxId, spawnInfoProp])
 
   // Re-fit when becoming visible
   useEffect(() => {
