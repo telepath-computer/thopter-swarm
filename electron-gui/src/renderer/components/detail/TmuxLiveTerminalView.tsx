@@ -136,8 +136,10 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
           shell.openExternal(uri)
         },
       },
-      onWebLinkClick: (_event: MouseEvent, uri: string) => {
-        shell.openExternal(uri)
+      onWebLinkClick: (event: MouseEvent, uri: string) => {
+        if (event.metaKey || event.ctrlKey) {
+          shell.openExternal(uri)
+        }
       },
       theme: {
         background: '#0d1117',

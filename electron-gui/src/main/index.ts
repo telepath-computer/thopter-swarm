@@ -19,9 +19,14 @@ function createWindow(): void {
     shell.openExternal(url)
   })
 
-  // Handle window.open() calls the same way
+  // Handle window.open() calls the same way.
+  // Ignore about:blank — xterm.js's default OSC 8 link handler calls
+  // window.open() with no URL (about:blank) first, then navigates.
+  // Passing about:blank to shell.openExternal causes an OS error.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    if (url && url !== 'about:blank') {
+      shell.openExternal(url)
+    }
     return { action: 'deny' }
   })
 
