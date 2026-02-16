@@ -207,7 +207,7 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
 
   return (
     <div className="flex-1 relative bg-[#0d1117]">
-      <div ref={containerRef} className="absolute inset-0" style={{ WebkitFontSmoothing: 'antialiased' }} />
+      <div ref={containerRef} className="absolute inset-0 overflow-hidden" style={{ WebkitFontSmoothing: 'antialiased' }} />
 
       {/* Connecting overlay */}
       {state === 'connecting' && (
