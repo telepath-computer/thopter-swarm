@@ -165,47 +165,20 @@ syncthing cli --home="$ST_HOME" config devices "$LAPTOP_DEVICE_ID" auto-accept-f
 
 echo "Laptop peer configured."
 
-# ── 8. Ensure SyncThing runs persistently ─────────────────────────────────
+# ── 8. Start SyncThing and leave persistence to the heartbeat ──────────────
 
-# Try systemd user service first; fall back to cron @reboot if systemd isn't available
-# (Runloop devboxes don't have D-Bus, so systemd --user may not work)
+# The heartbeat cron (thopter-heartbeat.sh) checks every ~10s whether
+# syncthing is alive and restarts it if not.  No @reboot cron or systemd
+# service needed — the heartbeat is the supervisor.
 kill $ST_PID 2>/dev/null || true
 wait $ST_PID 2>/dev/null || true
 
-SYSTEMD_OK=false
-if systemctl --user daemon-reload 2>/dev/null; then
-    mkdir -p "$HOME/.config/systemd/user"
-    cat > "$HOME/.config/systemd/user/syncthing.service" << SYSTEMD
-[Unit]
-Description=Syncthing File Synchronization
-After=network.target
+# Remove any stale @reboot cron entry from previous installs
+( crontab -l 2>/dev/null | grep -v "syncthing serve" ) | crontab - 2>/dev/null || true
 
-[Service]
-ExecStart=/usr/local/bin/syncthing serve --home=$ST_HOME --no-browser --no-upgrade
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=default.target
-SYSTEMD
-
-    sudo loginctl enable-linger user 2>/dev/null || true
-    systemctl --user enable syncthing.service 2>/dev/null && \
-    systemctl --user start syncthing.service 2>/dev/null && \
-    SYSTEMD_OK=true
-fi
-
-if [ "$SYSTEMD_OK" = true ]; then
-    echo "SyncThing running via systemd."
-else
-    echo "systemd not available, using cron + nohup fallback."
-    # Add @reboot cron entry (idempotent)
-    CRON_CMD="@reboot /usr/local/bin/syncthing serve --home=$ST_HOME --no-browser --no-upgrade > /dev/null 2>&1"
-    ( crontab -l 2>/dev/null | grep -v "syncthing serve" ; echo "$CRON_CMD" ) | crontab -
-    # Start now
-    nohup syncthing serve --home="$ST_HOME" --no-browser --no-upgrade > "$ST_HOME/syncthing.log" 2>&1 &
-    echo "SyncThing started in background (cron @reboot for persistence)."
-fi
+# Start now (heartbeat will keep it alive going forward)
+nohup syncthing serve --home="$ST_HOME" --no-browser --no-upgrade > "$ST_HOME/syncthing.log" 2>&1 &
+echo "SyncThing started (heartbeat will keep it alive)."
 
 # ── 9. Output device ID (last line — captured by caller) ────────────────────
 

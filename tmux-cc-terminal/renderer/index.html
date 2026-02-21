@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>tmux CC Terminal</title>
+  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="tab-bar">
+    <div id="tabs"></div>
+    <button id="new-tab-btn" title="New window">+</button>
+    <div id="spacer"></div>
+    <button id="detach-btn" title="Detach from tmux">Detach</button>
+    <button id="connect-btn" title="Reconnect" style="display:none;">Connect</button>
+  </div>
+  <div id="status-bar">
+    <span id="status-text">Connecting...</span>
+  </div>
+  <div id="terminal-container"></div>
+
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

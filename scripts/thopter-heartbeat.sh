@@ -5,6 +5,12 @@
 
 . "$HOME/.bashrc" 2>/dev/null
 
+# Ensure SyncThing is running (idempotent — no-op if already alive)
+ST_HOME="$HOME/.local/state/syncthing"
+if [ -f "$ST_HOME/config.xml" ] && ! pgrep -x syncthing >/dev/null 2>&1; then
+    nohup syncthing serve --home="$ST_HOME" --no-browser --no-upgrade > "$ST_HOME/syncthing.log" 2>&1 &
+fi
+
 # Activity-based status: check the touch file that Claude hooks update.
 # If active within the last minute, status is "running".
 # If stale and status was "running", flip to "inactive" (Claude likely died

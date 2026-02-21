@@ -1,0 +1,159 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#tab-bar {
+  display: flex;
+  align-items: center;
+  background: #181825;
+  height: 36px;
+  padding: 0 8px;
+  gap: 4px;
+  -webkit-app-region: drag;
+}
+
+#tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  -webkit-app-region: no-drag;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: #313244;
+  border: none;
+  border-radius: 6px 6px 0 0;
+  color: #a6adc8;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+.tab:hover {
+  background: #45475a;
+}
+
+.tab.active {
+  background: #1e1e2e;
+  color: #cdd6f4;
+}
+
+.tab .close-btn {
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.tab .close-btn:hover {
+  opacity: 1;
+  color: #f38ba8;
+}
+
+.tab .split-btn {
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.4;
+  padding: 0 2px;
+}
+
+.tab .split-btn:hover {
+  opacity: 1;
+  color: #89b4fa;
+}
+
+#new-tab-btn,
+#detach-btn,
+#connect-btn {
+  background: none;
+  border: 1px solid #45475a;
+  color: #a6adc8;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  -webkit-app-region: no-drag;
+}
+
+#new-tab-btn:hover,
+#detach-btn:hover,
+#connect-btn:hover {
+  background: #45475a;
+  color: #cdd6f4;
+}
+
+#spacer {
+  flex: 1;
+}
+
+#status-bar {
+  background: #11111b;
+  padding: 2px 12px;
+  font-size: 12px;
+  color: #6c7086;
+  height: 22px;
+  display: flex;
+  align-items: center;
+}
+
+#terminal-container {
+  flex: 1;
+  min-height: 0;
+  background: #1e1e2e;
+  position: relative;
+  overflow: hidden;
+}
+
+.window-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: none;
+}
+
+.window-wrapper.active {
+  display: block;
+}
+
+.terminal-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: block;
+  padding: 4px;
+}
+
+/* Border between panes in a split layout.
+   Padding is reduced from 4px to 1px so that the total overhead
+   (padding + border = 4px per pane) stays under one character cell.
+   This ensures xterm's computed cols match tmux's pane allocation. */
+.terminal-wrapper.split-pane {
+  border: 1px solid #45475a;
+  padding: 1px;
+}
+
+.terminal-wrapper.split-pane.active-pane {
+  border-color: #89b4fa;
+}

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import { StatusPanel } from './StatusPanel'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from './TerminalView'
-import { LiveTerminalView } from './LiveTerminalView'
+import { TmuxLiveTerminalView } from './TmuxLiveTerminalView'
 import { ActionBar } from './ActionBar'
 
 interface Props {
@@ -108,10 +108,10 @@ export function ThopterDetail({ tabName }: Props) {
         {/* Live terminal stays mounted once activated, hidden/shown via CSS */}
         {hasLiveTerminal && (
           <div
-            className="absolute inset-0"
-            style={{ display: liveVisible ? 'flex' : 'none' }}
+            className="absolute inset-0 flex"
+            style={{ visibility: liveVisible ? 'visible' : 'hidden', pointerEvents: liveVisible ? undefined : 'none' }}
           >
-            <LiveTerminalView name={thopter.name} visible={liveVisible} />
+            <TmuxLiveTerminalView name={thopter.name} devboxId={thopter.id} visible={liveVisible} />
           </div>
         )}
       </div>

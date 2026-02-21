@@ -79,6 +79,13 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
       cursorBlink: true,
       fontSize: 14,
       fontFamily: "'IosevkaTerm Nerd Font', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+      // Override default OSC 8 link handler — the default uses window.open()
+      // which Electron intercepts as about:blank. Open directly in system browser.
+      linkHandler: {
+        activate: (_event: MouseEvent, uri: string) => {
+          shell.openExternal(uri)
+        },
+      },
       theme: {
         background: '#0d1117',
         foreground: '#c9d1d9',

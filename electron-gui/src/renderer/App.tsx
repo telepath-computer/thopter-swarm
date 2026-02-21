@@ -68,12 +68,12 @@ export default function App() {
       <div className="flex flex-col h-screen bg-background text-foreground">
         <Header />
         <TabBar />
-        <main className="flex-1 overflow-hidden">
-          <div className="h-full" style={{ display: activeTab === 'dashboard' ? undefined : 'none' }}>
+        <main className="flex-1 overflow-hidden relative">
+          <div className="absolute inset-0" style={{ visibility: activeTab === 'dashboard' ? 'visible' : 'hidden', pointerEvents: activeTab === 'dashboard' ? undefined : 'none' }}>
             <Dashboard />
           </div>
           {openTabs.map((name) => (
-            <div key={name} className="h-full" style={{ display: activeTab === name ? undefined : 'none' }}>
+            <div key={name} className="absolute inset-0" style={{ visibility: activeTab === name ? 'visible' : 'hidden', pointerEvents: activeTab === name ? undefined : 'none' }}>
               <ThopterDetail tabName={name} />
             </div>
           ))}
