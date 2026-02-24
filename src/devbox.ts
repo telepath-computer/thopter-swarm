@@ -53,16 +53,21 @@ npm i -g @runloop/rl-cli
 # Install starship prompt (non-interactive)
 curl -sS https://starship.rs/install.sh | sh -s -- -y
 
-# Ensure ~/.local/bin is on PATH and set aliases
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-echo 'alias yolo-claude="claude --dangerously-skip-permissions"' >> ~/.bashrc
-echo 'alias attach-or-launch-tmux-cc="tmux -CC attach || tmux -CC"' >> ~/.bashrc
+# Append thopter bashrc block (idempotent — skip if already present)
+if ! grep -q '# --- thopter ---' ~/.bashrc 2>/dev/null; then
+cat >> ~/.bashrc << 'THOPTERRC'
 
-# Source thopter identity env vars (written by create command after boot)
-echo '. ~/.thopter-env' >> ~/.bashrc
-
-# Activate starship prompt
-echo 'eval "$(starship init bash)"' >> ~/.bashrc
+# --- thopter ---
+export PATH="$HOME/.local/bin:$PATH"
+alias yolo-claude="claude --dangerously-skip-permissions"
+alias attach-or-launch-tmux-cc="tmux -CC attach || tmux -CC"
+. ~/.thopter-env
+if [ "$TERM" != "dumb" ]; then
+  eval "$(starship init bash)"
+fi
+# --- end thopter ---
+THOPTERRC
+fi
 
 echo "Devbox init complete"
 `.trim();
