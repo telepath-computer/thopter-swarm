@@ -5,8 +5,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { useStore } from '@/store'
 
 export function Header() {
-  const openRunModal = useStore((s) => s.openRunModal)
-  const openReauthModal = useStore((s) => s.openReauthModal)
+  const openTab = useStore((s) => s.openTab)
   const toggleSidebar = useStore((s) => s.toggleSidebar)
   const unreadCount = useStore((s) => s.unreadNotificationCount)
   const connectionStatus = useStore((s) => s.connectionStatus)
@@ -23,13 +22,13 @@ export function Header() {
         )}
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="default" size="sm" onClick={openRunModal}>
+        <Button variant="default" size="sm" onClick={() => openTab('__run__')}>
           <Plus />
           Run New Thopter
         </Button>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" size="sm" onClick={openReauthModal}>
+            <Button variant="outline" size="sm" onClick={() => openTab('__reauth__')}>
               <KeyRound />
               Re-Authenticate
             </Button>

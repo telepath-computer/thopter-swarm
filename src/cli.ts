@@ -78,7 +78,7 @@ program
   .argument("[name]", "Name for the devbox (auto-generated if omitted)")
   .option("--snapshot <id>", "Snapshot ID or label to restore from")
   .option("--fresh", "Create a fresh devbox, ignoring the default snapshot")
-  .option("--keep-alive <minutes>", "Keep-alive time in minutes before shutdown (default: 720)", parseInt)
+  .option("--keep-alive <minutes>", "Keep-alive time in minutes before shutdown (default: 1440)", parseInt)
   .option("--no-sync", "Skip SyncThing artifact sync setup")
   .option("-a, --attach", "SSH into the devbox after creation")
   .action(async (name: string | undefined, opts: { snapshot?: string; fresh?: boolean; keepAlive?: number; noSync?: boolean; attach?: boolean }) => {

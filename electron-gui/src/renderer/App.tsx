@@ -5,8 +5,8 @@ import { TabBar } from './components/layout/TabBar'
 import { NotificationSidebar } from './components/layout/NotificationSidebar'
 import { Dashboard } from './components/dashboard/Dashboard'
 import { ThopterDetail } from './components/detail/ThopterDetail'
-import { RunModal } from './components/modals/RunModal'
-import { ReauthModal } from './components/modals/ReauthModal'
+import { RunTab } from './components/modals/RunTab'
+import { ReauthTab } from './components/modals/ReauthTab'
 import { useStore } from './store'
 import { getService } from './services'
 import { subscribeNtfy, subscribeMockNtfy } from './services/ntfy'
@@ -74,13 +74,17 @@ export default function App() {
           </div>
           {openTabs.map((name) => (
             <div key={name} className="absolute inset-0" style={{ visibility: activeTab === name ? 'visible' : 'hidden', pointerEvents: activeTab === name ? undefined : 'none' }}>
-              <ThopterDetail tabName={name} />
+              {name === '__run__' ? (
+                <RunTab />
+              ) : name === '__reauth__' ? (
+                <ReauthTab />
+              ) : (
+                <ThopterDetail tabName={name} />
+              )}
             </div>
           ))}
         </main>
         <NotificationSidebar />
-        <RunModal />
-        <ReauthModal />
       </div>
     </TooltipProvider>
   )

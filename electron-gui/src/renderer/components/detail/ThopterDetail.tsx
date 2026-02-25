@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { StatusPanel } from './StatusPanel'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from './TerminalView'
+import { LiveTerminalView } from './LiveTerminalView'
 import { TmuxLiveTerminalView } from './TmuxLiveTerminalView'
 import { ActionBar } from './ActionBar'
 
@@ -111,6 +112,8 @@ export function ThopterDetail({ tabName }: Props) {
             className="absolute inset-0 flex"
             style={{ visibility: liveVisible ? 'visible' : 'hidden', pointerEvents: liveVisible ? undefined : 'none' }}
           >
+            <LiveTerminalView name={thopter.name} visible={liveVisible} />
+            <div className="w-px bg-border shrink-0" />
             <TmuxLiveTerminalView name={thopter.name} devboxId={thopter.id} visible={liveVisible} />
           </div>
         )}

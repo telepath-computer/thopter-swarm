@@ -24,10 +24,6 @@ export const useStore = create<Store>((set, get) => ({
   // Display state
   activeTab: 'dashboard',
   openTabs: [],
-  isRunModalOpen: false,
-  runModalStep: 0,
-  isReauthModalOpen: false,
-  reauthModalStep: 0,
   isSidebarOpen: false,
   autoRefresh: true,
   unreadNotificationCount: 0,
@@ -185,13 +181,6 @@ export const useStore = create<Store>((set, get) => ({
       }
     })
   },
-
-  openRunModal: () => set({ isRunModalOpen: true, runModalStep: 0 }),
-  closeRunModal: () => set({ isRunModalOpen: false, runModalStep: 0 }),
-  setRunModalStep: (step) => set({ runModalStep: step }),
-
-  openReauthModal: () => set({ isReauthModalOpen: true, reauthModalStep: 0 }),
-  closeReauthModal: () => set({ isReauthModalOpen: false, reauthModalStep: 0 }),
 
   toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
 

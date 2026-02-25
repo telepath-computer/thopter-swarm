@@ -28,10 +28,6 @@ export interface StoreState {
   // Display state (UI layer)
   activeTab: 'dashboard' | string
   openTabs: string[]
-  isRunModalOpen: boolean
-  runModalStep: number
-  isReauthModalOpen: boolean
-  reauthModalStep: number
   isSidebarOpen: boolean
   autoRefresh: boolean
   unreadNotificationCount: number
@@ -62,11 +58,6 @@ export interface StoreActions {
   setActiveTab(tab: string): void
   openTab(name: string): void
   closeTab(name: string): void
-  openRunModal(): void
-  closeRunModal(): void
-  setRunModalStep(step: number): void
-  openReauthModal(): void
-  closeReauthModal(): void
   toggleSidebar(): void
   setDraftMessage(name: string, message: string): void
   setAutoRefresh(enabled: boolean): void

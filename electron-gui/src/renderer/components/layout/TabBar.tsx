@@ -1,7 +1,12 @@
-import { X, LayoutDashboard } from 'lucide-react'
+import { X, LayoutDashboard, Plus, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store'
+
+const SPECIAL_TABS: Record<string, { label: string; Icon: typeof Plus }> = {
+  __run__: { label: 'Run New Thopter', Icon: Plus },
+  __reauth__: { label: 'Re-Authenticate', Icon: KeyRound },
+}
 
 export function TabBar() {
   const activeTab = useStore((s) => s.activeTab)
@@ -25,46 +30,53 @@ export function TabBar() {
         <LayoutDashboard className="size-3.5" />
         Dashboard
       </button>
-      {openTabs.map((tab) => (
-        <div
-          key={tab}
-          className={cn(
-            'flex items-center gap-0.5 rounded-md transition-colors group',
-            activeTab === tab
-              ? 'bg-background shadow-sm'
-              : 'hover:bg-background/50'
-          )}
-        >
-          <button
-            role="tab"
-            aria-selected={activeTab === tab}
+      {openTabs.map((tab) => {
+        const special = SPECIAL_TABS[tab]
+        const label = special?.label ?? tab
+        const Icon = special?.Icon
+
+        return (
+          <div
+            key={tab}
             className={cn(
-              'px-3 py-1 text-sm',
-              activeTab === tab ? 'font-medium' : 'text-muted-foreground hover:text-foreground'
-            )}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab}
-          </button>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Close ${tab} tab`}
-            className={cn(
-              'mr-0.5 transition-opacity',
+              'flex items-center gap-0.5 rounded-md transition-colors group',
               activeTab === tab
-                ? 'opacity-60 hover:opacity-100'
-                : 'opacity-0 group-hover:opacity-100'
+                ? 'bg-background shadow-sm'
+                : 'hover:bg-background/50'
             )}
-            onClick={(e) => {
-              e.stopPropagation()
-              closeTab(tab)
-            }}
           >
-            <X />
-          </Button>
-        </div>
-      ))}
+            <button
+              role="tab"
+              aria-selected={activeTab === tab}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1 text-sm',
+                activeTab === tab ? 'font-medium' : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => setActiveTab(tab)}
+            >
+              {Icon && <Icon className="size-3.5" />}
+              {label}
+            </button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Close ${label} tab`}
+              className={cn(
+                'mr-0.5 transition-opacity',
+                activeTab === tab
+                  ? 'opacity-60 hover:opacity-100'
+                  : 'opacity-0 group-hover:opacity-100'
+              )}
+              onClick={(e) => {
+                e.stopPropagation()
+                closeTab(tab)
+              }}
+            >
+              <X />
+            </Button>
+          </div>
+        )
+      })}
     </div>
   )
 }
