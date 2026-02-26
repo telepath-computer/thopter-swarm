@@ -122,13 +122,13 @@ export function ThopterDetail({ tabName }: Props) {
         {hasLiveTerminal && (
           <>
             <div
-              className="absolute inset-0"
+              className="absolute inset-0 flex flex-col"
               style={{ visibility: sshVisible ? 'visible' : 'hidden', pointerEvents: sshVisible ? undefined : 'none' }}
             >
               <LiveTerminalView name={thopter.name} visible={sshVisible} />
             </div>
             <div
-              className="absolute inset-0"
+              className="absolute inset-0 flex flex-col"
               style={{ visibility: tmuxVisible ? 'visible' : 'hidden', pointerEvents: tmuxVisible ? undefined : 'none' }}
             >
               <TmuxLiveTerminalView name={thopter.name} devboxId={thopter.id} visible={tmuxVisible} />

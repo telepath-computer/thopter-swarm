@@ -90,9 +90,9 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
 
     // Build SSH args for the TmuxAdapter.
     // getSSHSpawn() returns { command: 'ssh', args: ['-tt', ...opts, 'user@host', 'bash -l'] }.
-    // We need to replace the remote command ('bash -l') with the tmux CC command.
-    const sessionName = name.replace(/[^a-zA-Z0-9_-]/g, '-')
-    const tmuxCmd = `tmux -CC new-session -A -s ${sessionName} -x 120 -y 36`
+    // We need to replace the remote command ('bash -l') with tmux CC attach.
+    // Just attach to the default/existing tmux session rather than creating a named one.
+    const tmuxCmd = 'tmux -CC attach'
 
     // Replace the last arg (remote command like 'bash -l') with tmux CC command
     const sshArgs = [...spawnInfo.args]
@@ -107,7 +107,6 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
     // rawArgs: true — we've already assembled the full arg list including the tmux command
     const adapter = new TmuxAdapter({
       sshArgs,
-      sessionName,
       targetLabel: name,
       spawnCommand: spawnInfo.command,
       rawArgs: true,
