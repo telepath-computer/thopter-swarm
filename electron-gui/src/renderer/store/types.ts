@@ -21,17 +21,13 @@ export interface StoreState {
   refreshing: boolean
   claudeReady: Record<string, ClaudeReadyStatus>
   screenDumps: Record<string, string | null>
-  detailViewMode: Record<string, 'transcript' | 'terminal' | 'live'>
+  detailViewMode: Record<string, 'transcript' | 'terminal' | 'ssh' | 'tmux'>
   liveTerminals: string[] // thopter names with active live terminal sessions
   draftMessages: Record<string, string>
 
   // Display state (UI layer)
   activeTab: 'dashboard' | string
   openTabs: string[]
-  isRunModalOpen: boolean
-  runModalStep: number
-  isReauthModalOpen: boolean
-  reauthModalStep: number
   isSidebarOpen: boolean
   autoRefresh: boolean
   unreadNotificationCount: number
@@ -56,17 +52,12 @@ export interface StoreActions {
 
   // Screen dump
   fetchScreenDump(name: string): Promise<void>
-  setDetailViewMode(name: string, mode: 'transcript' | 'terminal' | 'live'): void
+  setDetailViewMode(name: string, mode: 'transcript' | 'terminal' | 'ssh' | 'tmux'): void
 
   // UI actions
   setActiveTab(tab: string): void
   openTab(name: string): void
   closeTab(name: string): void
-  openRunModal(): void
-  closeRunModal(): void
-  setRunModalStep(step: number): void
-  openReauthModal(): void
-  closeReauthModal(): void
   toggleSidebar(): void
   setDraftMessage(name: string, message: string): void
   setAutoRefresh(enabled: boolean): void

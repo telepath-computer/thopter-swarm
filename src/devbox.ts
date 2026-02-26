@@ -30,7 +30,7 @@ const INIT_SCRIPT = `
 set -e
 
 # Install essential tools
-sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 xvfb xauth > /dev/null
+sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 xvfb xauth bash-completion > /dev/null
 sudo /usr/sbin/cron 2>/dev/null || true
 
 # Install Neovim (latest stable, NvChad requires 0.10+)
@@ -50,6 +50,17 @@ npm i -g @openai/codex
 # Install Runloop CLI (for rli devbox ssh from inside devboxes)
 npm i -g @runloop/rl-cli
 
+# Install git-delta pager
+DELTA_ARCH=$(dpkg --print-architecture)
+curl -fL "https://github.com/dandavison/delta/releases/download/0.18.2/git-delta_0.18.2_\${DELTA_ARCH}.deb" -o /tmp/git-delta.deb
+sudo PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin dpkg -i /tmp/git-delta.deb
+rm /tmp/git-delta.deb
+git config --global core.pager delta
+git config --global interactive.diffFilter "delta --color-only"
+git config --global delta.side-by-side true
+git config --global delta.navigate true
+git config --global delta.line-numbers true
+
 # Install starship prompt (non-interactive)
 curl -sS https://starship.rs/install.sh | sh -s -- -y
 
@@ -62,6 +73,7 @@ export PATH="$HOME/.local/bin:$PATH"
 alias yolo-claude="claude --dangerously-skip-permissions"
 alias attach-or-launch-tmux-cc="tmux -CC attach || tmux -CC"
 . ~/.thopter-env
+[ -f /usr/share/bash-completion/bash_completion ] && . /usr/share/bash-completion/bash_completion
 if [ "$TERM" != "dumb" ]; then
   eval "$(starship init bash)"
 fi
@@ -134,6 +146,11 @@ async function installThopterScripts(
     : readScript("thopter-claude-md.md");
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/home/user/.claude/CLAUDE.md",
+    contents: claudeMdContents,
+  });
+  // Also deploy as Codex AGENTS.md
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/home/user/.codex/AGENTS.md",
     contents: claudeMdContents,
   });
 

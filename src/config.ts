@@ -18,8 +18,8 @@ export const OWNER_KEY = "thopter_owner";
 /** Default devbox resource size. */
 export const DEFAULT_RESOURCE_SIZE = "LARGE" as const;
 
-/** Default keep-alive time: 12 hours. Devbox shuts down after this period unless reset. */
-export const DEFAULT_KEEP_ALIVE_SECONDS = 12 * 60 * 60;
+/** Default keep-alive time: 24 hours. Devbox shuts down after this period unless reset. */
+export const DEFAULT_KEEP_ALIVE_SECONDS = 24 * 60 * 60;
 
 // --- Local config ---
 

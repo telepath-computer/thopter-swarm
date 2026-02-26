@@ -1,7 +1,8 @@
-# CLAUDE.md — Thopter Devbox
+# "Thopter" Devbox
 
 You are running inside a headless Runloop devbox (KVM microVM). There is no
-GUI, no browser, and no display server.
+GUI, no browser, and no display server. This div box is called a thopter, as an
+instance of a system called Thopter Swarm. 
 
 ## Git
 

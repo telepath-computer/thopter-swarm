@@ -24,10 +24,6 @@ export const useStore = create<Store>((set, get) => ({
   // Display state
   activeTab: 'dashboard',
   openTabs: [],
-  isRunModalOpen: false,
-  runModalStep: 0,
-  isReauthModalOpen: false,
-  reauthModalStep: 0,
   isSidebarOpen: false,
   autoRefresh: true,
   unreadNotificationCount: 0,
@@ -154,7 +150,7 @@ export const useStore = create<Store>((set, get) => ({
     set((s) => {
       const update: Partial<typeof s> = { detailViewMode: { ...s.detailViewMode, [name]: mode } }
       // Track live terminal sessions so they persist across tab switches
-      if (mode === 'live' && !s.liveTerminals.includes(name)) {
+      if ((mode === 'ssh' || mode === 'tmux') && !s.liveTerminals.includes(name)) {
         update.liveTerminals = [...s.liveTerminals, name]
       }
       return update
@@ -185,13 +181,6 @@ export const useStore = create<Store>((set, get) => ({
       }
     })
   },
-
-  openRunModal: () => set({ isRunModalOpen: true, runModalStep: 0 }),
-  closeRunModal: () => set({ isRunModalOpen: false, runModalStep: 0 }),
-  setRunModalStep: (step) => set({ runModalStep: step }),
-
-  openReauthModal: () => set({ isReauthModalOpen: true, reauthModalStep: 0 }),
-  closeReauthModal: () => set({ isReauthModalOpen: false, reauthModalStep: 0 }),
 
   toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
 
