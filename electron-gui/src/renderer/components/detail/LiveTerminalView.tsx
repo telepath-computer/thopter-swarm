@@ -21,7 +21,7 @@ interface Props {
   spawnInfo?: { command: string; args: string[] }
 }
 
-type ViewState = 'connecting' | 'connected' | 'error' | 'exited'
+type ViewState = 'idle' | 'connecting' | 'connected' | 'error' | 'exited'
 
 export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoProp }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -30,7 +30,7 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
   const ptyRef = useRef<ReturnType<typeof pty.spawn> | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
   const wheelCleanupRef = useRef<(() => void) | null>(null)
-  const [state, setState] = useState<ViewState>('connecting')
+  const [state, setState] = useState<ViewState>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
   const connect = useCallback(async () => {
@@ -283,10 +283,8 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     })
   }, [visible])
 
-  // Connect on mount, clean up on unmount
+  // Clean up on unmount (no auto-connect — user clicks "Connect")
   useEffect(() => {
-    connect()
-
     return () => {
       if (wheelCleanupRef.current) {
         wheelCleanupRef.current()
@@ -311,6 +309,21 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
   return (
     <div className="flex-1 relative bg-[#0d1117]">
       <div ref={containerRef} className="absolute inset-0" style={{ WebkitFontSmoothing: 'antialiased' }} />
+
+      {/* Idle overlay — waiting for user to click Connect */}
+      {state === 'idle' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117] z-10">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <span className="text-sm text-muted-foreground">SSH terminal for {name}</span>
+            <button
+              onClick={connect}
+              className="px-3 py-1.5 text-xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Connect
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Connecting overlay */}
       {state === 'connecting' && (

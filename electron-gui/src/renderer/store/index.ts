@@ -150,7 +150,7 @@ export const useStore = create<Store>((set, get) => ({
     set((s) => {
       const update: Partial<typeof s> = { detailViewMode: { ...s.detailViewMode, [name]: mode } }
       // Track live terminal sessions so they persist across tab switches
-      if (mode === 'live' && !s.liveTerminals.includes(name)) {
+      if ((mode === 'ssh' || mode === 'tmux') && !s.liveTerminals.includes(name)) {
         update.liveTerminals = [...s.liveTerminals, name]
       }
       return update

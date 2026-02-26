@@ -27,14 +27,14 @@ interface Props {
   spawnInfo?: { command: string; args: string[] }
 }
 
-type ViewState = 'connecting' | 'connected' | 'error' | 'exited'
+type ViewState = 'idle' | 'connecting' | 'connected' | 'error' | 'exited'
 
 export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo: spawnInfoProp }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const adapterRef = useRef<InstanceType<typeof TmuxAdapter> | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const apiRef = useRef<any>(null)
-  const [state, setState] = useState<ViewState>('connecting')
+  const [state, setState] = useState<ViewState>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
   const connect = useCallback(async () => {
@@ -189,10 +189,8 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
     }
   }, [name, devboxId, spawnInfoProp])
 
-  // Connect on mount, clean up on unmount
+  // Clean up on unmount (no auto-connect — user clicks "Connect")
   useEffect(() => {
-    connect()
-
     return () => {
       if (apiRef.current) {
         apiRef.current.destroy()
@@ -208,6 +206,21 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
   return (
     <div className="flex-1 relative bg-[#0d1117]">
       <div ref={containerRef} className="absolute inset-0 overflow-hidden" style={{ WebkitFontSmoothing: 'antialiased' }} />
+
+      {/* Idle overlay — waiting for user to click Connect */}
+      {state === 'idle' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117] z-10">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <span className="text-sm text-muted-foreground">Tmux terminal for {name}</span>
+            <button
+              onClick={connect}
+              className="px-3 py-1.5 text-xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Connect
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Connecting overlay */}
       {state === 'connecting' && (

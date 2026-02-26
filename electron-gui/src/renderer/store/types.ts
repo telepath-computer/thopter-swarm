@@ -21,7 +21,7 @@ export interface StoreState {
   refreshing: boolean
   claudeReady: Record<string, ClaudeReadyStatus>
   screenDumps: Record<string, string | null>
-  detailViewMode: Record<string, 'transcript' | 'terminal' | 'live'>
+  detailViewMode: Record<string, 'transcript' | 'terminal' | 'ssh' | 'tmux'>
   liveTerminals: string[] // thopter names with active live terminal sessions
   draftMessages: Record<string, string>
 
@@ -52,7 +52,7 @@ export interface StoreActions {
 
   // Screen dump
   fetchScreenDump(name: string): Promise<void>
-  setDetailViewMode(name: string, mode: 'transcript' | 'terminal' | 'live'): void
+  setDetailViewMode(name: string, mode: 'transcript' | 'terminal' | 'ssh' | 'tmux'): void
 
   // UI actions
   setActiveTab(tab: string): void

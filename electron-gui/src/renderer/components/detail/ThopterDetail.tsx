@@ -49,7 +49,8 @@ export function ThopterDetail({ tabName }: Props) {
   }, [tabName, thopter?.devboxStatus, isClaudeReady, checkClaude])
 
   const hasLiveTerminal = liveTerminals.includes(tabName)
-  const liveVisible = isVisible && viewMode === 'live'
+  const sshVisible = isVisible && viewMode === 'ssh'
+  const tmuxVisible = isVisible && viewMode === 'tmux'
 
   if (!thopter) {
     return (
@@ -88,15 +89,26 @@ export function ThopterDetail({ tabName }: Props) {
           Screen
         </button>
         <button
-          onClick={() => setDetailViewMode(tabName, 'live')}
+          onClick={() => setDetailViewMode(tabName, 'ssh')}
           className={cn(
             'px-2.5 py-1 text-xs rounded font-medium transition-colors',
-            viewMode === 'live'
+            viewMode === 'ssh'
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground hover:bg-muted',
           )}
         >
-          Live
+          SSH
+        </button>
+        <button
+          onClick={() => setDetailViewMode(tabName, 'tmux')}
+          className={cn(
+            'px-2.5 py-1 text-xs rounded font-medium transition-colors',
+            viewMode === 'tmux'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+          )}
+        >
+          Tmux
         </button>
       </div>
 
@@ -106,16 +118,22 @@ export function ThopterDetail({ tabName }: Props) {
         {viewMode === 'transcript' && <TranscriptView name={thopter.name} />}
         {viewMode === 'terminal' && <TerminalView name={thopter.name} />}
 
-        {/* Live terminal stays mounted once activated, hidden/shown via CSS */}
+        {/* SSH and Tmux terminals stay mounted once activated, hidden/shown via CSS */}
         {hasLiveTerminal && (
-          <div
-            className="absolute inset-0 flex"
-            style={{ visibility: liveVisible ? 'visible' : 'hidden', pointerEvents: liveVisible ? undefined : 'none' }}
-          >
-            <LiveTerminalView name={thopter.name} visible={liveVisible} />
-            <div className="w-px bg-border shrink-0" />
-            <TmuxLiveTerminalView name={thopter.name} devboxId={thopter.id} visible={liveVisible} />
-          </div>
+          <>
+            <div
+              className="absolute inset-0"
+              style={{ visibility: sshVisible ? 'visible' : 'hidden', pointerEvents: sshVisible ? undefined : 'none' }}
+            >
+              <LiveTerminalView name={thopter.name} visible={sshVisible} />
+            </div>
+            <div
+              className="absolute inset-0"
+              style={{ visibility: tmuxVisible ? 'visible' : 'hidden', pointerEvents: tmuxVisible ? undefined : 'none' }}
+            >
+              <TmuxLiveTerminalView name={thopter.name} devboxId={thopter.id} visible={tmuxVisible} />
+            </div>
+          </>
         )}
       </div>
 

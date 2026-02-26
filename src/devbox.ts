@@ -148,6 +148,11 @@ async function installThopterScripts(
     file_path: "/home/user/.claude/CLAUDE.md",
     contents: claudeMdContents,
   });
+  // Also deploy as Codex AGENTS.md
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: "/home/user/.codex/AGENTS.md",
+    contents: claudeMdContents,
+  });
 
   // Claude Code hooks for redis status updates
   const hookFiles: Record<string, string> = {
