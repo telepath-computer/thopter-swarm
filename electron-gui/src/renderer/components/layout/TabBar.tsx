@@ -3,9 +3,13 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store'
 
-const SPECIAL_TABS: Record<string, { label: string; Icon: typeof Plus }> = {
-  __run__: { label: 'Run New Thopter', Icon: Plus },
-  __reauth__: { label: 'Re-Authenticate', Icon: KeyRound },
+const SPECIAL_TAB_PREFIXES: { prefix: string; label: string; Icon: typeof Plus }[] = [
+  { prefix: '__run__', label: 'Run New Thopter', Icon: Plus },
+  { prefix: '__reauth__', label: 'Re-Authenticate', Icon: KeyRound },
+]
+
+function getSpecialTab(tab: string) {
+  return SPECIAL_TAB_PREFIXES.find((s) => tab.startsWith(s.prefix))
 }
 
 export function TabBar() {
@@ -32,7 +36,7 @@ export function TabBar() {
         Dashboard
       </button>
       {openTabs.map((tab) => {
-        const special = SPECIAL_TABS[tab]
+        const special = getSpecialTab(tab)
         const label = special?.label ?? tab
         const Icon = special?.Icon
 

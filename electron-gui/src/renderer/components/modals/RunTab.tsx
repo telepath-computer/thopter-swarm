@@ -17,7 +17,7 @@ interface CheckoutEntry {
   branch: string
 }
 
-export function RunTab() {
+export function RunTab({ tabId }: { tabId: string }) {
   const closeTab = useStore((s) => s.closeTab)
   const runThopter = useStore((s) => s.runThopter)
   const openTab = useStore((s) => s.openTab)
@@ -77,7 +77,7 @@ export function RunTab() {
   const effectiveRepo = repo === '__custom__' ? customRepo : repo
 
   function handleClose() {
-    closeTab('__run__')
+    closeTab(tabId)
   }
 
   function handleSelectMode(m: WorkMode) {
@@ -155,7 +155,7 @@ export function RunTab() {
   }
 
   function handleDone() {
-    closeTab('__run__')
+    closeTab(tabId)
     if (launchedName) openTab(launchedName)
   }
 
