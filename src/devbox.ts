@@ -35,7 +35,7 @@ const INIT_SCRIPT = `
 set -e
 
 # Install essential tools
-sudo apt-get update -qq && sudo apt-get install -y -qq tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 xvfb xauth bash-completion > /dev/null
+sudo apt-get update -qq && sudo apt-get install -y -qq git tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 xvfb xauth bash-completion > /dev/null
 sudo /usr/sbin/cron 2>/dev/null || true
 
 # Install Neovim (latest stable, NvChad requires 0.10+)
@@ -55,8 +55,10 @@ sudo ln -sf "$NODE_BIN_DIR/node" /usr/local/bin/node
 sudo ln -sf "$NODE_BIN_DIR/npm" /usr/local/bin/npm
 sudo ln -sf "$NODE_BIN_DIR/npx" /usr/local/bin/npx
 
-# Install NvChad
-git clone https://github.com/NvChad/starter ~/.config/nvim 2>/dev/null || true
+# Install NvChad starter (fresh installs only)
+if [ ! -d ~/.config/nvim ]; then
+  git clone https://github.com/NvChad/starter ~/.config/nvim
+fi
 
 # Install Claude Code
 curl -fsSL https://claude.ai/install.sh | bash
@@ -106,6 +108,24 @@ const SCRIPTS_DIR = resolve(__dirname, "..", "scripts");
 
 function readScript(name: string): string {
   return readFileSync(resolve(SCRIPTS_DIR, name), "utf-8");
+}
+
+function thopterBashrcEnsureCommand(): string {
+  const block = [
+    "",
+    "# --- thopter ---",
+    "export PATH=\"$HOME/.local/bin:$PATH\"",
+    "alias yolo-claude=\"claude --dangerously-skip-permissions\"",
+    "alias attach-or-launch-tmux-cc=\"tmux -CC attach || tmux -CC\"",
+    ". ~/.thopter-env",
+    "[ -f /usr/share/bash-completion/bash_completion ] && . /usr/share/bash-completion/bash_completion",
+    "if [ \"$TERM\" != \"dumb\" ]; then",
+    "  eval \"$(starship init bash)\"",
+    "fi",
+    "# --- end thopter ---",
+    "",
+  ].join("\\n");
+  return `grep -q '# --- thopter ---' ~/.bashrc 2>/dev/null || printf '%b' '${block}' >> ~/.bashrc`;
 }
 
 function requireRunloopFeature(feature: string): void {
@@ -371,6 +391,11 @@ function installThopterScriptsDO(
   if (result.status !== 0) {
     throw new Error(result.stderr || "failed to install thopter scripts");
   }
+  console.log("  Ensuring thopter aliases in ~/.bashrc...");
+  const bashrcResult = doExecSync(dropletId, thopterBashrcEnsureCommand(), { retryMax: 60 });
+  if (bashrcResult.status !== 0) {
+    throw new Error(bashrcResult.stderr || "failed to ensure thopter bashrc block");
+  }
 }
 
 /**
@@ -466,6 +491,9 @@ async function installThopterScripts(
   // Install scripts to /usr/local/bin, make hooks executable, register hooks, set up cron
   await client.devboxes.executeAsync(devboxId, {
     command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
+  });
+  await client.devboxes.executeAsync(devboxId, {
+    command: thopterBashrcEnsureCommand(),
   });
 }
 
