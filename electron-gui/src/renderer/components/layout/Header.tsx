@@ -1,14 +1,21 @@
+import { useCallback } from 'react'
 import { Bell, Plus, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useStore } from '@/store'
 
+let runTabCounter = 0
+
 export function Header() {
   const openTab = useStore((s) => s.openTab)
   const toggleSidebar = useStore((s) => s.toggleSidebar)
   const unreadCount = useStore((s) => s.unreadNotificationCount)
   const connectionStatus = useStore((s) => s.connectionStatus)
+
+  const openNewRunTab = useCallback(() => {
+    openTab(`__run__${++runTabCounter}`)
+  }, [openTab])
 
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b bg-card">
@@ -22,7 +29,7 @@ export function Header() {
         )}
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="default" size="sm" onClick={() => openTab('__run__')}>
+        <Button variant="default" size="sm" onClick={openNewRunTab}>
           <Plus />
           Run New Thopter
         </Button>

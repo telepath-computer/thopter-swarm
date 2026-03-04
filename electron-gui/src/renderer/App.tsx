@@ -74,9 +74,9 @@ export default function App() {
           </div>
           {openTabs.map((name) => (
             <div key={name} className="absolute inset-0" style={{ visibility: activeTab === name ? 'visible' : 'hidden', pointerEvents: activeTab === name ? undefined : 'none' }}>
-              {name === '__run__' ? (
-                <RunTab />
-              ) : name === '__reauth__' ? (
+              {name.startsWith('__run__') ? (
+                <RunTab tabId={name} />
+              ) : name.startsWith('__reauth__') ? (
                 <ReauthTab />
               ) : (
                 <ThopterDetail tabName={name} />
