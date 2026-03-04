@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getClient } from "./client.js";
+import { executeCommandById, writeFileById } from "./devbox.js";
 import { getSyncthingConfig, type SyncthingConfig } from "./config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,17 +30,12 @@ export async function installSyncthingOnDevbox(
   devboxId: string,
   syncConfig: SyncthingConfig,
 ): Promise<string | null> {
-  const client = getClient();
-
   // Upload the install script
   const script = readFileSync(
     resolve(SCRIPTS_DIR, "install-syncthing.sh"),
     "utf-8",
   );
-  await client.devboxes.writeFileContents(devboxId, {
-    file_path: "/tmp/install-syncthing.sh",
-    contents: script,
-  });
+  await writeFileById(devboxId, "/tmp/install-syncthing.sh", script);
 
   // Run it with config as arguments
   console.log("Installing SyncThing on devbox...");
@@ -52,14 +47,7 @@ export async function installSyncthingOnDevbox(
     "2>&1",
   ].join(" ");
 
-  const execution = await client.devboxes.executeAsync(devboxId, {
-    command: cmd,
-  });
-
-  const result = await client.devboxes.executions.awaitCompleted(
-    devboxId,
-    execution.execution_id,
-  );
+  const result = await executeCommandById(devboxId, cmd);
 
   const output = result.stdout ?? "";
   if (result.stderr) {
@@ -94,8 +82,6 @@ export async function ensurePeerOnDevbox(
   devboxId: string,
   syncConfig: SyncthingConfig,
 ): Promise<void> {
-  const client = getClient();
-
   const cmds = [
     // Add laptop device (ignore "already exists" errors)
     `syncthing cli --home="${ST_HOME_EXPR}" config devices add --device-id "${syncConfig.deviceId}" --name "laptop" 2>/dev/null || true`,
@@ -105,16 +91,9 @@ export async function ensurePeerOnDevbox(
     `syncthing cli --home="${ST_HOME_EXPR}" config devices "${syncConfig.deviceId}" auto-accept-folders set true 2>/dev/null || true`,
   ];
 
-  const execution = await client.devboxes.executeAsync(devboxId, {
-    command: cmds.join(" && "),
-  });
+  const result = await executeCommandById(devboxId, cmds.join(" && "));
 
-  const result = await client.devboxes.executions.awaitCompleted(
-    devboxId,
-    execution.execution_id,
-  );
-
-  if (result.exit_status && result.exit_status !== 0) {
+  if (result.exitCode !== 0) {
     console.log("WARNING: Could not configure laptop peer on devbox.");
     if (result.stderr) process.stderr.write(result.stderr);
   }
@@ -126,15 +105,9 @@ export async function ensurePeerOnDevbox(
 export async function getDevboxDeviceId(
   devboxId: string,
 ): Promise<string | null> {
-  const client = getClient();
-
-  const execution = await client.devboxes.executeAsync(devboxId, {
-    command: "syncthing device-id --home=$(echo ~)/.local/state/syncthing 2>&1",
-  });
-
-  const result = await client.devboxes.executions.awaitCompleted(
+  const result = await executeCommandById(
     devboxId,
-    execution.execution_id,
+    "syncthing device-id --home=$(echo ~)/.local/state/syncthing 2>&1",
   );
 
   const id = (result.stdout ?? "").trim();

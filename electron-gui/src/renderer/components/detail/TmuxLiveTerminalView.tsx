@@ -89,10 +89,9 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
     }
 
     // Build SSH args for the TmuxAdapter.
-    // getSSHSpawn() returns { command: 'ssh', args: ['-tt', ...opts, 'user@host', 'bash -l'] }.
-    // We need to replace the remote command ('bash -l') with tmux CC attach.
-    // Just attach to the default/existing tmux session rather than creating a named one.
-    const tmuxCmd = 'tmux -CC attach'
+    // Match `thopter attach` semantics exactly: attach default session if present,
+    // otherwise create a default session.
+    const tmuxCmd = 'tmux -CC attach \\; refresh-client || tmux -CC'
 
     // Replace the last arg (remote command like 'bash -l') with tmux CC command
     const sshArgs = [...spawnInfo.args]
@@ -171,10 +170,12 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
     })
 
     adapter.on('disconnected', (reason: string) => {
-      if (reason === 'tmux exited' || reason.includes('exited')) {
+      const sshExitMatch = reason.match(/ssh exited \(code (\d+)\)/)
+      if (reason === 'tmux exited' || sshExitMatch?.[1] === '0') {
+        setErrorMsg('')
         setState('exited')
       } else {
-        setErrorMsg(reason)
+        setErrorMsg(reason || 'Connection failed')
         setState('error')
       }
     })
@@ -249,8 +250,9 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
       {/* Exited overlay */}
       {state === 'exited' && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117]/90 z-10">
-          <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex flex-col items-center gap-3 text-center px-6">
             <span className="text-sm text-muted-foreground">Session ended</span>
+            {errorMsg && <span className="text-xs text-muted-foreground/80">{errorMsg}</span>}
             <button
               onClick={connect}
               className="px-3 py-1.5 text-xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"

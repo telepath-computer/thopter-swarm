@@ -86,6 +86,8 @@ export interface AppConfig {
   stopNotificationQuietPeriod: number;
 }
 
+export type InfrastructureProvider = 'runloop' | 'digitalocean' | 'unknown';
+
 // --- Notification types (ntfy.sh) ---
 
 export interface NtfyNotification {
@@ -109,6 +111,7 @@ export interface ClaudeReadyStatus {
 
 export interface ThopterService {
   // Queries
+  getProvider(): Promise<InfrastructureProvider>;
   listThopters(): Promise<ThopterInfo[]>;
   getThopterStatus(name: string): Promise<ThopterInfo>;
   getTranscript(name: string, lines?: number): Promise<TranscriptEntry[]>;

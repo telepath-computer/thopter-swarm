@@ -3,7 +3,8 @@
 # Cron launches this once per minute; it loops 6 times internally.
 # Installed to /usr/local/bin/thopter-heartbeat
 
-. "$HOME/.bashrc" 2>/dev/null
+# Load thopter env explicitly (cron/non-interactive shells won't run ~/.bashrc block)
+[ -f "$HOME/.thopter-env" ] && . "$HOME/.thopter-env"
 
 # Ensure SyncThing is running (idempotent — no-op if already alive)
 ST_HOME="$HOME/.local/state/syncthing"

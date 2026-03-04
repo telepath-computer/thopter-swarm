@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Hook: SessionEnd — Claude session ended
 
+[ -f "$HOME/.thopter-env" ] && . "$HOME/.thopter-env"
+
 read -t 1 INPUT || true
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 

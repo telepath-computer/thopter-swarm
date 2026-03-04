@@ -3,10 +3,16 @@
  */
 
 import Runloop from "@runloop/api-client";
+import { isDigitalOceanProvider } from "./provider.js";
 
 let _client: Runloop | undefined;
 
 export function getClient(): Runloop {
+  if (isDigitalOceanProvider()) {
+    throw new Error(
+      "Runloop client requested while provider is set to DigitalOcean. This operation is not migrated yet.",
+    );
+  }
   if (_client) return _client;
 
   const apiKey = process.env.RUNLOOP_API_KEY;

@@ -15,6 +15,7 @@ import type {
   AppConfig,
   ClaudeReadyStatus,
   Unsubscribe,
+  InfrastructureProvider,
 } from './types';
 
 // --- Node.js runtime imports via Electron's native require ---
@@ -157,6 +158,23 @@ async function execThopter(...args: string[]): Promise<string> {
 // --- Real service implementation ---
 
 export class RealThopterService implements ThopterService {
+  private providerCache: InfrastructureProvider | null = null;
+
+  async getProvider(): Promise<InfrastructureProvider> {
+    if (this.providerCache) return this.providerCache;
+    try {
+      const output = await execThopter('provider', '--json');
+      const parsed = JSON.parse(output) as { provider?: string };
+      if (parsed.provider === 'runloop' || parsed.provider === 'digitalocean') {
+        this.providerCache = parsed.provider;
+        return parsed.provider;
+      }
+      return 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  }
+
   /**
    * List live thopters via `thopter status --json`.
    * Uses the same Runloop API + Redis logic as the CLI — Runloop is the source
@@ -415,50 +433,19 @@ export class RealThopterService implements ThopterService {
   }
 
   /**
-   * Resolve SSH spawn info from a devbox ID.
-   * Parses `rli devbox ssh --config-only <id>` output (same as src/devbox.ts).
-   */
-  private async resolveSSHSpawn(devboxId: string): Promise<{ command: string; args: string[] }> {
-    const { stdout: configOutput } = await execFileAsync('rli', ['devbox', 'ssh', '--config-only', devboxId], {
-      encoding: 'utf-8',
-      timeout: 15_000,
-    });
-
-    const hostname = configOutput.match(/Hostname\s+(.+)/)?.[1]?.trim();
-    const identityFile = configOutput.match(/IdentityFile\s+(.+)/)?.[1]?.trim();
-    const proxyCommand = configOutput.match(/ProxyCommand\s+(.+)/)?.[1]?.trim();
-
-    if (!hostname || !identityFile || !proxyCommand) {
-      throw new Error('Failed to parse SSH config from rli');
-    }
-
-    return {
-      command: 'ssh',
-      args: [
-        '-tt',
-        '-o', 'StrictHostKeyChecking=no',
-        '-o', `ProxyCommand=${proxyCommand}`,
-        '-i', identityFile,
-        `user@${hostname}`,
-        'bash -l',
-      ],
-    };
-  }
-
-  /**
    * Get SSH spawn command + args by thopter name (resolves devbox ID via Redis).
    */
   async getSSHSpawn(name: string): Promise<{ command: string; args: string[] }> {
-    const status = await this.getThopterStatus(name);
-    if (!status.id) throw new Error(`No devbox ID for thopter '${name}'`);
-    return this.resolveSSHSpawn(status.id);
+    const output = await execThopter('ssh', name, '--spawn-json');
+    return JSON.parse(output) as { command: string; args: string[] };
   }
 
   /**
    * Get SSH spawn command + args directly by devbox ID (skips Redis lookup).
    */
   async getSSHSpawnById(devboxId: string): Promise<{ command: string; args: string[] }> {
-    return this.resolveSSHSpawn(devboxId);
+    const output = await execThopter('ssh', devboxId, '--spawn-json');
+    return JSON.parse(output) as { command: string; args: string[] };
   }
 
   /**

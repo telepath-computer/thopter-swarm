@@ -12,14 +12,18 @@ import { Button } from '@/components/ui/button'
 interface Props {
   open: boolean
   name: string
+  provider: 'runloop' | 'digitalocean' | 'unknown'
   onClose: () => void
 }
 
-const COMMANDS: { label: string; command: (name: string) => string }[] = [
+const BASE_COMMANDS: { label: string; command: (name: string) => string }[] = [
   { label: 'Attach (tmux)', command: (n) => `thopter attach ${n}` },
   { label: 'SSH', command: (n) => `thopter ssh ${n}` },
   { label: 'Tail (follow)', command: (n) => `thopter tail ${n} -f` },
   { label: 'Status', command: (n) => `thopter status ${n}` },
+]
+
+const RUNLOOP_COMMANDS: { label: string; command: (name: string) => string }[] = [
   { label: 'Suspend', command: (n) => `thopter suspend ${n}` },
   { label: 'Resume', command: (n) => `thopter resume ${n}` },
 ]
@@ -48,7 +52,9 @@ function CopyField({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function ShellCommandsModal({ open, name, onClose }: Props) {
+export function ShellCommandsModal({ open, name, provider, onClose }: Props) {
+  const commands = provider === 'runloop' ? [...BASE_COMMANDS, ...RUNLOOP_COMMANDS] : BASE_COMMANDS
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
@@ -59,7 +65,7 @@ export function ShellCommandsModal({ open, name, onClose }: Props) {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
-          {COMMANDS.map((c) => (
+          {commands.map((c) => (
             <CopyField key={c.label} label={c.label} value={c.command(name)} />
           ))}
         </div>

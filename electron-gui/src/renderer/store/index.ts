@@ -20,6 +20,7 @@ export const useStore = create<Store>((set, get) => ({
   detailViewMode: {},
   liveTerminals: [],
   draftMessages: {},
+  provider: 'unknown',
 
   // Display state
   activeTab: 'dashboard',
@@ -33,13 +34,13 @@ export const useStore = create<Store>((set, get) => ({
     set({ refreshing: true })
     try {
       const service = getService()
-      const list = await service.listThopters()
+      const [provider, list] = await Promise.all([service.getProvider(), service.listThopters()])
       const thopters: Record<string, ThopterInfo> = {}
       for (const t of list) thopters[t.name] = t
-      set({ thopters, connectionStatus: 'connected' })
+      set({ provider, thopters, connectionStatus: 'connected' })
     } catch (err) {
       console.error('[store] refreshThopters failed:', err)
-      set({ connectionStatus: 'error' })
+      set({ provider: 'unknown', connectionStatus: 'error' })
     } finally {
       set({ refreshing: false })
     }

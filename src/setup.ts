@@ -5,6 +5,12 @@
 import { createInterface } from "node:readline";
 import { execSync } from "node:child_process";
 import { getClient } from "./client.js";
+import { isDigitalOceanProvider } from "./provider.js";
+import {
+  ensureDOFingerprintForLocalRSAPub,
+  getLocalRSAPrivateKeyPath,
+  getLocalRSAPublicKeyPath,
+} from "./do-ssh-key.js";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -61,37 +67,80 @@ export async function runSetup(): Promise<void> {
   console.log("=".repeat(60));
   console.log();
 
-  // --- Step 1: Runloop API key ---
-  console.log("Step 1: Runloop API Key");
-  console.log("  Get yours from the Runloop dashboard.");
-  const currentApiKey = getRunloopApiKey();
-  if (currentApiKey) {
-    console.log("  (already configured)");
-    const newKey = await ask("  Runloop API key [keep current]: ");
-    if (newKey) {
-      setRunloopApiKey(newKey);
-      console.log("  Updated.");
+  // --- Step 1: Provider auth ---
+  if (isDigitalOceanProvider()) {
+    console.log("Step 1: DigitalOcean Auth");
+    console.log("  Verifying doctl authentication context...");
+    try {
+      const output = execSync("doctl auth list", { encoding: "utf-8" });
+      if (!output.includes("(current)")) {
+        throw new Error("no current doctl auth context");
+      }
+      console.log("  Authenticated to DigitalOcean via doctl.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log(`  ERROR: doctl authentication check failed: ${msg}`);
+      console.log("  Run: doctl auth init --context <name>");
+      rl.close();
+      process.exit(1);
+    }
+
+    console.log("  Verifying SSH key files...");
+    try {
+      const privateKey = getLocalRSAPrivateKeyPath();
+      const publicKey = getLocalRSAPublicKeyPath();
+      console.log(`  Found private key: ${privateKey}`);
+      console.log(`  Found public key:  ${publicKey}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log(`  ERROR: ${msg}`);
+      console.log("  Create or symlink ~/.ssh/id_rsa and ~/.ssh/id_rsa.pub, then rerun setup.");
+      rl.close();
+      process.exit(1);
+    }
+
+    console.log("  Ensuring ~/.ssh/id_rsa.pub is registered in DigitalOcean SSH keys...");
+    try {
+      const fingerprint = ensureDOFingerprintForLocalRSAPub();
+      console.log(`  SSH key ready in DO (fingerprint: ${fingerprint}).`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log(`  ERROR: failed to ensure DO SSH key: ${msg}`);
+      rl.close();
+      process.exit(1);
     }
   } else {
-    const apiKey = await askRequired("  Runloop API key: ");
-    setRunloopApiKey(apiKey);
-    console.log("  Saved.");
-  }
-  // Reload env so getClient() works
-  loadConfigIntoEnv();
+    console.log("Step 1: Runloop API Key");
+    console.log("  Get yours from the Runloop dashboard.");
+    const currentApiKey = getRunloopApiKey();
+    if (currentApiKey) {
+      console.log("  (already configured)");
+      const newKey = await ask("  Runloop API key [keep current]: ");
+      if (newKey) {
+        setRunloopApiKey(newKey);
+        console.log("  Updated.");
+      }
+    } else {
+      const apiKey = await askRequired("  Runloop API key: ");
+      setRunloopApiKey(apiKey);
+      console.log("  Saved.");
+    }
+    // Reload env so getClient() works
+    loadConfigIntoEnv();
 
-  // Verify auth
-  console.log("  Verifying...");
-  try {
-    const client = getClient();
-    await client.devboxes.list({ limit: 1 });
-    console.log("  Authenticated to Runloop.");
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.log(`  ERROR: Authentication failed: ${msg}`);
-    console.log("  Check your API key and try again.");
-    rl.close();
-    process.exit(1);
+    // Verify auth
+    console.log("  Verifying...");
+    try {
+      const client = getClient();
+      await client.devboxes.list({ limit: 1 });
+      console.log("  Authenticated to Runloop.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log(`  ERROR: Authentication failed: ${msg}`);
+      console.log("  Check your API key and try again.");
+      rl.close();
+      process.exit(1);
+    }
   }
   console.log();
 

@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+# Non-interactive invocations (cron/hooks) may not load ~/.bashrc.
+[ -f "$HOME/.thopter-env" ] && . "$HOME/.thopter-env"
+
 if [ -z "${THOPTER_REDIS_URL:-}" ]; then
     echo "THOPTER_REDIS_URL not set" >&2
     exit 1

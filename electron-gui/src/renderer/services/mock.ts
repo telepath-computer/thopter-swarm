@@ -15,6 +15,7 @@ import type {
   AppConfig,
   ClaudeReadyStatus,
   Unsubscribe,
+  InfrastructureProvider,
 } from './types';
 
 // --- Fake data generators ---
@@ -176,6 +177,11 @@ export class MockThopterService implements ThopterService {
       const entryCount = randomBetween(20, 50);
       this.transcripts.set(name, generateTranscript(entryCount));
     }
+  }
+
+  async getProvider(): Promise<InfrastructureProvider> {
+    await delay(20);
+    return 'runloop';
   }
 
   async listThopters(): Promise<ThopterInfo[]> {
