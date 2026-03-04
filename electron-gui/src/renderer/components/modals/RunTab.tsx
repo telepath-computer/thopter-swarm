@@ -21,6 +21,7 @@ export function RunTab() {
   const closeTab = useStore((s) => s.closeTab)
   const runThopter = useStore((s) => s.runThopter)
   const openTab = useStore((s) => s.openTab)
+  const provider = useStore((s) => s.provider)
 
   const [step, setStep] = useState<Step>('mode')
   const [repos, setRepos] = useState<RepoConfig[]>([])
@@ -47,6 +48,7 @@ export function RunTab() {
   const [isDone, setIsDone] = useState(false)
   const [launchedName, setLaunchedName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const showKeepAlive = provider === 'runloop'
 
   const selectClass = 'h-9 w-full rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-xs [&_option]:bg-popover [&_option]:text-popover-foreground'
 
@@ -131,7 +133,7 @@ export function RunTab() {
           prompt: prompt.trim(),
           name: customName || undefined,
           snapshotId: snapshotId || undefined,
-          keepAliveMinutes: keepAlive ? parseInt(keepAlive, 10) : undefined,
+          keepAliveMinutes: showKeepAlive && keepAlive ? parseInt(keepAlive, 10) : undefined,
         })
       } else {
         name = await runThopter({
@@ -140,7 +142,7 @@ export function RunTab() {
           prompt: prompt.trim(),
           name: customName || undefined,
           snapshotId: snapshotId || undefined,
-          keepAliveMinutes: keepAlive ? parseInt(keepAlive, 10) : undefined,
+          keepAliveMinutes: showKeepAlive && keepAlive ? parseInt(keepAlive, 10) : undefined,
         })
       }
       setLaunchedName(name)
@@ -435,16 +437,18 @@ export function RunTab() {
                     </select>
                   </div>
 
-                  <div className="space-y-1.5 pl-3">
-                    <Label className="text-xs">Keep-alive (minutes)</Label>
-                    <Input
-                      type="number"
-                      value={keepAlive}
-                      onChange={(e) => setKeepAlive(e.target.value)}
-                      placeholder="Default"
-                      className="h-8 text-xs w-32"
-                    />
-                  </div>
+                  {showKeepAlive && (
+                    <div className="space-y-1.5 pl-3">
+                      <Label className="text-xs">Keep-alive (minutes)</Label>
+                      <Input
+                        type="number"
+                        value={keepAlive}
+                        onChange={(e) => setKeepAlive(e.target.value)}
+                        placeholder="Default"
+                        className="h-8 text-xs w-32"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -495,7 +499,7 @@ export function RunTab() {
                 <span className="text-muted-foreground">Task</span>
                 <p className="mt-1 text-xs whitespace-pre-wrap line-clamp-4">{prompt}</p>
               </div>
-              {(customName || snapshotId || keepAlive) && (
+              {(customName || snapshotId || (showKeepAlive && keepAlive)) && (
                 <>
                   <Separator />
                   {customName && (
@@ -510,7 +514,7 @@ export function RunTab() {
                       <span className="text-xs font-mono">{snapshotId.slice(0, 16)}...</span>
                     </div>
                   )}
-                  {keepAlive && (
+                  {showKeepAlive && keepAlive && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Keep-alive</span>
                       <span className="text-xs">{keepAlive} min</span>

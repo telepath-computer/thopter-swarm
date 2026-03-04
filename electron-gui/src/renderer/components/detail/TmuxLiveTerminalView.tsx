@@ -89,10 +89,9 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
     }
 
     // Build SSH args for the TmuxAdapter.
-    // getSSHSpawn() returns { command: 'ssh', args: ['-tt', ...opts, 'user@host', 'bash -l'] }.
-    // We need to replace the remote command ('bash -l') with tmux CC attach.
-    // Just attach to the default/existing tmux session rather than creating a named one.
-    const tmuxCmd = 'tmux -CC attach'
+    // Match `thopter attach` semantics exactly: attach default session if present,
+    // otherwise create a default session.
+    const tmuxCmd = 'tmux -CC attach \\; refresh-client || tmux -CC'
 
     // Replace the last arg (remote command like 'bash -l') with tmux CC command
     const sshArgs = [...spawnInfo.args]

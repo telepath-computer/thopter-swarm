@@ -7,6 +7,7 @@ import type {
   AppConfig,
   ClaudeReadyStatus,
   RunThopterOpts,
+  InfrastructureProvider,
 } from '../services/types'
 
 export interface StoreState {
@@ -24,6 +25,7 @@ export interface StoreState {
   detailViewMode: Record<string, 'transcript' | 'terminal' | 'ssh' | 'tmux'>
   liveTerminals: string[] // thopter names with active live terminal sessions
   draftMessages: Record<string, string>
+  provider: InfrastructureProvider
 
   // Display state (UI layer)
   activeTab: 'dashboard' | string

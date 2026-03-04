@@ -6,6 +6,7 @@
 
 import { Command } from "commander";
 import { loadConfigIntoEnv, resolveThopterName } from "./config.js";
+import { getActiveProvider } from "./provider.js";
 
 // Load API keys from ~/.thopter.json into process.env (won't override existing env vars)
 loadConfigIntoEnv();
@@ -61,6 +62,19 @@ examples:
   thopter resume dev                     Resume a suspended devbox
   thopter destroy dev                    Shut down a devbox`,
   );
+
+program
+  .command("provider")
+  .description("Show active infrastructure provider")
+  .option("--json", "Output as JSON")
+  .action((opts: { json?: boolean }) => {
+    const provider = getActiveProvider();
+    if (opts.json) {
+      process.stdout.write(JSON.stringify({ provider }) + "\n");
+      return;
+    }
+    console.log(provider);
+  });
 
 // --- setup ---
 program
@@ -318,8 +332,14 @@ program
   .command("ssh")
   .description("SSH into a devbox (via rli)")
   .argument("<devbox>", "Devbox name or ID")
-  .action(async (devbox: string) => {
-    const { sshDevbox } = await import("./devbox.js");
+  .option("--spawn-json", "Print JSON spawn info instead of connecting")
+  .action(async (devbox: string, opts: { spawnJson?: boolean }) => {
+    const { sshDevbox, getSSHSpawn } = await import("./devbox.js");
+    if (opts.spawnJson) {
+      const spawn = await getSSHSpawn(resolveThopterName(devbox));
+      process.stdout.write(JSON.stringify(spawn) + "\n");
+      return;
+    }
     await sshDevbox(resolveThopterName(devbox));
   });
 

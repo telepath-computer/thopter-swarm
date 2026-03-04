@@ -1740,6 +1740,60 @@ export async function sshDevbox(nameOrId: string): Promise<void> {
   rliSsh(id);
 }
 
+export async function getSSHSpawn(
+  nameOrId: string,
+  remoteCommand = "bash -l",
+): Promise<{ command: string; args: string[] }> {
+  const { id } = await resolveDevbox(nameOrId);
+
+  if (isDigitalOceanProvider()) {
+    const ip = getDODropletPublicIPv4(id);
+    return {
+      command: "ssh",
+      args: [
+        "-tt",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "ConnectTimeout=5",
+        "-i",
+        getLocalRSAPrivateKeyPath(),
+        `user@${ip}`,
+        remoteCommand,
+      ],
+    };
+  }
+
+  const configOutput = execSync(`rli devbox ssh --config-only ${id}`, {
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const hostname = configOutput.match(/Hostname\s+(.+)/)?.[1]?.trim();
+  const identityFile = configOutput.match(/IdentityFile\s+(.+)/)?.[1]?.trim();
+  const proxyCommand = configOutput.match(/ProxyCommand\s+(.+)/)?.[1]?.trim();
+
+  if (!hostname || !identityFile || !proxyCommand) {
+    throw new Error("Failed to parse SSH config from rli.");
+  }
+
+  return {
+    command: "ssh",
+    args: [
+      "-tt",
+      "-o",
+      "StrictHostKeyChecking=no",
+      "-o",
+      `ProxyCommand=${proxyCommand}`,
+      "-i",
+      identityFile,
+      `user@${hostname}`,
+      remoteCommand,
+    ],
+  };
+}
+
 export async function attachDevbox(nameOrId: string): Promise<void> {
   const { id } = await resolveDevbox(nameOrId);
 

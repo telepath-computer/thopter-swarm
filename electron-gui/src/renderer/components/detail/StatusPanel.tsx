@@ -99,6 +99,7 @@ export function StatusPanel({ thopter }: Props) {
   const suspendThopter = useStore((s) => s.suspendThopter)
   const resumeThopter = useStore((s) => s.resumeThopter)
   const destroyThopter = useStore((s) => s.destroyThopter)
+  const provider = useStore((s) => s.provider)
   const [confirmDestroy, setConfirmDestroy] = useState(false)
   const [confirmSuspend, setConfirmSuspend] = useState(false)
   const [confirmResume, setConfirmResume] = useState(false)
@@ -107,6 +108,7 @@ export function StatusPanel({ thopter }: Props) {
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
   const isSuspended = thopter.devboxStatus === 'suspended'
+  const showSuspendResume = provider === 'runloop'
 
   return (
     <div className="px-4 py-3 border-b bg-card/50">
@@ -149,26 +151,28 @@ export function StatusPanel({ thopter }: Props) {
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
-          {isSuspended ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmResume(true)}>
-                  <Play />
-                  Resume
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Resume suspended devbox</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmSuspend(true)}>
-                  <Pause />
-                  Suspend
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Suspend devbox (saves state)</TooltipContent>
-            </Tooltip>
+          {showSuspendResume && (
+            isSuspended ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmResume(true)}>
+                    <Play />
+                    Resume
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Resume suspended devbox</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="xs" className="cursor-pointer" onClick={() => setConfirmSuspend(true)}>
+                    <Pause />
+                    Suspend
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Suspend devbox (saves state)</TooltipContent>
+              </Tooltip>
+            )
           )}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -194,28 +198,32 @@ export function StatusPanel({ thopter }: Props) {
 
       <EditableTask name={thopter.name} task={thopter.task} />
 
-      <ConfirmDialog
-        open={confirmResume}
-        title="Resume Thopter"
-        description={`This will resume "${thopter.name}" from its suspended state.`}
-        confirmLabel="Resume"
-        onConfirm={() => {
-          setConfirmResume(false)
-          resumeThopter(thopter.name)
-        }}
-        onCancel={() => setConfirmResume(false)}
-      />
-      <ConfirmDialog
-        open={confirmSuspend}
-        title="Suspend Thopter"
-        description={`This will suspend "${thopter.name}" and its devbox. The state will be saved and you can resume it later.`}
-        confirmLabel="Suspend"
-        onConfirm={() => {
-          setConfirmSuspend(false)
-          suspendThopter(thopter.name)
-        }}
-        onCancel={() => setConfirmSuspend(false)}
-      />
+      {showSuspendResume && (
+        <ConfirmDialog
+          open={confirmResume}
+          title="Resume Thopter"
+          description={`This will resume "${thopter.name}" from its suspended state.`}
+          confirmLabel="Resume"
+          onConfirm={() => {
+            setConfirmResume(false)
+            resumeThopter(thopter.name)
+          }}
+          onCancel={() => setConfirmResume(false)}
+        />
+      )}
+      {showSuspendResume && (
+        <ConfirmDialog
+          open={confirmSuspend}
+          title="Suspend Thopter"
+          description={`This will suspend "${thopter.name}" and its devbox. The state will be saved and you can resume it later.`}
+          confirmLabel="Suspend"
+          onConfirm={() => {
+            setConfirmSuspend(false)
+            suspendThopter(thopter.name)
+          }}
+          onCancel={() => setConfirmSuspend(false)}
+        />
+      )}
       <ConfirmDialog
         open={confirmDestroy}
         title="Destroy Thopter"
@@ -228,7 +236,7 @@ export function StatusPanel({ thopter }: Props) {
         }}
         onCancel={() => setConfirmDestroy(false)}
       />
-      <ShellCommandsModal open={shellModalOpen} name={thopter.name} onClose={() => setShellModalOpen(false)} />
+      <ShellCommandsModal open={shellModalOpen} name={thopter.name} provider={provider} onClose={() => setShellModalOpen(false)} />
     </div>
   )
 }
