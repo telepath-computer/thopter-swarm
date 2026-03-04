@@ -3,11 +3,12 @@
  */
 
 import { createInterface } from "node:readline";
-import { createDevbox } from "./devbox.js";
-import { getClient } from "./client.js";
+import { createDevbox, executeCommandById, writeFileById } from "./devbox.js";
 import { getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getRepos } from "./config.js";
 import { generateName } from "./names.js";
 import { chooseMode } from "./repos.js";
+
+const WORKSPACE_DIR = "/home/user/workspace";
 
 // --- Types ---
 
@@ -31,7 +32,7 @@ function buildRunPrompt(opts: {
     ? `You should work on the \`${opts.branch}\` branch.`
     : `Work on the repository's default branch.`;
 
-  return `You are running on a thopter devbox. The repository \`${opts.repo}\` has been cloned to your home directory.
+  return `You are running on a thopter devbox. The repository \`${opts.repo}\` has been cloned inside \`${WORKSPACE_DIR}\`.
 
 ${branchInfo}
 
@@ -48,12 +49,12 @@ function buildHomeDirPrompt(opts: {
   let repoInfo = "";
   if (opts.checkouts.length > 0) {
     const repoList = opts.checkouts
-      .map((c) => `- \`${c.repo}\` (branch: \`${c.branch}\`) — cloned to \`/home/user/${c.repo.split("/")[1]}\``)
+      .map((c) => `- \`${c.repo}\` (branch: \`${c.branch}\`) — cloned to \`${WORKSPACE_DIR}/${c.repo.split("/")[1]}\``)
       .join("\n");
     repoInfo = `\n\nThe following repositories have been pre-checked out:\n${repoList}`;
   }
 
-  return `You are running on a thopter devbox. Your working directory is \`/home/user\`.${repoInfo}
+  return `You are running on a thopter devbox. Your working directory is \`${WORKSPACE_DIR}\`.${repoInfo}
 
 IMPORTANT: You can only push to branches prefixed with \`thopter/\`. Create a \`thopter/\` branch for your work. You cannot push to \`main\` or \`master\` directly. If you want to propose changes, push to a \`thopter/\` branch and create a pull request.
 
@@ -138,14 +139,14 @@ async function cloneRepos(
   checkouts: RepoCheckout[],
   thopterName: string,
 ): Promise<void> {
-  const client = getClient();
   for (const checkout of checkouts) {
     const repo = validateRepo(checkout.repo);
     validateBranch(checkout.branch);
     const repoName = repo.split("/")[1];
 
     const cloneScript = [
-      `cd /home/user`,
+      `mkdir -p "${WORKSPACE_DIR}"`,
+      `cd "${WORKSPACE_DIR}"`,
       `if [ ! -d "${repoName}" ]; then git clone "https://github.com/${repo}.git"; fi`,
       `cd "${repoName}"`,
       `git fetch origin`,
@@ -154,13 +155,12 @@ async function cloneRepos(
     ].join(" && ");
 
     console.log(`Cloning ${repo}...`);
-    const cloneExec = await client.devboxes.executeAsync(devboxId, { command: cloneScript });
-    const cloneResult = await client.devboxes.executions.awaitCompleted(devboxId, cloneExec.execution_id);
+    const cloneResult = await executeCommandById(devboxId, cloneScript);
     if (cloneResult.stdout) process.stdout.write(cloneResult.stdout);
     if (cloneResult.stderr) process.stderr.write(cloneResult.stderr);
 
-    if (cloneResult.exit_status && cloneResult.exit_status !== 0) {
-      console.error(`\nError: Repository setup failed for ${repo} (exit ${cloneResult.exit_status}).`);
+    if (cloneResult.exitCode !== 0) {
+      console.error(`\nError: Repository setup failed for ${repo} (exit ${cloneResult.exitCode}).`);
       console.error(`  The devbox '${thopterName}' is still running. Debug with: thopter ssh ${thopterName}`);
       process.exit(1);
     }
@@ -264,20 +264,19 @@ export async function runThopter(opts: {
   }
 
   // Step 3: Write prompt file and launch Claude in tmux
-  const client = getClient();
   let fullPrompt: string;
   let workingDir: string;
 
   if (mode.kind === "repo") {
     const repoName = mode.checkout.repo.split("/")[1];
-    workingDir = `/home/user/${repoName}`;
+    workingDir = `${WORKSPACE_DIR}/${repoName}`;
     fullPrompt = buildRunPrompt({
       repo: mode.checkout.repo,
       branch: mode.checkout.branch,
       userPrompt: opts.prompt,
     });
   } else {
-    workingDir = "/home/user";
+    workingDir = WORKSPACE_DIR;
     fullPrompt = buildHomeDirPrompt({
       checkouts: mode.checkouts,
       userPrompt: opts.prompt,
@@ -285,27 +284,40 @@ export async function runThopter(opts: {
   }
 
   const promptPath = "/home/user/thopter-run-prompt.txt";
-  await client.devboxes.writeFileContents(devboxId, {
-    file_path: promptPath,
-    contents: fullPrompt,
-  });
+  await writeFileById(devboxId, promptPath, fullPrompt);
 
   // Write a launcher script that runs claude under bash. When claude exits,
   // `exec bash -l` replaces the script process with a fresh login shell so the
   // tmux session stays alive (see issue #137).
   const launcherPath = "/home/user/thopter-launch.sh";
-  await client.devboxes.writeFileContents(devboxId, {
-    file_path: launcherPath,
-    contents: [
+  await writeFileById(
+    devboxId,
+    launcherPath,
+    [
       `#!/bin/bash -l`,
       `cd ${workingDir}`,
       `claude --dangerously-skip-permissions "Read the file ${promptPath}. Print a brief summary of the instructions you read, then proceed to follow them."`,
       `exec bash -l`,
     ].join("\n"),
-  });
+  );
+
+  // Ensure Claude is actually available/healthy before trying to launch tmux session.
+  const claudeCheck = await executeCommandById(
+    devboxId,
+    "command -v claude >/dev/null 2>&1 && claude --version >/dev/null 2>&1",
+  );
+  if (claudeCheck.exitCode !== 0) {
+    throw new Error(
+      "Claude CLI is not healthy on the thopter (install likely failed). SSH in and run `claude --version` for diagnostics.",
+    );
+  }
 
   const launchCmd = `tmux kill-server 2>/dev/null || true; chmod +x ${launcherPath} && tmux new-session -d ${launcherPath}`;
-  await client.devboxes.executeAsync(devboxId, { command: launchCmd });
+  const launchResult = await executeCommandById(devboxId, launchCmd);
+  if (launchResult.exitCode !== 0) {
+    if (launchResult.stderr) process.stderr.write(launchResult.stderr);
+    throw new Error(`Failed to launch Claude in tmux (exit ${launchResult.exitCode}).`);
+  }
 
   // Step 4: Print summary
   console.log(`\nThopter '${thopterName}' running.`);

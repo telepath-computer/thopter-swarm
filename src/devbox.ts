@@ -3,8 +3,9 @@
  */
 
 import { execFileSync, execSync, spawn, spawnSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { copyFileSync, readFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { resolve, dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { getClient } from "./client.js";
 import { printTable } from "./output.js";
@@ -32,18 +33,66 @@ import {
 
 /** Tool installation script that runs inside the devbox on first create. */
 const INIT_SCRIPT = `
-set -e
+set -euo pipefail
+
+THOPTER_INIT_LOG="$HOME/thopter-init.log"
+THOPTER_INIT_WARN="$HOME/.thopter-init-warnings"
+mkdir -p "$(dirname "$THOPTER_INIT_LOG")"
+: > "$THOPTER_INIT_WARN"
+exec > >(tee -a "$THOPTER_INIT_LOG") 2>&1
+
+redis_safe() {
+  if [ -z "\${THOPTER_REDIS_URL:-}" ] || [ -z "\${THOPTER_NAME:-}" ]; then
+    return 0
+  fi
+  redis-cli --tls -u "$THOPTER_REDIS_URL" "$@" >/dev/null 2>&1 || true
+}
+
+progress() {
+  local stage="$1"
+  local message="$2"
+  local now
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "[thopter-init][$stage] $message"
+  redis_safe SETEX "thopter:$THOPTER_NAME:create:stage" 3600 "$stage"
+  redis_safe SETEX "thopter:$THOPTER_NAME:create:message" 3600 "$message"
+  redis_safe SETEX "thopter:$THOPTER_NAME:create:timestamp" 3600 "$now"
+  redis_safe RPUSH "thopter:$THOPTER_NAME:create:logs" "$now [$stage] $message"
+  redis_safe LTRIM "thopter:$THOPTER_NAME:create:logs" -200 -1
+  redis_safe EXPIRE "thopter:$THOPTER_NAME:create:logs" 3600
+}
+
+echo "[thopter-init] starting at $(date -Is)"
+progress "start" "thopter cloud-init started"
+
+run_optional() {
+  local label="$1"
+  shift
+  progress "optional:$label" "starting optional step"
+  if "$@"; then
+    echo "[thopter-init] OK(optional): $label"
+    progress "optional:$label" "optional step complete"
+    return 0
+  fi
+  echo "[thopter-init] WARN(optional): $label"
+  echo "$label" >> "$THOPTER_INIT_WARN"
+  progress "optional:$label" "optional step failed (continuing)"
+  return 0
+}
 
 # Install essential tools
+progress "apt" "installing base packages"
 sudo apt-get update -qq && sudo apt-get install -y -qq git tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 xvfb xauth bash-completion > /dev/null
 sudo /usr/sbin/cron 2>/dev/null || true
 
 # Install Neovim (latest stable, NvChad requires 0.10+)
+progress "nvim" "installing neovim"
 NVIM_ARCH=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/x86_64/')
 curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-\${NVIM_ARCH}.tar.gz" | sudo tar xz -C /opt
 sudo ln -sf /opt/nvim-linux-\${NVIM_ARCH}/bin/nvim /usr/local/bin/nvim
 
 # Install Node.js via NVM (Node 22) and make it default
+progress "node" "installing node via nvm"
 export NVM_DIR="$HOME/.nvm"
 curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 . "$NVM_DIR/nvm.sh"
@@ -55,33 +104,62 @@ sudo ln -sf "$NODE_BIN_DIR/node" /usr/local/bin/node
 sudo ln -sf "$NODE_BIN_DIR/npm" /usr/local/bin/npm
 sudo ln -sf "$NODE_BIN_DIR/npx" /usr/local/bin/npx
 
+# Ensure canonical working directory exists for automated runs.
+mkdir -p "$HOME/workspace"
+
 # Install NvChad starter (fresh installs only)
 if [ ! -d ~/.config/nvim ]; then
-  git clone https://github.com/NvChad/starter ~/.config/nvim
+  run_optional "clone NvChad starter" git clone https://github.com/NvChad/starter ~/.config/nvim
 fi
 
-# Install Claude Code
-curl -fsSL https://claude.ai/install.sh | bash
+# Install Claude Code with retries and health check
+progress "claude" "installing claude code"
+export PATH="$HOME/.local/bin:$PATH"
+install_claude() {
+  local attempts=3
+  local i=1
+  while [ "$i" -le "$attempts" ]; do
+    # Clear previous installer artifacts/payloads so retries always start clean.
+    rm -f "$HOME/.claude/downloads/claude-"* 2>/dev/null || true
+    rm -f "$HOME/.local/bin/claude" 2>/dev/null || true
+    rm -rf "$HOME/.local/share/claude" 2>/dev/null || true
+    hash -r || true
+    if curl -fsSL https://claude.ai/install.sh | bash; then
+      if command -v claude >/dev/null 2>&1; then
+        CLAUDE_BIN="$(command -v claude)"
+        if [ -x "$CLAUDE_BIN" ] && "$CLAUDE_BIN" --version >/dev/null 2>&1; then
+          return 0
+        fi
+      fi
+      if [ -x "$HOME/.local/bin/claude" ] && "$HOME/.local/bin/claude" --version >/dev/null 2>&1; then
+        return 0
+      fi
+    fi
+    echo "Claude install/verify failed (attempt $i/$attempts), retrying..."
+    sleep 5
+    i=$((i + 1))
+  done
+  echo "ERROR: Claude installation failed after $attempts attempts."
+  return 1
+}
+install_claude
 
 # Install OpenAI Codex
-npm i -g @openai/codex
+progress "codex" "installing openai codex"
+run_optional "install @openai/codex" npm i -g @openai/codex
 
 # Install Runloop CLI (for rli devbox ssh from inside devboxes)
-npm i -g @runloop/rl-cli
+progress "rl-cli" "installing runloop cli"
+run_optional "install @runloop/rl-cli" npm i -g @runloop/rl-cli
 
 # Install git-delta pager
+progress "git-delta" "installing git-delta"
 DELTA_ARCH=$(dpkg --print-architecture)
-curl -fL "https://github.com/dandavison/delta/releases/download/0.18.2/git-delta_0.18.2_\${DELTA_ARCH}.deb" -o /tmp/git-delta.deb
-sudo PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin dpkg -i /tmp/git-delta.deb
-rm /tmp/git-delta.deb
-git config --global core.pager delta
-git config --global interactive.diffFilter "delta --color-only"
-git config --global delta.side-by-side true
-git config --global delta.navigate true
-git config --global delta.line-numbers true
+run_optional "install git-delta" bash -lc "curl -fL https://github.com/dandavison/delta/releases/download/0.18.2/git-delta_0.18.2_\${DELTA_ARCH}.deb -o /tmp/git-delta.deb && sudo PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin dpkg -i /tmp/git-delta.deb && rm /tmp/git-delta.deb && git config --global core.pager delta && git config --global interactive.diffFilter 'delta --color-only' && git config --global delta.side-by-side true && git config --global delta.navigate true && git config --global delta.line-numbers true"
 
 # Install starship prompt (non-interactive)
-curl -sS https://starship.rs/install.sh | sh -s -- -y
+progress "starship" "installing starship"
+run_optional "install starship" bash -lc "curl -sS https://starship.rs/install.sh | sh -s -- -y -b $HOME/.local/bin"
 
 # Append thopter bashrc block (idempotent — skip if already present)
 if ! grep -q '# --- thopter ---' ~/.bashrc 2>/dev/null; then
@@ -100,7 +178,13 @@ fi
 THOPTERRC
 fi
 
-echo "Devbox init complete"
+echo "[thopter-init] complete at $(date -Is)"
+progress "done" "thopter cloud-init completed"
+if [ -s "$THOPTER_INIT_WARN" ]; then
+  echo "[thopter-init] completed with optional warnings:"
+  cat "$THOPTER_INIT_WARN"
+fi
+touch "$HOME/.thopter-init-complete"
 `.trim();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -138,7 +222,8 @@ function requireRunloopFeature(feature: string): void {
 
 const DO_MANAGED_TAG = "managed-by:thopter";
 const DO_DEFAULT_IMAGE = "ubuntu-24-04-x64";
-const DO_DEFAULT_SIZE = "s-2vcpu-4gb";
+const DO_DEFAULT_SIZE = "s-4vcpu-8gb";
+const DO_DEFAULT_REGION = "sfo3";
 
 interface DODroplet {
   id: string;
@@ -152,6 +237,31 @@ interface DOSnapshot {
   name: string;
   sourceId: string;
   createdAt: string;
+}
+
+type LogFn = (message: string) => void;
+
+function makeTimedLogger(startMs: number): LogFn {
+  return (message: string) => {
+    const ts = new Date().toISOString();
+    const elapsedSeconds = ((Date.now() - startMs) / 1000).toFixed(1);
+    console.log(`[${ts} +${elapsedSeconds}s] ${message}`);
+  };
+}
+
+function printPostCreateChecklist(log: LogFn): void {
+  log("Recommended next steps:");
+  log("  1. SSH in and enter the workspace: cd ~/workspace");
+  log("  2. Launch Claude in YOLO mode (e.g. yolo-claude), accept trust/permission dialogs, authenticate, then verify with a short back-and-forth prompt.");
+  log("  3. In ~/workspace, launch Codex in YOLO mode, authenticate, verify it responds, then quit.");
+  log("  4. Clone/check out your common repos under ~/workspace and verify access works.");
+  log("  5. Run npm installs (or other dependency installs) for your day-to-day repos.");
+}
+
+export interface RemoteCommandResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
 }
 
 function doctlJson(args: string[]): unknown {
@@ -282,13 +392,18 @@ function doExecSync(
   opts?: { user?: string; retryMax?: number; inheritIO?: boolean },
 ): { stdout: string; stderr: string; status: number } {
   const ip = getDODropletPublicIPv4(dropletId);
+  const wrappedCommand = [
+    "export PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH\"",
+    "hash -r || true",
+    command,
+  ].join("; ");
   const args = [
     "-o", "StrictHostKeyChecking=no",
     "-o", "UserKnownHostsFile=/dev/null",
     "-o", "ConnectTimeout=5",
     "-i", getLocalRSAPrivateKeyPath(),
     `${opts?.user ?? "user"}@${ip}`,
-    command,
+    `bash -lc ${shellSingleQuote(wrappedCommand)}`,
   ];
   const result = spawnSync("ssh", args, {
     encoding: "utf-8",
@@ -320,52 +435,319 @@ function doWriteFile(
   }
 }
 
+function doScpToDroplet(
+  dropletId: string,
+  localPath: string,
+  remotePath: string,
+  opts?: { user?: string },
+): void {
+  const ip = getDODropletPublicIPv4(dropletId);
+  const args = [
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "ConnectTimeout=5",
+    "-i", getLocalRSAPrivateKeyPath(),
+    localPath,
+    `${opts?.user ?? "user"}@${ip}:${remotePath}`,
+  ];
+  const result = spawnSync("scp", args, { encoding: "utf-8" });
+  if ((result.status ?? 1) !== 0) {
+    throw new Error(result.stderr || `failed to scp ${localPath} to ${remotePath}`);
+  }
+}
+
+type DOAssetBundleEntry =
+  | { archivePath: string; contents: string }
+  | { archivePath: string; sourcePath: string };
+
+function createDOAssetsBundle(files: DOAssetBundleEntry[]): {
+  tarPath: string;
+  cleanup: () => void;
+} {
+  const root = mkdtempSync(join(tmpdir(), "thopter-assets-"));
+  const stage = join(root, "stage");
+  mkdirSync(stage, { recursive: true });
+
+  for (const file of files) {
+    const rel = file.archivePath.replace(/^\/+/, "");
+    const dest = join(stage, rel);
+    mkdirSync(dirname(dest), { recursive: true });
+    if ("sourcePath" in file) {
+      copyFileSync(file.sourcePath, dest);
+    } else {
+      writeFileSync(dest, file.contents, "utf-8");
+    }
+  }
+
+  const tarPath = join(root, "assets.tgz");
+  execFileSync("tar", ["-czf", tarPath, "-C", stage, "."], {
+    stdio: "pipe",
+    env: { ...process.env, COPYFILE_DISABLE: "1" },
+  });
+  return {
+    tarPath,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
+}
+
+function archivePathForDORemote(remotePath: string): string | null {
+  if (remotePath.startsWith("/home/user/")) {
+    return `home/${remotePath.slice("/home/user/".length)}`;
+  }
+  if (remotePath === "/home/user") {
+    return "home";
+  }
+  if (remotePath.startsWith("/tmp/")) {
+    return `tmp/${remotePath.slice("/tmp/".length)}`;
+  }
+  if (remotePath === "/tmp") {
+    return "tmp";
+  }
+  return null;
+}
+
+function uploadBundleToDO(
+  dropletId: string,
+  files: DOAssetBundleEntry[],
+  log: LogFn,
+): void {
+  const bundle = createDOAssetsBundle(files);
+  try {
+    log(`  Packaging ${files.length} assets...`);
+    log("  Uploading assets bundle...");
+    doScpToDroplet(dropletId, bundle.tarPath, "/tmp/thopter-assets.tgz");
+    log("  Extracting assets bundle...");
+    const extract = doExecSync(
+      dropletId,
+      [
+        "rm -rf /home/user/.thopter-staging",
+        "mkdir -p /home/user/.thopter-staging",
+        "tar xzf /tmp/thopter-assets.tgz -C /home/user/.thopter-staging --no-same-owner --no-same-permissions --warning=no-unknown-keyword",
+        "mkdir -p /home/user/.claude/hooks /home/user/.codex /home/user/.config/nvim/lua/plugins /home/user/.config/starship",
+        "cp -R /home/user/.thopter-staging/home/. /home/user/ 2>/dev/null || true",
+        "cp -R /home/user/.thopter-staging/tmp/. /tmp/ 2>/dev/null || true",
+        "rm -rf /home/user/.thopter-staging /tmp/thopter-assets.tgz",
+      ].join(" && "),
+      { retryMax: 60 },
+    );
+    if (extract.status !== 0) {
+      throw new Error(extract.stderr || "failed to extract assets bundle");
+    }
+  } finally {
+    bundle.cleanup();
+  }
+}
+
+function doUploadFileToRemotePath(
+  dropletId: string,
+  localPath: string,
+  remotePath: string,
+  opts?: { user?: string },
+): void {
+  const tempName = `/tmp/thopter-upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  doScpToDroplet(dropletId, localPath, tempName, opts);
+  const remoteQuoted = shellSingleQuote(remotePath);
+  const tmpQuoted = shellSingleQuote(tempName);
+  const cmd = [
+    `mkdir -p "$(dirname ${remoteQuoted})"`,
+    `mv ${tmpQuoted} ${remoteQuoted}`,
+  ].join(" && ");
+  const result = doExecSync(dropletId, cmd, { user: opts?.user });
+  if (result.status !== 0) {
+    throw new Error(result.stderr || `failed to place upload at ${remotePath}`);
+  }
+}
+
 async function waitForDOSSHReady(
   dropletId: string,
+  log: LogFn,
   user = "user",
   maxAttempts = 120,
 ): Promise<void> {
-  console.log(`Waiting for SSH (${user})...`);
+  log(`Waiting for SSH (${user})...`);
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const probe = doExecSync(dropletId, "true", {
       user,
       retryMax: 1,
     });
     if (probe.status === 0) {
-      console.log(`SSH ready after ${attempt} attempt${attempt === 1 ? "" : "s"}.`);
+      log(`SSH ready after ${attempt} attempt${attempt === 1 ? "" : "s"}.`);
       return;
     }
     if (attempt % 10 === 0) {
-      process.stdout.write(`Waiting for SSH (${user})... attempt ${attempt}/${maxAttempts}\n`);
+      log(`Waiting for SSH (${user})... attempt ${attempt}/${maxAttempts}`);
     }
     await new Promise((r) => setTimeout(r, 5000));
   }
   throw new Error(`Timed out waiting for SSH (${user}) on droplet ${dropletId}.`);
 }
 
+function getDOCloudInitDiagnostics(dropletId: string): string {
+  const diagnostics = doExecSync(
+    dropletId,
+    [
+      "echo '--- cloud-init status --long ---'",
+      "sudo cloud-init status --long || true",
+      "echo '--- /var/log/cloud-init-output.log (tail 120) ---'",
+      "sudo tail -n 120 /var/log/cloud-init-output.log || true",
+      "echo '--- /var/log/cloud-init.log (tail 120) ---'",
+      "sudo tail -n 120 /var/log/cloud-init.log || true",
+      "echo '--- /home/user/thopter-init.log (tail 120) ---'",
+      "tail -n 120 /home/user/thopter-init.log || true",
+      "echo '--- /home/user/.thopter-init-warnings ---'",
+      "cat /home/user/.thopter-init-warnings || true",
+    ].join("; "),
+    { user: "user", retryMax: 1 },
+  );
+  return [diagnostics.stdout, diagnostics.stderr].filter(Boolean).join("\n").trim();
+}
+
+async function startDOCreateRedisProgressLoop(
+  log: LogFn,
+  thopterName?: string,
+  redisUrl?: string,
+): Promise<() => Promise<void>> {
+  if (!thopterName || !redisUrl) {
+    return async () => {};
+  }
+
+  const { Redis } = await import("ioredis");
+  const needsTls = redisUrl.startsWith("redis://");
+  const redis = new Redis(redisUrl, {
+    lazyConnect: true,
+    ...(needsTls ? { tls: {} } : {}),
+    connectTimeout: 1500,
+    maxRetriesPerRequest: 1,
+    enableOfflineQueue: false,
+    retryStrategy: () => 1000,
+    reconnectOnError: () => false,
+  });
+  redis.on("error", () => {
+    // Best-effort progress stream only.
+  });
+
+  const key = `thopter:${thopterName}:create:logs`;
+  let stopped = false;
+  let cursor = 0;
+  let loop: Promise<void> | null = null;
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  loop = (async () => {
+    while (!stopped) {
+      try {
+        if (redis.status !== "ready") {
+          await redis.connect();
+        }
+        const len = await redis.llen(key);
+        if (cursor > len) cursor = Math.max(0, len - 50);
+        if (len > cursor) {
+          const lines = await redis.lrange(key, cursor, len - 1);
+          for (const line of lines) {
+            log(`cloud-init log: ${line}`);
+          }
+          cursor = len;
+        }
+      } catch {
+        // Keep trying; Redis telemetry must never block create.
+      }
+      await sleep(1000);
+    }
+  })();
+
+  return async () => {
+    stopped = true;
+    if (loop) {
+      try {
+        await loop;
+      } catch {
+        // Ignore shutdown errors from best-effort loop.
+      }
+    }
+    try {
+      redis.disconnect();
+    } catch {
+      // Ignore close errors.
+    }
+  };
+}
+
+async function waitForDOInitComplete(
+  dropletId: string,
+  log: LogFn,
+): Promise<void> {
+  log("Waiting for cloud-init to finish...");
+  const maxAttempts = 72; // 6 minutes at 5s intervals
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const statusResult = doExecSync(
+      dropletId,
+      "sudo cloud-init status --long || true",
+      { user: "user", retryMax: 1 },
+    );
+    const statusText = `${statusResult.stdout}\n${statusResult.stderr}`;
+    const statusMatch = statusText.match(/status:\s*([a-zA-Z-]+)/);
+    const status = statusMatch ? statusMatch[1].toLowerCase() : "unknown";
+
+    if (status === "done") {
+      const marker = doExecSync(
+        dropletId,
+        "[ -f /home/user/.thopter-init-complete ] && command -v node >/dev/null 2>&1 && command -v claude >/dev/null 2>&1",
+        { user: "user", retryMax: 1 },
+      );
+      if (marker.status === 0) {
+        log("cloud-init finished and thopter init marker is present.");
+        return;
+      }
+      const diag = getDOCloudInitDiagnostics(dropletId);
+      throw new Error(
+        `Droplet init failed: cloud-init completed but required tools/marker were missing.\n${diag}`,
+      );
+    }
+
+    if (status === "error") {
+      const diag = getDOCloudInitDiagnostics(dropletId);
+      throw new Error(
+        `Droplet init failed: cloud-init reported an error.\n${diag}`,
+      );
+    }
+
+    if (attempt % 6 === 0) {
+      log(`Waiting for cloud-init... attempt ${attempt}/${maxAttempts} (status: ${status})`);
+    }
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+
+  const diag = getDOCloudInitDiagnostics(dropletId);
+  throw new Error(
+    `Droplet init timed out after 6 minutes.\n${diag}`,
+  );
+}
+
 function installThopterScriptsDO(
   dropletId: string,
   name: string,
+  log: LogFn,
 ): void {
   void name;
-  const upload = (path: string, data: string) => {
-    console.log(`  Uploading ${path}...`);
-    doWriteFile(dropletId, path, data, { retryMax: 60 });
-  };
-  upload("/tmp/thopter-status", readScript("thopter-status.sh"));
-  upload("/tmp/thopter-heartbeat", readScript("thopter-heartbeat.sh"));
-  upload("/tmp/thopter-cron-install.sh", readScript("thopter-cron-install.sh"));
-  upload("/home/user/.config/nvim/lua/options.lua", readScript("nvim-options.lua"));
-  upload("/home/user/.config/nvim/lua/plugins/thopter.lua", readScript("nvim-plugins.lua"));
-  upload("/home/user/.config/starship.toml", readScript("starship.toml"));
-  upload("/home/user/.tmux.conf", readScript("tmux.conf"));
+  const files: Array<{ archivePath: string; contents: string }> = [
+    { archivePath: "tmp/thopter-status", contents: readScript("thopter-status.sh") },
+    { archivePath: "tmp/thopter-heartbeat", contents: readScript("thopter-heartbeat.sh") },
+    { archivePath: "tmp/thopter-cron-install.sh", contents: readScript("thopter-cron-install.sh") },
+    { archivePath: "home/.config/nvim/lua/options.lua", contents: readScript("nvim-options.lua") },
+    { archivePath: "home/.config/nvim/lua/plugins/thopter.lua", contents: readScript("nvim-plugins.lua") },
+    { archivePath: "home/.config/starship.toml", contents: readScript("starship.toml") },
+    { archivePath: "home/.tmux.conf", contents: readScript("tmux.conf") },
+  ];
 
   const claudeMdPath = getClaudeMdPath();
   const claudeMdContents = claudeMdPath
     ? readFileSync(claudeMdPath, "utf-8")
     : readScript("thopter-claude-md.md");
-  upload("/home/user/.claude/CLAUDE.md", claudeMdContents);
-  upload("/home/user/.codex/AGENTS.md", claudeMdContents);
+  files.push(
+    { archivePath: "home/.claude/CLAUDE.md", contents: claudeMdContents },
+    { archivePath: "home/.codex/AGENTS.md", contents: claudeMdContents },
+  );
 
   const hookFiles: Record<string, string> = {
     "claude-hook-stop.sh": "on-stop.sh",
@@ -376,22 +758,26 @@ function installThopterScriptsDO(
     "claude-hook-tool-use.sh": "on-tool-use.sh",
   };
   for (const [src, dest] of Object.entries(hookFiles)) {
-    upload(`/home/user/.claude/hooks/${dest}`, readScript(src));
+    files.push({ archivePath: `home/.claude/hooks/${dest}`, contents: readScript(src) });
   }
-  upload("/tmp/thopter-transcript-push.mjs", readScript("thopter-transcript-push.mjs"));
-  upload("/tmp/install-claude-hooks.mjs", readScript("install-claude-hooks.mjs"));
+  files.push(
+    { archivePath: "tmp/thopter-transcript-push.mjs", contents: readScript("thopter-transcript-push.mjs") },
+    { archivePath: "tmp/install-claude-hooks.mjs", contents: readScript("install-claude-hooks.mjs") },
+  );
+
+  uploadBundleToDO(dropletId, files, log);
 
   const installCmd =
     "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && " +
     "sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && " +
     "sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && " +
     "chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh";
-  console.log("  Installing uploaded scripts and hooks...");
+  log("  Installing uploaded scripts and hooks...");
   const result = doExecSync(dropletId, installCmd, { retryMax: 60 });
   if (result.status !== 0) {
     throw new Error(result.stderr || "failed to install thopter scripts");
   }
-  console.log("  Ensuring thopter aliases in ~/.bashrc...");
+  log("  Ensuring thopter aliases in ~/.bashrc...");
   const bashrcResult = doExecSync(dropletId, thopterBashrcEnsureCommand(), { retryMax: 60 });
   if (bashrcResult.status !== 0) {
     throw new Error(bashrcResult.stderr || "failed to ensure thopter bashrc block");
@@ -610,6 +996,8 @@ export async function createDevbox(opts: {
   keepAlive?: number;
   noSync?: boolean;
 }): Promise<string> {
+  const log = makeTimedLogger(Date.now());
+
   // Get owner from operator's git config (required)
   let ownerName: string;
   try {
@@ -634,6 +1022,7 @@ export async function createDevbox(opts: {
       throw new Error(`Upload file not found: ${entry.local}`);
     }
   }
+  const envVars = getEnvVars();
 
   // Determine snapshot (resolve name → ID if needed)
   let snapshotId = opts.snapshotId
@@ -644,7 +1033,7 @@ export async function createDevbox(opts: {
     if (defaultSnap) {
       try {
         snapshotId = await resolveSnapshotId(defaultSnap);
-        console.log(`Using default snapshot: ${defaultSnap}`);
+        log(`Using default snapshot: ${defaultSnap}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(
@@ -659,6 +1048,12 @@ export async function createDevbox(opts: {
     const ownerTag = `owner:${coerceTagValue(ownerName)}`;
     const thopterTag = `thopter-name:${coerceTagValue(opts.name)}`;
     const dropletName = `thopter-${coerceTagValue(opts.name).slice(0, 48)}`;
+    const redisUrlForCreate = envVars.THOPTER_REDIS_URL?.trim();
+    const initEnvForUser = [`THOPTER_NAME=${shellSingleQuote(opts.name)}`];
+    if (redisUrlForCreate) {
+      initEnvForUser.push(`THOPTER_REDIS_URL=${shellSingleQuote(redisUrlForCreate)}`);
+    }
+    const userInitCmd = `${initEnvForUser.join(" ")} bash /tmp/thopter-init.sh`;
     const cloudInit = [
       "#!/bin/bash",
       "set -euo pipefail",
@@ -675,15 +1070,15 @@ export async function createDevbox(opts: {
       "THOPTER_INIT",
       "chown user:user /tmp/thopter-init.sh",
       "chmod +x /tmp/thopter-init.sh",
-      "su - user -c 'bash /tmp/thopter-init.sh'",
+      `su - user -c ${shellSingleQuote(userInitCmd)}`,
     ].join("\n");
 
-    console.log(
+    log(
       snapshotId
         ? `Creating droplet '${opts.name}' from snapshot ${snapshotId}...`
         : `Creating droplet '${opts.name}' (fresh)...`,
     );
-    console.log("Waiting for droplet to be ready...");
+    log("Waiting for droplet to be ready...");
 
     const createArgs = [
       "compute",
@@ -692,6 +1087,8 @@ export async function createDevbox(opts: {
       dropletName,
       "--image",
       image,
+      "--region",
+      DO_DEFAULT_REGION,
       "--size",
       DO_DEFAULT_SIZE,
       "--tag-names",
@@ -708,59 +1105,82 @@ export async function createDevbox(opts: {
     }
     const droplet = normalizeDODroplet(created[0]);
     const dropletId = droplet.id;
-    console.log(`Droplet created: ${dropletId}`);
-    await waitForDOSSHReady(dropletId, "user");
-    console.log("Provisioning runtime...");
+    log(`Droplet created: ${dropletId}`);
+    const stopProgress = await startDOCreateRedisProgressLoop(log, opts.name, redisUrlForCreate);
+    try {
+      await waitForDOSSHReady(dropletId, log, "user");
+      await waitForDOInitComplete(dropletId, log);
+      log("Provisioning runtime...");
 
-    const envVars = getEnvVars();
-    const envLines: string[] = [];
-    envLines.push(`export THOPTER_NAME="${escapeEnvValue(opts.name)}"`);
-    envLines.push(`export THOPTER_ID="${escapeEnvValue(dropletId)}"`);
-    envLines.push(`export THOPTER_OWNER="${escapeEnvValue(ownerName)}"`);
-    if (!getStopNotifications()) {
-      envLines.push(`export THOPTER_STOP_NOTIFY=0`);
-    }
-    const quietPeriod = getStopNotificationQuietPeriod();
-    envLines.push(`export THOPTER_STOP_NOTIFY_QUIET_PERIOD="${quietPeriod}"`);
-    for (const [key, value] of Object.entries(envVars)) {
-      envLines.push(`export ${key}="${escapeEnvValue(value)}"`);
-    }
-    console.log("Writing /home/user/.thopter-env...");
-    doWriteFile(dropletId, "/home/user/.thopter-env", envLines.join("\n") + "\n", { retryMax: 60 });
-
-    if (envVars.GH_TOKEN) {
-      console.log("Configuring git credentials...");
-      const gitCmd =
-        "source ~/.thopter-env && " +
-        "git config --global credential.helper store && " +
-        "echo \"https://thopterbot:${GH_TOKEN}@github.com\" > ~/.git-credentials && " +
-        "git config --global url.\"https://github.com/\".insteadOf \"git@github.com:\" && " +
-        "git config --global user.name \"ThopterBot\" && " +
-        "git config --global user.email \"thopterbot@telepath.computer\"";
-      const result = doExecSync(dropletId, gitCmd, { retryMax: 60 });
-      if (result.status !== 0) {
-        throw new Error(result.stderr || "failed to configure git credentials");
+      const envLines: string[] = [];
+      envLines.push(`export THOPTER_NAME="${escapeEnvValue(opts.name)}"`);
+      envLines.push(`export THOPTER_ID="${escapeEnvValue(dropletId)}"`);
+      envLines.push(`export THOPTER_OWNER="${escapeEnvValue(ownerName)}"`);
+      if (!getStopNotifications()) {
+        envLines.push(`export THOPTER_STOP_NOTIFY=0`);
       }
-    }
-
-    console.log("Installing thopter scripts...");
-    installThopterScriptsDO(dropletId, opts.name);
-
-    if (uploads.length > 0) {
-      console.log(`Uploading ${uploads.length} custom file${uploads.length === 1 ? "" : "s"}...`);
-      for (const entry of uploads) {
-        console.log(`  Uploading ${entry.local} -> ${entry.remote}...`);
-        doWriteFile(dropletId, entry.remote, readFileSync(entry.local, "utf-8"), { retryMax: 60 });
+      const quietPeriod = getStopNotificationQuietPeriod();
+      envLines.push(`export THOPTER_STOP_NOTIFY_QUIET_PERIOD="${quietPeriod}"`);
+      for (const [key, value] of Object.entries(envVars)) {
+        envLines.push(`export ${key}="${escapeEnvValue(value)}"`);
       }
-    }
+      log("Writing /home/user/.thopter-env...");
+      doWriteFile(dropletId, "/home/user/.thopter-env", envLines.join("\n") + "\n", { retryMax: 60 });
 
-    if (!opts.noSync && getSyncthingConfig()) {
-      console.log("WARNING: SyncThing auto-pair on create is not implemented in DigitalOcean mode yet.");
-      console.log("  Set up later manually once DO sync integration is migrated.");
-    }
+      if (envVars.GH_TOKEN) {
+        log("Configuring git credentials...");
+        const gitCmd =
+          "source ~/.thopter-env && " +
+          "git config --global credential.helper store && " +
+          "echo \"https://thopterbot:${GH_TOKEN}@github.com\" > ~/.git-credentials && " +
+          "git config --global url.\"https://github.com/\".insteadOf \"git@github.com:\" && " +
+          "git config --global user.name \"ThopterBot\" && " +
+          "git config --global user.email \"thopterbot@telepath.computer\"";
+        const result = doExecSync(dropletId, gitCmd, { retryMax: 60 });
+        if (result.status !== 0) {
+          throw new Error(result.stderr || "failed to configure git credentials");
+        }
+      }
 
-    console.log(`Create complete: ${dropletId}`);
-    return dropletId;
+      log("Installing thopter scripts...");
+      installThopterScriptsDO(dropletId, opts.name, log);
+
+      if (uploads.length > 0) {
+        log(`Uploading ${uploads.length} custom file${uploads.length === 1 ? "" : "s"}...`);
+        const bundleable: DOAssetBundleEntry[] = [];
+        const fallback: typeof uploads = [];
+        for (const entry of uploads) {
+          const archivePath = archivePathForDORemote(entry.remote);
+          if (archivePath) {
+            bundleable.push({
+              archivePath,
+              sourcePath: entry.local,
+            });
+          } else {
+            fallback.push(entry);
+          }
+        }
+        if (bundleable.length > 0) {
+          log(`  Uploading ${bundleable.length} custom file${bundleable.length === 1 ? "" : "s"} via bundle...`);
+          uploadBundleToDO(dropletId, bundleable, log);
+        }
+        for (const entry of fallback) {
+          log(`  Uploading ${entry.local} -> ${entry.remote} (direct binary fallback)...`);
+          doUploadFileToRemotePath(dropletId, entry.local, entry.remote, { user: "user" });
+        }
+      }
+
+      if (!opts.noSync && getSyncthingConfig()) {
+        log("WARNING: SyncThing auto-pair on create is not implemented in DigitalOcean mode yet.");
+        log("  Set up later manually once DO sync integration is migrated.");
+      }
+
+      log(`Create complete: ${dropletId}`);
+      printPostCreateChecklist(log);
+      return dropletId;
+    } finally {
+      await stopProgress();
+    }
   }
 
   const client = getClient();
@@ -783,23 +1203,22 @@ export async function createDevbox(opts: {
     },
   };
 
-  console.log(
+  log(
     snapshotId
       ? `Creating devbox '${opts.name}' from snapshot ${snapshotId}...`
       : `Creating devbox '${opts.name}' (fresh)...`,
   );
-  console.log("Waiting for devbox to be ready...");
+  log("Waiting for devbox to be ready...");
 
   try {
     const devbox = await client.devboxes.createAndAwaitRunning(createParams);
-    console.log(`Devbox created: ${devbox.id}`);
-    console.log("Devbox is running.");
+    log(`Devbox created: ${devbox.id}`);
+    log("Devbox is running.");
 
     // Write ~/.thopter-env with all env vars from config + identity vars.
     // This is the single source of truth for devbox environment.
     // Sourced from .bashrc so interactive shells + cron both get these vars.
     // On snapshot creates, this overwrites stale values from the previous devbox.
-    const envVars = getEnvVars();
     const envLines: string[] = [];
     // Identity vars (safe — generated by us, no user-controlled shell metacharacters)
     envLines.push(`export THOPTER_NAME="${escapeEnvValue(opts.name)}"`);
@@ -821,19 +1240,19 @@ export async function createDevbox(opts: {
 
     // Configure git credentials using GH_TOKEN (post-boot, after env file is written)
     if (envVars.GH_TOKEN) {
-      console.log("Configuring git credentials...");
+      log("Configuring git credentials...");
       await client.devboxes.executeAsync(devbox.id, {
         command: `source ~/.thopter-env && git config --global credential.helper store && echo "https://thopterbot:\${GH_TOKEN}@github.com" > ~/.git-credentials && git config --global url."https://github.com/".insteadOf "git@github.com:" && git config --global user.name "ThopterBot" && git config --global user.email "thopterbot@telepath.computer"`,
       });
     }
 
     // Upload and install thopter-status scripts + cron
-    console.log("Installing thopter scripts...");
+    log("Installing thopter scripts...");
     await installThopterScripts(devbox.id, opts.name);
 
     // Upload custom files from config (last, so user files override defaults)
     if (uploads.length > 0) {
-      console.log(`Uploading ${uploads.length} custom file${uploads.length === 1 ? "" : "s"}...`);
+      log(`Uploading ${uploads.length} custom file${uploads.length === 1 ? "" : "s"}...`);
       for (const entry of uploads) {
         await client.devboxes.writeFileContents(devbox.id, {
           file_path: entry.remote,
@@ -854,25 +1273,26 @@ export async function createDevbox(opts: {
           }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          console.log(`WARNING: SyncThing setup failed: ${msg}`);
-          console.log("  Devbox is ready, but file sync is not configured.");
-          console.log("  To set up later: thopter sync pair " + opts.name);
+          log(`WARNING: SyncThing setup failed: ${msg}`);
+          log("  Devbox is ready, but file sync is not configured.");
+          log("  To set up later: thopter sync pair " + opts.name);
         }
       }
     }
 
+    printPostCreateChecklist(log);
     return devbox.id;
   } catch (e) {
     // If it failed after creation, try to extract the ID from the error or re-fetch
     const msg = e instanceof Error ? e.message : String(e);
-    console.log(`WARNING: Devbox may not have reached running state: ${msg}`);
-    console.log("  Check status with: runloop-thopters list");
+    log(`WARNING: Devbox may not have reached running state: ${msg}`);
+    log("  Check status with: runloop-thopters list");
 
     // Try to find the devbox we just created by name
     for await (const db of client.devboxes.list({ limit: 50 })) {
       const meta = db.metadata ?? {};
       if (meta[NAME_KEY] === opts.name && meta[MANAGED_BY_KEY] === MANAGED_BY_VALUE) {
-        console.log(`Devbox ID: ${db.id} (status: ${db.status})`);
+        log(`Devbox ID: ${db.id} (status: ${db.status})`);
         return db.id;
       }
     }
@@ -1220,7 +1640,7 @@ export async function deleteSnapshot(nameOrId: string): Promise<void> {
 
   console.log(`Deleting snapshot ${snapshotId}...`);
   if (isDigitalOceanProvider()) {
-    execFileSync("doctl", ["compute", "snapshot", "delete", snapshotId], {
+    execFileSync("doctl", ["compute", "snapshot", "delete", snapshotId, "--force"], {
       stdio: "inherit",
     });
   } else {
@@ -1402,41 +1822,9 @@ export async function execDevbox(
   command: string[],
 ): Promise<void> {
   const { id } = await resolveDevbox(nameOrId);
-
-  if (isDigitalOceanProvider()) {
-    const cmd = command.join(" ");
-    console.log(`Executing in ${id}: ${cmd}`);
-    const ip = getDODropletPublicIPv4(id);
-    const result = spawnSync(
-      "ssh",
-      [
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-i",
-        getLocalRSAPrivateKeyPath(),
-        `user@${ip}`,
-        cmd,
-      ],
-      { stdio: "inherit" },
-    );
-    if (result.status && result.status !== 0) {
-      process.exit(result.status);
-    }
-    return;
-  }
-
-  const client = getClient();
-
   const cmd = command.join(" ");
   console.log(`Executing in ${id}: ${cmd}`);
-
-  const execution = await client.devboxes.executeAsync(id, { command: cmd });
-  const execId = execution.execution_id;
-
-  // Wait for completion
-  const result = await client.devboxes.executions.awaitCompleted(id, execId);
+  const result = await executeCommandById(id, cmd);
 
   if (result.stdout) {
     process.stdout.write(result.stdout);
@@ -1445,10 +1833,50 @@ export async function execDevbox(
     process.stderr.write(result.stderr);
   }
 
-  const exitCode = result.exit_status ?? 0;
-  if (exitCode !== 0) {
-    process.exit(exitCode);
+  if (result.exitCode !== 0) {
+    process.exit(result.exitCode);
   }
+}
+
+export async function writeFileById(
+  devboxId: string,
+  filePath: string,
+  contents: string,
+): Promise<void> {
+  if (isDigitalOceanProvider()) {
+    doWriteFile(devboxId, filePath, contents, { retryMax: 60 });
+    return;
+  }
+  const client = getClient();
+  await client.devboxes.writeFileContents(devboxId, {
+    file_path: filePath,
+    contents,
+  });
+}
+
+export async function executeCommandById(
+  devboxId: string,
+  command: string,
+): Promise<RemoteCommandResult> {
+  if (isDigitalOceanProvider()) {
+    const result = doExecSync(devboxId, command, { retryMax: 5 });
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.status,
+    };
+  }
+  const client = getClient();
+  const execution = await client.devboxes.executeAsync(devboxId, { command });
+  const completed = await client.devboxes.executions.awaitCompleted(
+    devboxId,
+    execution.execution_id,
+  );
+  return {
+    stdout: completed.stdout ?? "",
+    stderr: completed.stderr ?? "",
+    exitCode: completed.exit_status ?? 0,
+  };
 }
 
 export async function snapshotDevbox(
@@ -1534,7 +1962,7 @@ export async function replaceSnapshot(
     }
     for (const s of old) {
       console.log(`Deleting old snapshot ${s.id}...`);
-      execFileSync("doctl", ["compute", "snapshot", "delete", s.id], {
+      execFileSync("doctl", ["compute", "snapshot", "delete", s.id, "--force"], {
         stdio: "inherit",
       });
     }

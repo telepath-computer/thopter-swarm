@@ -2,8 +2,7 @@
  * `thopter tell` — send a message to a running Claude session on a devbox.
  */
 
-import { resolveDevbox } from "./devbox.js";
-import { getClient } from "./client.js";
+import { resolveDevbox, executeCommandById, writeFileById } from "./devbox.js";
 import { tailTranscript } from "./tail.js";
 
 /**
@@ -41,27 +40,14 @@ fi
  */
 export async function checkClaude(name: string): Promise<{ tmux: boolean; claude: boolean }> {
   const { id: devboxId } = await resolveDevbox(name);
-  const client = getClient();
 
   // Step 1: Check tmux
-  const tmuxExec = await client.devboxes.executeAsync(devboxId, {
-    command: CHECK_TMUX_SCRIPT,
-  });
-  const tmuxResult = await client.devboxes.executions.awaitCompleted(
-    devboxId,
-    tmuxExec.execution_id,
-  );
+  const tmuxResult = await executeCommandById(devboxId, CHECK_TMUX_SCRIPT);
   const hasTmux = (tmuxResult.stdout ?? "").trim() === "ok";
   if (!hasTmux) return { tmux: false, claude: false };
 
   // Step 2: Check Claude in tmux
-  const claudeExec = await client.devboxes.executeAsync(devboxId, {
-    command: FIND_CLAUDE_PANE_SCRIPT,
-  });
-  const claudeResult = await client.devboxes.executions.awaitCompleted(
-    devboxId,
-    claudeExec.execution_id,
-  );
+  const claudeResult = await executeCommandById(devboxId, FIND_CLAUDE_PANE_SCRIPT);
   const output = (claudeResult.stdout ?? "").trim();
   const hasClaude = output !== "" && output !== "NO_CLAUDE";
 
@@ -74,16 +60,9 @@ export async function tellThopter(
   opts: { interrupt?: boolean; noTail?: boolean },
 ): Promise<void> {
   const { id: devboxId } = await resolveDevbox(name);
-  const client = getClient();
 
   // Pre-flight: check tmux and Claude
-  const tmuxExec = await client.devboxes.executeAsync(devboxId, {
-    command: CHECK_TMUX_SCRIPT,
-  });
-  const tmuxResult = await client.devboxes.executions.awaitCompleted(
-    devboxId,
-    tmuxExec.execution_id,
-  );
+  const tmuxResult = await executeCommandById(devboxId, CHECK_TMUX_SCRIPT);
   const hasTmux = (tmuxResult.stdout ?? "").trim() === "ok";
 
   if (!hasTmux) {
@@ -94,13 +73,7 @@ export async function tellThopter(
   }
 
   // Find the tmux pane running Claude
-  const findExec = await client.devboxes.executeAsync(devboxId, {
-    command: FIND_CLAUDE_PANE_SCRIPT,
-  });
-  const findResult = await client.devboxes.executions.awaitCompleted(
-    devboxId,
-    findExec.execution_id,
-  );
+  const findResult = await executeCommandById(devboxId, FIND_CLAUDE_PANE_SCRIPT);
 
   const paneTarget = (findResult.stdout ?? "").trim();
   if (!paneTarget || paneTarget === "NO_CLAUDE") {
@@ -120,10 +93,7 @@ export async function tellThopter(
     .trim();
 
   // Write sanitized message to a temp file on the devbox (avoids shell escaping issues)
-  await client.devboxes.writeFileContents(devboxId, {
-    file_path: "/tmp/thopter-tell-msg",
-    contents: sanitized,
-  });
+  await writeFileById(devboxId, "/tmp/thopter-tell-msg", sanitized);
 
   // Build the tmux command sequence targeting the discovered pane
   const parts: string[] = [];
@@ -150,15 +120,9 @@ export async function tellThopter(
       : `Sending message to '${name}'...`,
   );
 
-  const execution = await client.devboxes.executeAsync(devboxId, {
-    command: cmd,
-  });
-  const result = await client.devboxes.executions.awaitCompleted(
-    devboxId,
-    execution.execution_id,
-  );
+  const result = await executeCommandById(devboxId, cmd);
 
-  if (result.exit_status && result.exit_status !== 0) {
+  if (result.exitCode !== 0) {
     console.error("Failed to send message.");
     if (result.stderr) process.stderr.write(result.stderr);
     process.exit(1);
