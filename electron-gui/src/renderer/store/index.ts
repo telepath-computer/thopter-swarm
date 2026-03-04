@@ -9,7 +9,8 @@ export const useStore = create<Store>((set, get) => ({
   // Internal state
   thopters: {},
   transcripts: {},
-  notifications: [],
+  thopterNotifications: {},
+  unassociatedNotifications: [],
   repos: [],
   snapshots: [],
   config: null,
@@ -21,13 +22,12 @@ export const useStore = create<Store>((set, get) => ({
   liveTerminals: [],
   draftMessages: {},
   provider: 'unknown',
+  lastDetailInteraction: {},
 
   // Display state
   activeTab: 'dashboard',
   openTabs: [],
-  isSidebarOpen: false,
   autoRefresh: true,
-  unreadNotificationCount: 0,
 
   // Data actions
   refreshThopters: async () => {
@@ -116,12 +116,14 @@ export const useStore = create<Store>((set, get) => ({
     await service.destroyThopter(name)
     get().unsubscribeTranscript(name)
     get().closeTab(name)
+    get().dismissNotification(name) // Auto-clear on destroy
     get().refreshThopters()
   },
 
   suspendThopter: async (name) => {
     const service = getService()
     await service.suspendThopter(name)
+    get().dismissNotification(name) // Auto-clear on suspend
     get().refreshThopters()
   },
 
@@ -159,13 +161,19 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   // UI actions
-  setActiveTab: (tab) => set({ activeTab: tab }),
+  setActiveTab: (tab) => {
+    set({ activeTab: tab })
+    // Smart dismissal: switching to a thopter tab clears its notifications
+    get().dismissNotification(tab)
+  },
 
   openTab: (name) => {
     set((s) => ({
       openTabs: s.openTabs.includes(name) ? s.openTabs : [...s.openTabs, name],
       activeTab: name,
     }))
+    // Smart dismissal: switching to a thopter's detail view clears its notifications
+    get().dismissNotification(name)
   },
 
   closeTab: (name) => {
@@ -183,28 +191,76 @@ export const useStore = create<Store>((set, get) => ({
     })
   },
 
-  toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
-
   setDraftMessage: (name, message) => set((s) => ({ draftMessages: { ...s.draftMessages, [name]: message } })),
 
   setAutoRefresh: (enabled) => set({ autoRefresh: enabled }),
 
-  markNotificationsRead: () => set({ unreadNotificationCount: 0 }),
-
+  // Notification actions
   addNotification: (notification) => {
+    const thopterName = notification.thopterName
+    if (!thopterName) {
+      // Can't associate — store separately
+      set((s) => ({
+        unassociatedNotifications: [notification, ...s.unassociatedNotifications].slice(0, 50),
+      }))
+      return
+    }
+
+    const state = get()
+    // Smart dismissal: if user is currently viewing this thopter's detail
+    // AND has interacted recently (within 10s), auto-dismiss
+    const isViewingDetail = state.activeTab === thopterName
+    const lastInteraction = state.lastDetailInteraction[thopterName] ?? 0
+    const recentlyInteracted = Date.now() - lastInteraction < 10_000
+
+    if (isViewingDetail && recentlyInteracted) {
+      // User is actively looking at this thopter — don't create unread
+      set((s) => ({
+        thopterNotifications: {
+          ...s.thopterNotifications,
+          [thopterName]: { latest: notification, unread: false },
+        },
+      }))
+      return
+    }
+
     set((s) => ({
-      notifications: [notification, ...s.notifications],
-      unreadNotificationCount: s.unreadNotificationCount + 1,
+      thopterNotifications: {
+        ...s.thopterNotifications,
+        [thopterName]: { latest: notification, unread: true },
+      },
     }))
   },
 
-  removeNotification: (id) => {
-    set((s) => ({
-      notifications: s.notifications.filter((n) => n.id !== id),
-    }))
+  dismissNotification: (thopterName) => {
+    set((s) => {
+      const existing = s.thopterNotifications[thopterName]
+      if (!existing) return s
+      return {
+        thopterNotifications: {
+          ...s.thopterNotifications,
+          [thopterName]: { ...existing, unread: false },
+        },
+      }
+    })
   },
 
-  clearNotifications: () => {
-    set({ notifications: [], unreadNotificationCount: 0 })
+  dismissAllNotifications: () => {
+    set((s) => {
+      const updated: typeof s.thopterNotifications = {}
+      for (const [name, state] of Object.entries(s.thopterNotifications)) {
+        updated[name] = { ...state, unread: false }
+      }
+      return { thopterNotifications: updated }
+    })
+  },
+
+  recordDetailInteraction: (thopterName) => {
+    set((s) => ({
+      lastDetailInteraction: {
+        ...s.lastDetailInteraction,
+        [thopterName]: Date.now(),
+      },
+    }))
   },
 }))

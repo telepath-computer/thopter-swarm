@@ -98,6 +98,7 @@ export interface NtfyNotification {
   title?: string;
   message: string;
   tags?: string[];
+  thopterName?: string; // Parsed from title field — links notification to a thopter
 }
 
 // --- Service interface ---

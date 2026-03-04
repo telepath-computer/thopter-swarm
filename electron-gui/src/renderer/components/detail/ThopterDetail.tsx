@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { StatusPanel } from './StatusPanel'
@@ -23,8 +23,36 @@ export function ThopterDetail({ tabName }: Props) {
   const subscribeTranscript = useStore((s) => s.subscribeTranscript)
   const unsubscribeTranscript = useStore((s) => s.unsubscribeTranscript)
   const checkClaude = useStore((s) => s.checkClaude)
+  const dismissNotification = useStore((s) => s.dismissNotification)
+  const recordDetailInteraction = useStore((s) => s.recordDetailInteraction)
+  const hasUnread = useStore((s) => s.thopterNotifications[tabName]?.unread ?? false)
 
   const isVisible = activeTab === tabName
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Smart dismissal: when user interacts while viewing this detail, dismiss notifications
+  const handleInteraction = useCallback(() => {
+    recordDetailInteraction(tabName)
+    if (hasUnread) {
+      dismissNotification(tabName)
+    }
+  }, [tabName, hasUnread, recordDetailInteraction, dismissNotification])
+
+  // Track mouse/keyboard interactions on the detail view
+  useEffect(() => {
+    if (!isVisible) return
+    const el = containerRef.current
+    if (!el) return
+
+    el.addEventListener('click', handleInteraction)
+    el.addEventListener('scroll', handleInteraction, true)
+    el.addEventListener('keydown', handleInteraction)
+    return () => {
+      el.removeEventListener('click', handleInteraction)
+      el.removeEventListener('scroll', handleInteraction, true)
+      el.removeEventListener('keydown', handleInteraction)
+    }
+  }, [isVisible, handleInteraction])
 
   // Fetch transcript on mount and subscribe to live updates
   useEffect(() => {
@@ -61,7 +89,7 @@ export function ThopterDetail({ tabName }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div ref={containerRef} className="flex flex-col h-full">
       <StatusPanel thopter={thopter} />
 
       {/* View mode toggle */}
