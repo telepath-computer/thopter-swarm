@@ -56,7 +56,7 @@ electron-gui/   Electron desktop app (experimental)
   src/renderer/components/dashboard/    Dashboard + ThopterCard
   src/renderer/components/detail/       ThopterDetail, TranscriptView, TerminalView, LiveTerminalView, ActionBar, StatusPanel
   src/renderer/components/layout/       Header, TabBar, NotificationSidebar
-  src/renderer/components/modals/       RunModal, ReauthModal, ShellCommandsModal, ConfirmDialog
+  src/renderer/components/modals/       RunTab, ReauthTab, ShellCommandsModal, ConfirmDialog
   src/renderer/components/ui/           shadcn/ui primitives
   electron.vite.config.ts              Vite config (node-pty in externals)
 ```
