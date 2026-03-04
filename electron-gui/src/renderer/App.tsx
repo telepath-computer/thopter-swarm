@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { TooltipProvider } from './components/ui/tooltip'
 import { Header } from './components/layout/Header'
 import { TabBar } from './components/layout/TabBar'
-import { NotificationSidebar } from './components/layout/NotificationSidebar'
+import { ToastNotifications } from './components/layout/ToastNotifications'
 import { Dashboard } from './components/dashboard/Dashboard'
 import { ThopterDetail } from './components/detail/ThopterDetail'
 import { RunTab } from './components/modals/RunTab'
@@ -84,7 +84,7 @@ export default function App() {
             </div>
           ))}
         </main>
-        <NotificationSidebar />
+        <ToastNotifications />
       </div>
     </TooltipProvider>
   )

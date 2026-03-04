@@ -27,6 +27,7 @@ export function subscribeNtfy(
         title: data.title,
         message: data.message ?? '',
         tags: data.tags,
+        thopterName: data.title || undefined, // Hook sends THOPTER_NAME as Title header
       };
 
       onNotification(notification);
@@ -51,33 +52,29 @@ export function subscribeNtfy(
 export function subscribeMockNtfy(
   onNotification: (n: NtfyNotification) => void,
 ): Unsubscribe {
-  const MOCK_TITLES = [
-    'Thopter stopped',
-    'Task completed',
-    'Build failed',
-    'PR created',
-    'Tests passing',
-  ];
+  const MOCK_THOPTERS = ['eager-falcon', 'calm-horizon', 'bright-nebula', 'swift-current', 'quiet-ember'];
 
   const MOCK_MESSAGES = [
-    'eager-falcon has stopped after completing its task.',
-    'calm-horizon finished: "Implementing auth middleware for API routes"',
-    'bright-nebula: npm run build failed with exit code 1',
-    'swift-current created PR #42: "Add rate limiting to API endpoints"',
-    'quiet-ember: All 24 tests passing after fix.',
+    'Claude session stopped after completing task.',
+    'Finished: "Implementing auth middleware for API routes"',
+    'npm run build failed with exit code 1',
+    'Created PR #42: "Add rate limiting to API endpoints"',
+    'All 24 tests passing after fix.',
   ];
 
   let counter = 0;
 
   const interval = setInterval(() => {
-    const idx = counter % MOCK_TITLES.length;
+    const idx = counter % MOCK_THOPTERS.length;
+    const thopterName = MOCK_THOPTERS[idx];
     const notification: NtfyNotification = {
       id: `mock_ntfy_${Date.now()}_${counter}`,
       time: Math.floor(Date.now() / 1000),
       event: 'message',
       topic: 'thopter-mock',
-      title: MOCK_TITLES[idx],
+      title: thopterName,
       message: MOCK_MESSAGES[idx],
+      thopterName,
     };
     counter++;
     onNotification(notification);

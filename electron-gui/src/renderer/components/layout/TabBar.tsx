@@ -13,6 +13,7 @@ export function TabBar() {
   const openTabs = useStore((s) => s.openTabs)
   const setActiveTab = useStore((s) => s.setActiveTab)
   const closeTab = useStore((s) => s.closeTab)
+  const thopterNotifications = useStore((s) => s.thopterNotifications)
 
   return (
     <div className="flex items-center gap-0.5 px-2 py-1 border-b bg-muted/30 overflow-x-auto" role="tablist">
@@ -35,6 +36,8 @@ export function TabBar() {
         const label = special?.label ?? tab
         const Icon = special?.Icon
 
+        const hasUnread = !special && thopterNotifications[tab]?.unread
+
         return (
           <div
             key={tab}
@@ -56,6 +59,9 @@ export function TabBar() {
             >
               {Icon && <Icon className="size-3.5" />}
               {label}
+              {hasUnread && (
+                <span className="size-1.5 rounded-full bg-destructive shrink-0" />
+              )}
             </button>
             <Button
               variant="ghost"
