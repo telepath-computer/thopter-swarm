@@ -4,6 +4,7 @@
  */
 
 import { Redis } from "ioredis";
+import { isDigitalOceanProvider } from "./provider.js";
 
 function getRedis(): Redis {
   const url = process.env.THOPTER_REDIS_URL;
@@ -80,23 +81,37 @@ export async function showThopterStatus(name: string): Promise<void> {
   // Look up Runloop devbox status
   let devboxStatus = "-";
   let devboxId = "-";
-  try {
-    const { getClient } = await import("./client.js");
-    const { MANAGED_BY_KEY, MANAGED_BY_VALUE, NAME_KEY } = await import("./config.js");
-    const client = getClient();
-    outer:
-    for (const s of ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const) {
-      for await (const db of client.devboxes.list({ status: s, limit: 100 })) {
-        const meta = db.metadata ?? {};
-        if (meta[MANAGED_BY_KEY] === MANAGED_BY_VALUE && meta[NAME_KEY] === name) {
-          devboxStatus = db.status;
-          devboxId = db.id;
-          break outer;
+  if (isDigitalOceanProvider()) {
+    try {
+      const { fetchThopters } = await import("./devbox.js");
+      const thopters = await fetchThopters();
+      const found = thopters.find((t) => t.name === name);
+      if (found) {
+        devboxStatus = found.devboxStatus;
+        devboxId = found.id;
+      }
+    } catch {
+      // DO API unavailable — continue with Redis-only info
+    }
+  } else {
+    try {
+      const { getClient } = await import("./client.js");
+      const { MANAGED_BY_KEY, MANAGED_BY_VALUE, NAME_KEY } = await import("./config.js");
+      const client = getClient();
+      outer:
+      for (const s of ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const) {
+        for await (const db of client.devboxes.list({ status: s, limit: 100 })) {
+          const meta = db.metadata ?? {};
+          if (meta[MANAGED_BY_KEY] === MANAGED_BY_VALUE && meta[NAME_KEY] === name) {
+            devboxStatus = db.status;
+            devboxId = db.id;
+            break outer;
+          }
         }
       }
+    } catch {
+      // Runloop API unavailable — continue with Redis-only info
     }
-  } catch {
-    // Runloop API unavailable — continue with Redis-only info
   }
 
   const redis = getRedis();

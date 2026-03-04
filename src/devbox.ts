@@ -2,12 +2,17 @@
  * Devbox lifecycle: create, list, destroy, ssh, exec, snapshot, fork.
  */
 
-import { execSync, spawn } from "node:child_process";
+import { execFileSync, execSync, spawn, spawnSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getClient } from "./client.js";
 import { printTable } from "./output.js";
+import { isDigitalOceanProvider } from "./provider.js";
+import {
+  ensureDOFingerprintForLocalRSAPub,
+  getLocalRSAPrivateKeyPath,
+} from "./do-ssh-key.js";
 import {
   MANAGED_BY_KEY,
   MANAGED_BY_VALUE,
@@ -37,6 +42,18 @@ sudo /usr/sbin/cron 2>/dev/null || true
 NVIM_ARCH=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/x86_64/')
 curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-\${NVIM_ARCH}.tar.gz" | sudo tar xz -C /opt
 sudo ln -sf /opt/nvim-linux-\${NVIM_ARCH}/bin/nvim /usr/local/bin/nvim
+
+# Install Node.js via NVM (Node 22) and make it default
+export NVM_DIR="$HOME/.nvm"
+curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+. "$NVM_DIR/nvm.sh"
+nvm install 22
+nvm alias default 22
+nvm use 22
+NODE_BIN_DIR="$NVM_DIR/versions/node/$(nvm version 22)/bin"
+sudo ln -sf "$NODE_BIN_DIR/node" /usr/local/bin/node
+sudo ln -sf "$NODE_BIN_DIR/npm" /usr/local/bin/npm
+sudo ln -sf "$NODE_BIN_DIR/npx" /usr/local/bin/npx
 
 # Install NvChad
 git clone https://github.com/NvChad/starter ~/.config/nvim 2>/dev/null || true
@@ -89,6 +106,231 @@ const SCRIPTS_DIR = resolve(__dirname, "..", "scripts");
 
 function readScript(name: string): string {
   return readFileSync(resolve(SCRIPTS_DIR, name), "utf-8");
+}
+
+function requireRunloopFeature(feature: string): void {
+  if (isDigitalOceanProvider()) {
+    throw new Error(
+      `${feature} is not implemented in DigitalOcean mode yet.`,
+    );
+  }
+}
+
+const DO_MANAGED_TAG = "managed-by:thopter";
+const DO_DEFAULT_IMAGE = "ubuntu-24-04-x64";
+const DO_DEFAULT_SIZE = "s-2vcpu-4gb";
+
+interface DODroplet {
+  id: string;
+  name: string;
+  status: string;
+  tags: string[];
+}
+
+function doctlJson(args: string[]): unknown {
+  const raw = execFileSync("doctl", [...args, "-o", "json"], { encoding: "utf-8" });
+  return JSON.parse(raw);
+}
+
+function normalizeDODroplet(raw: unknown): DODroplet {
+  const obj = raw as Record<string, unknown>;
+  const idValue = obj.id ?? obj.ID;
+  const nameValue = obj.name ?? obj.Name;
+  const statusValue = obj.status ?? obj.Status;
+  const tagsValue = obj.tags ?? obj.Tags;
+  const tags = Array.isArray(tagsValue)
+    ? tagsValue.filter((t): t is string => typeof t === "string")
+    : [];
+  return {
+    id: String(idValue ?? ""),
+    name: String(nameValue ?? ""),
+    status: String(statusValue ?? ""),
+    tags,
+  };
+}
+
+function parseDOTagValue(tags: string[], key: string): string | undefined {
+  const prefix = `${key}:`;
+  const tag = tags.find((t) => t.startsWith(prefix));
+  return tag ? tag.slice(prefix.length) : undefined;
+}
+
+function coerceTagValue(input: string): string {
+  const lowered = input.toLowerCase();
+  const whitespace = lowered.replace(/\s+/g, "-");
+  const sanitized = whitespace.replace(/[^a-z0-9:_-]/g, "-");
+  const collapsed = sanitized.replace(/-+/g, "-");
+  const trimmed = collapsed.replace(/^[-:]+|[-:]+$/g, "");
+  const out = trimmed || "unknown";
+  return out.slice(0, 220);
+}
+
+function mapDOStatus(status: string): string {
+  switch (status) {
+    case "active":
+      return "running";
+    case "off":
+      return "suspended";
+    case "new":
+      return "provisioning";
+    case "archive":
+      return "shutdown";
+    default:
+      return status || "unknown";
+  }
+}
+
+function listManagedDODroplets(): DODroplet[] {
+  const raw = doctlJson([
+    "compute",
+    "droplet",
+    "list",
+    "--tag-name",
+    DO_MANAGED_TAG,
+  ]);
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeDODroplet);
+}
+
+function getDODropletPublicIPv4(dropletId: string): string {
+  const raw = doctlJson(["compute", "droplet", "get", dropletId]);
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new Error(`Could not load droplet ${dropletId} details from DigitalOcean.`);
+  }
+  const obj = raw[0] as Record<string, unknown>;
+  const networks = (obj.networks ?? obj.Networks) as Record<string, unknown> | undefined;
+  const v4 = (networks?.v4 ?? networks?.V4) as unknown;
+  if (!Array.isArray(v4)) {
+    throw new Error(`Droplet ${dropletId} has no IPv4 network data.`);
+  }
+  for (const rowRaw of v4) {
+    const row = rowRaw as Record<string, unknown>;
+    if (String(row.type ?? row.Type ?? "") === "public") {
+      return String(row.ip_address ?? row.IPAddress ?? "");
+    }
+  }
+  throw new Error(`Droplet ${dropletId} has no public IPv4 address.`);
+}
+
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function doExecSync(
+  dropletId: string,
+  command: string,
+  opts?: { user?: string; retryMax?: number; inheritIO?: boolean },
+): { stdout: string; stderr: string; status: number } {
+  const ip = getDODropletPublicIPv4(dropletId);
+  const args = [
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "ConnectTimeout=5",
+    "-i", getLocalRSAPrivateKeyPath(),
+    `${opts?.user ?? "user"}@${ip}`,
+    command,
+  ];
+  const result = spawnSync("ssh", args, {
+    encoding: "utf-8",
+    stdio: opts?.inheritIO ? "inherit" : "pipe",
+  });
+  return {
+    stdout: typeof result.stdout === "string" ? result.stdout : "",
+    stderr: typeof result.stderr === "string" ? result.stderr : "",
+    status: result.status ?? 0,
+  };
+}
+
+function doWriteFile(
+  dropletId: string,
+  remotePath: string,
+  contents: string,
+  opts?: { user?: string; retryMax?: number },
+): void {
+  const b64 = Buffer.from(contents, "utf-8").toString("base64");
+  const pathQuoted = shellSingleQuote(remotePath);
+  const b64Quoted = shellSingleQuote(b64);
+  const command = [
+    `mkdir -p "$(dirname ${pathQuoted})"`,
+    `printf '%s' ${b64Quoted} | base64 -d > ${pathQuoted}`,
+  ].join(" && ");
+  const result = doExecSync(dropletId, command, opts);
+  if (result.status !== 0) {
+    throw new Error(result.stderr || `failed to write ${remotePath}`);
+  }
+}
+
+async function waitForDOSSHReady(
+  dropletId: string,
+  user = "user",
+  maxAttempts = 120,
+): Promise<void> {
+  console.log(`Waiting for SSH (${user})...`);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const probe = doExecSync(dropletId, "true", {
+      user,
+      retryMax: 1,
+    });
+    if (probe.status === 0) {
+      console.log(`SSH ready after ${attempt} attempt${attempt === 1 ? "" : "s"}.`);
+      return;
+    }
+    if (attempt % 10 === 0) {
+      process.stdout.write(`Waiting for SSH (${user})... attempt ${attempt}/${maxAttempts}\n`);
+    }
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+  throw new Error(`Timed out waiting for SSH (${user}) on droplet ${dropletId}.`);
+}
+
+function installThopterScriptsDO(
+  dropletId: string,
+  name: string,
+): void {
+  void name;
+  const upload = (path: string, data: string) => {
+    console.log(`  Uploading ${path}...`);
+    doWriteFile(dropletId, path, data, { retryMax: 60 });
+  };
+  upload("/tmp/thopter-status", readScript("thopter-status.sh"));
+  upload("/tmp/thopter-heartbeat", readScript("thopter-heartbeat.sh"));
+  upload("/tmp/thopter-cron-install.sh", readScript("thopter-cron-install.sh"));
+  upload("/home/user/.config/nvim/lua/options.lua", readScript("nvim-options.lua"));
+  upload("/home/user/.config/nvim/lua/plugins/thopter.lua", readScript("nvim-plugins.lua"));
+  upload("/home/user/.config/starship.toml", readScript("starship.toml"));
+  upload("/home/user/.tmux.conf", readScript("tmux.conf"));
+
+  const claudeMdPath = getClaudeMdPath();
+  const claudeMdContents = claudeMdPath
+    ? readFileSync(claudeMdPath, "utf-8")
+    : readScript("thopter-claude-md.md");
+  upload("/home/user/.claude/CLAUDE.md", claudeMdContents);
+  upload("/home/user/.codex/AGENTS.md", claudeMdContents);
+
+  const hookFiles: Record<string, string> = {
+    "claude-hook-stop.sh": "on-stop.sh",
+    "claude-hook-prompt.sh": "on-prompt.sh",
+    "claude-hook-notification.sh": "on-notification.sh",
+    "claude-hook-session-start.sh": "on-session-start.sh",
+    "claude-hook-session-end.sh": "on-session-end.sh",
+    "claude-hook-tool-use.sh": "on-tool-use.sh",
+  };
+  for (const [src, dest] of Object.entries(hookFiles)) {
+    upload(`/home/user/.claude/hooks/${dest}`, readScript(src));
+  }
+  upload("/tmp/thopter-transcript-push.mjs", readScript("thopter-transcript-push.mjs"));
+  upload("/tmp/install-claude-hooks.mjs", readScript("install-claude-hooks.mjs"));
+
+  const installCmd =
+    "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && " +
+    "sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && " +
+    "sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && " +
+    "chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh";
+  console.log("  Installing uploaded scripts and hooks...");
+  const result = doExecSync(dropletId, installCmd, { retryMax: 60 });
+  if (result.status !== 0) {
+    throw new Error(result.stderr || "failed to install thopter scripts");
+  }
 }
 
 /**
@@ -191,6 +433,25 @@ async function installThopterScripts(
  * Resolve a snapshot by name or ID.
  */
 async function resolveSnapshotId(nameOrId: string): Promise<string> {
+  if (isDigitalOceanProvider()) {
+    if (/^\d+$/.test(nameOrId)) return nameOrId;
+    const raw = doctlJson(["compute", "snapshot", "list"]);
+    if (!Array.isArray(raw)) {
+      throw new Error("Failed to list snapshots from DigitalOcean.");
+    }
+    const snapshots = raw
+      .map((s) => s as Record<string, unknown>)
+      .filter((s) => (s.resource_type ?? s.ResourceType) === "droplet");
+    const matches = snapshots.filter((s) => (s.name ?? s.Name) === nameOrId);
+    if (matches.length === 0) {
+      throw new Error(`No snapshot named '${nameOrId}'. Use 'snapshot list' to see available snapshots.`);
+    }
+    if (matches.length > 1) {
+      const ids = matches.map((m) => String(m.id ?? m.ID ?? ""));
+      throw new Error(`Ambiguous: ${matches.length} snapshots named '${nameOrId}' (${ids.join(", ")}). Use a snapshot ID instead.`);
+    }
+    return String(matches[0].id ?? matches[0].ID ?? "");
+  }
   const client = getClient();
 
   // Direct ID — validate it still exists via queryStatus (single API call)
@@ -231,6 +492,24 @@ async function resolveSnapshotId(nameOrId: string): Promise<string> {
 export async function resolveDevbox(
   nameOrId: string,
 ): Promise<{ id: string; name?: string }> {
+  if (isDigitalOceanProvider()) {
+    if (/^\d+$/.test(nameOrId)) return { id: nameOrId };
+    const droplets = listManagedDODroplets();
+    const matches = droplets.filter((d) => {
+      const thopterName = parseDOTagValue(d.tags, "thopter-name");
+      return thopterName === nameOrId || d.name === nameOrId || d.id === nameOrId;
+    });
+    if (matches.length === 0) {
+      throw new Error(`No managed droplet named '${nameOrId}'. Use 'list' to see available machines.`);
+    }
+    if (matches.length > 1) {
+      throw new Error(
+        `Ambiguous: ${matches.length} droplets match '${nameOrId}' (${matches.map((m) => m.id).join(", ")}). Use an ID.`,
+      );
+    }
+    const match = matches[0];
+    return { id: match.id, name: parseDOTagValue(match.tags, "thopter-name") ?? match.name };
+  }
   const client = getClient();
 
   // If it looks like a devbox ID, return directly
@@ -263,8 +542,6 @@ export async function createDevbox(opts: {
   keepAlive?: number;
   noSync?: boolean;
 }): Promise<string> {
-  const client = getClient();
-
   // Get owner from operator's git config (required)
   let ownerName: string;
   try {
@@ -308,6 +585,117 @@ export async function createDevbox(opts: {
       }
     }
   }
+
+  if (isDigitalOceanProvider()) {
+    const image = snapshotId ?? DO_DEFAULT_IMAGE;
+    const ownerTag = `owner:${coerceTagValue(ownerName)}`;
+    const thopterTag = `thopter-name:${coerceTagValue(opts.name)}`;
+    const dropletName = `thopter-${coerceTagValue(opts.name).slice(0, 48)}`;
+    const cloudInit = [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      "if ! id -u user >/dev/null 2>&1; then useradd -m -s /bin/bash -G sudo user; fi",
+      "echo 'user ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/thopter-user",
+      "chmod 440 /etc/sudoers.d/thopter-user",
+      "mkdir -p /home/user/.ssh",
+      "if [ -f /root/.ssh/authorized_keys ]; then cp /root/.ssh/authorized_keys /home/user/.ssh/authorized_keys; fi",
+      "chown -R user:user /home/user/.ssh",
+      "chmod 700 /home/user/.ssh || true",
+      "chmod 600 /home/user/.ssh/authorized_keys || true",
+      "cat >/tmp/thopter-init.sh <<'THOPTER_INIT'",
+      INIT_SCRIPT,
+      "THOPTER_INIT",
+      "chown user:user /tmp/thopter-init.sh",
+      "chmod +x /tmp/thopter-init.sh",
+      "su - user -c 'bash /tmp/thopter-init.sh'",
+    ].join("\n");
+
+    console.log(
+      snapshotId
+        ? `Creating droplet '${opts.name}' from snapshot ${snapshotId}...`
+        : `Creating droplet '${opts.name}' (fresh)...`,
+    );
+    console.log("Waiting for droplet to be ready...");
+
+    const createArgs = [
+      "compute",
+      "droplet",
+      "create",
+      dropletName,
+      "--image",
+      image,
+      "--size",
+      DO_DEFAULT_SIZE,
+      "--tag-names",
+      [DO_MANAGED_TAG, ownerTag, thopterTag].join(","),
+      "--ssh-keys",
+      ensureDOFingerprintForLocalRSAPub(),
+      "--wait",
+      "--user-data",
+      cloudInit,
+    ];
+    const created = doctlJson(createArgs);
+    if (!Array.isArray(created) || created.length === 0) {
+      throw new Error("Failed to parse droplet create response.");
+    }
+    const droplet = normalizeDODroplet(created[0]);
+    const dropletId = droplet.id;
+    console.log(`Droplet created: ${dropletId}`);
+    await waitForDOSSHReady(dropletId, "user");
+    console.log("Provisioning runtime...");
+
+    const envVars = getEnvVars();
+    const envLines: string[] = [];
+    envLines.push(`export THOPTER_NAME="${escapeEnvValue(opts.name)}"`);
+    envLines.push(`export THOPTER_ID="${escapeEnvValue(dropletId)}"`);
+    envLines.push(`export THOPTER_OWNER="${escapeEnvValue(ownerName)}"`);
+    if (!getStopNotifications()) {
+      envLines.push(`export THOPTER_STOP_NOTIFY=0`);
+    }
+    const quietPeriod = getStopNotificationQuietPeriod();
+    envLines.push(`export THOPTER_STOP_NOTIFY_QUIET_PERIOD="${quietPeriod}"`);
+    for (const [key, value] of Object.entries(envVars)) {
+      envLines.push(`export ${key}="${escapeEnvValue(value)}"`);
+    }
+    console.log("Writing /home/user/.thopter-env...");
+    doWriteFile(dropletId, "/home/user/.thopter-env", envLines.join("\n") + "\n", { retryMax: 60 });
+
+    if (envVars.GH_TOKEN) {
+      console.log("Configuring git credentials...");
+      const gitCmd =
+        "source ~/.thopter-env && " +
+        "git config --global credential.helper store && " +
+        "echo \"https://thopterbot:${GH_TOKEN}@github.com\" > ~/.git-credentials && " +
+        "git config --global url.\"https://github.com/\".insteadOf \"git@github.com:\" && " +
+        "git config --global user.name \"ThopterBot\" && " +
+        "git config --global user.email \"thopterbot@telepath.computer\"";
+      const result = doExecSync(dropletId, gitCmd, { retryMax: 60 });
+      if (result.status !== 0) {
+        throw new Error(result.stderr || "failed to configure git credentials");
+      }
+    }
+
+    console.log("Installing thopter scripts...");
+    installThopterScriptsDO(dropletId, opts.name);
+
+    if (uploads.length > 0) {
+      console.log(`Uploading ${uploads.length} custom file${uploads.length === 1 ? "" : "s"}...`);
+      for (const entry of uploads) {
+        console.log(`  Uploading ${entry.local} -> ${entry.remote}...`);
+        doWriteFile(dropletId, entry.remote, readFileSync(entry.local, "utf-8"), { retryMax: 60 });
+      }
+    }
+
+    if (!opts.noSync && getSyncthingConfig()) {
+      console.log("WARNING: SyncThing auto-pair on create is not implemented in DigitalOcean mode yet.");
+      console.log("  Set up later manually once DO sync integration is migrated.");
+    }
+
+    console.log(`Create complete: ${dropletId}`);
+    return dropletId;
+  }
+
+  const client = getClient();
 
   // Build metadata
   const metadata: Record<string, string> = {
@@ -434,8 +822,35 @@ export async function fetchThopters(): Promise<{
   status: string | null; task: string | null; heartbeat: string | null;
   alive: boolean; claudeRunning: boolean; lastMessage: string | null;
 }[]> {
-  const client = getClient();
   const { getRedisInfoForNames } = await import("./status.js");
+
+  if (isDigitalOceanProvider()) {
+    const droplets = listManagedDODroplets();
+    const devboxes = droplets.map((d) => ({
+      id: d.id,
+      name: parseDOTagValue(d.tags, "thopter-name") ?? d.name,
+      owner: parseDOTagValue(d.tags, "owner") ?? "",
+      status: mapDOStatus(d.status),
+    }));
+    const redisMap = await getRedisInfoForNames(devboxes.map((db) => db.name));
+    return devboxes.map((db) => {
+      const redis = redisMap.get(db.name);
+      return {
+        name: db.name,
+        owner: db.owner,
+        id: db.id,
+        devboxStatus: db.status,
+        status: redis?.status ?? null,
+        task: redis?.task ?? null,
+        heartbeat: redis?.heartbeat ?? null,
+        alive: redis?.alive ?? false,
+        claudeRunning: redis?.claudeRunning === "1",
+        lastMessage: redis?.lastMessage ?? null,
+      };
+    });
+  }
+
+  const client = getClient();
 
   const devboxes: { name: string; owner: string; id: string; status: string }[] = [];
   const liveStatuses = ["running", "suspended", "provisioning", "initializing", "suspending", "resuming"] as const;
@@ -472,6 +887,50 @@ export async function fetchThopters(): Promise<{
 }
 
 export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "narrow"; json?: boolean }): Promise<void> {
+  if (isDigitalOceanProvider()) {
+    if (opts?.json) {
+      const thopters = await fetchThopters();
+      process.stdout.write(JSON.stringify(thopters) + "\n");
+      return;
+    }
+
+    const { relativeTime } = await import("./status.js");
+    const { formatTable } = await import("./output.js");
+    const render = async (): Promise<string> => {
+      const thopters = await fetchThopters();
+      if (thopters.length === 0) return "No managed droplets found.\n";
+      const rows = thopters.map((t) => [
+        t.name,
+        t.owner || "-",
+        t.devboxStatus,
+        t.status ?? "-",
+        t.task ?? "-",
+        t.claudeRunning ? "yes" : "no",
+        t.heartbeat ? relativeTime(t.heartbeat) : "-",
+        t.lastMessage ?? "-",
+      ]);
+      return formatTable(
+        ["NAME", "OWNER", "MACHINE", "AGENT", "TASK", "CLAUDE", "HEARTBEAT", "LAST MSG"],
+        rows,
+        { maxWidth: process.stdout.columns || 120, flexColumns: [4, 7] },
+      );
+    };
+
+    if (opts?.follow) {
+      const interval = opts.follow;
+      while (true) {
+        const output = await render();
+        process.stdout.write("\x1b[2J\x1b[H");
+        process.stdout.write(`Refreshing every ${interval}s — Ctrl+C to exit  (${new Date().toLocaleTimeString()})\n\n`);
+        process.stdout.write(output);
+        await new Promise((r) => setTimeout(r, interval * 1000));
+      }
+    } else {
+      process.stdout.write(await render());
+    }
+    return;
+  }
+
   if (opts?.json) {
     const thopters = await fetchThopters();
     process.stdout.write(JSON.stringify(thopters) + "\n");
@@ -653,6 +1112,7 @@ export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "
 }
 
 export async function listSnapshotsCmd(): Promise<void> {
+  requireRunloopFeature("snapshot list");
   const client = getClient();
 
   const rows: string[][] = [];
@@ -674,6 +1134,7 @@ export async function listSnapshotsCmd(): Promise<void> {
 }
 
 export async function deleteSnapshot(nameOrId: string): Promise<void> {
+  requireRunloopFeature("snapshot delete");
   const snapshotId = await resolveSnapshotId(nameOrId);
   const client = getClient();
 
@@ -685,6 +1146,15 @@ export async function deleteSnapshot(nameOrId: string): Promise<void> {
 export async function destroyDevbox(nameOrId: string): Promise<void> {
   const { id } = await resolveDevbox(nameOrId);
 
+  if (isDigitalOceanProvider()) {
+    console.log(`Deleting droplet ${id}...`);
+    execFileSync("doctl", ["compute", "droplet", "delete", id, "--force"], {
+      stdio: "inherit",
+    });
+    console.log("Done.");
+    return;
+  }
+
   console.log(`Shutting down devbox ${id}...`);
   const client = getClient();
   await client.devboxes.shutdown(id);
@@ -692,6 +1162,11 @@ export async function destroyDevbox(nameOrId: string): Promise<void> {
 }
 
 export async function suspendDevbox(nameOrId: string): Promise<void> {
+  if (isDigitalOceanProvider()) {
+    throw new Error(
+      "suspend is not supported in DigitalOcean mode. DigitalOcean does not provide cost-saving suspend semantics for thopters.",
+    );
+  }
   const { id } = await resolveDevbox(nameOrId);
 
   console.log(`Suspending devbox ${id}...`);
@@ -701,6 +1176,11 @@ export async function suspendDevbox(nameOrId: string): Promise<void> {
 }
 
 export async function resumeDevbox(nameOrId: string): Promise<void> {
+  if (isDigitalOceanProvider()) {
+    throw new Error(
+      "resume is not supported in DigitalOcean mode. DigitalOcean does not provide thopter suspend/resume semantics.",
+    );
+  }
   const { id } = await resolveDevbox(nameOrId);
 
   console.log(`Resuming devbox ${id}...`);
@@ -716,6 +1196,11 @@ export async function resumeDevbox(nameOrId: string): Promise<void> {
 }
 
 export async function keepaliveDevbox(nameOrId: string): Promise<void> {
+  if (isDigitalOceanProvider()) {
+    throw new Error(
+      "keepalive is not supported in DigitalOcean mode. DigitalOcean does not provide thopter keep-alive timer reset semantics.",
+    );
+  }
   const { id } = await resolveDevbox(nameOrId);
   const client = getClient();
 
@@ -727,12 +1212,50 @@ export async function keepaliveDevbox(nameOrId: string): Promise<void> {
 export async function sshDevbox(nameOrId: string): Promise<void> {
   const { id } = await resolveDevbox(nameOrId);
 
+  if (isDigitalOceanProvider()) {
+    const ip = getDODropletPublicIPv4(id);
+    const child = spawn("ssh", [
+      "-o",
+      "StrictHostKeyChecking=no",
+      "-o",
+      "UserKnownHostsFile=/dev/null",
+      "-i",
+      getLocalRSAPrivateKeyPath(),
+      `user@${ip}`,
+    ], {
+      stdio: "inherit",
+    });
+    child.on("exit", (code) => process.exit(code ?? 0));
+    return;
+  }
+
   console.log(`Connecting to ${id} via rli...`);
   rliSsh(id);
 }
 
 export async function attachDevbox(nameOrId: string): Promise<void> {
   const { id } = await resolveDevbox(nameOrId);
+
+  if (isDigitalOceanProvider()) {
+    const ip = getDODropletPublicIPv4(id);
+    const child = spawn(
+      "ssh",
+      [
+        "-tt",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-i",
+        getLocalRSAPrivateKeyPath(),
+        `user@${ip}`,
+        "tmux -CC attach \\; refresh-client || tmux -CC",
+      ],
+      { stdio: "inherit" },
+    );
+    child.on("exit", (code) => process.exit(code ?? 0));
+    return;
+  }
 
   console.log(`Attaching to tmux on ${id} via rli...`);
   rliSsh(id, "tmux -CC attach \\; refresh-client || tmux -CC");
@@ -792,6 +1315,31 @@ export async function execDevbox(
   command: string[],
 ): Promise<void> {
   const { id } = await resolveDevbox(nameOrId);
+
+  if (isDigitalOceanProvider()) {
+    const cmd = command.join(" ");
+    console.log(`Executing in ${id}: ${cmd}`);
+    const ip = getDODropletPublicIPv4(id);
+    const result = spawnSync(
+      "ssh",
+      [
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-i",
+        getLocalRSAPrivateKeyPath(),
+        `user@${ip}`,
+        cmd,
+      ],
+      { stdio: "inherit" },
+    );
+    if (result.status && result.status !== 0) {
+      process.exit(result.status);
+    }
+    return;
+  }
+
   const client = getClient();
 
   const cmd = command.join(" ");
@@ -820,6 +1368,7 @@ export async function snapshotDevbox(
   nameOrId: string,
   snapshotName?: string,
 ): Promise<string> {
+  requireRunloopFeature("snapshot create");
   const { id } = await resolveDevbox(nameOrId);
   const client = getClient();
 
@@ -854,6 +1403,7 @@ export async function replaceSnapshot(
   devboxNameOrId: string,
   snapshotName: string,
 ): Promise<string> {
+  requireRunloopFeature("snapshot replace");
   const { id: devboxId } = await resolveDevbox(devboxNameOrId);
   const client = getClient();
 
@@ -884,4 +1434,3 @@ export async function replaceSnapshot(
   console.log(`Replaced snapshot '${snapshotName}': ${snapshot.id}`);
   return snapshot.id;
 }
-
