@@ -3,6 +3,8 @@
 # Pushes transcript to Redis (which also updates last_message).
 # Sends ntfy notification if THOPTER_NTFY_CHANNEL is configured.
 
+[ -f "$HOME/.thopter-env" ] && . "$HOME/.thopter-env"
+
 # read -t returns immediately when a line is available, with 1s safety timeout
 read -t 1 INPUT || true
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')

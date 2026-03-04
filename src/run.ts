@@ -295,6 +295,7 @@ export async function runThopter(opts: {
     launcherPath,
     [
       `#!/bin/bash -l`,
+      `[ -f "$HOME/.thopter-env" ] && . "$HOME/.thopter-env"`,
       `cd ${workingDir}`,
       `claude --dangerously-skip-permissions "Read the file ${promptPath}. Print a brief summary of the instructions you read, then proceed to follow them."`,
       `exec bash -l`,

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Hook: SessionStart — Claude session started or resumed
 
+[ -f "$HOME/.thopter-env" ] && . "$HOME/.thopter-env"
+
 read -t 1 INPUT || true
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 

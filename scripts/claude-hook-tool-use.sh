@@ -2,6 +2,8 @@
 # Post-tool-use hook: signal that Claude is actively working.
 # The activity file mtime is used by the heartbeat for liveness detection.
 
+[ -f "$HOME/.thopter-env" ] && . "$HOME/.thopter-env"
+
 read -t 1 INPUT || true
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 [ -n "$TRANSCRIPT" ] && echo "$TRANSCRIPT" > /tmp/thopter-active || touch /tmp/thopter-active

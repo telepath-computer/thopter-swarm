@@ -2,6 +2,8 @@
 # Hook: Notification — log Claude Code notifications to redis
 # Sends ntfy notification if THOPTER_NTFY_CHANNEL is configured.
 
+[ -f "$HOME/.thopter-env" ] && . "$HOME/.thopter-env"
+
 read -t 1 INPUT || true
 MSG=$(echo "$INPUT" | jq -r '.message // "unknown notification"')
 TYPE=$(echo "$INPUT" | jq -r '.notification_type // "unknown"')
