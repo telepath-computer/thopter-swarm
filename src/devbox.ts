@@ -127,6 +127,13 @@ interface DODroplet {
   tags: string[];
 }
 
+interface DOSnapshot {
+  id: string;
+  name: string;
+  sourceId: string;
+  createdAt: string;
+}
+
 function doctlJson(args: string[]): unknown {
   const raw = execFileSync("doctl", [...args, "-o", "json"], { encoding: "utf-8" });
   return JSON.parse(raw);
@@ -190,6 +197,39 @@ function listManagedDODroplets(): DODroplet[] {
   ]);
   if (!Array.isArray(raw)) return [];
   return raw.map(normalizeDODroplet);
+}
+
+function normalizeDOSnapshot(raw: unknown): DOSnapshot {
+  const obj = raw as Record<string, unknown>;
+  return {
+    id: String(obj.id ?? obj.ID ?? ""),
+    name: String(obj.name ?? obj.Name ?? ""),
+    sourceId: String(obj.resource_id ?? obj.ResourceID ?? ""),
+    createdAt: String(obj.created_at ?? obj.CreatedAt ?? ""),
+  };
+}
+
+function listDOSnapshots(): DOSnapshot[] {
+  const raw = doctlJson(["compute", "snapshot", "list"]);
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((s) => s as Record<string, unknown>)
+    .filter((s) => String(s.resource_type ?? s.ResourceType ?? "") === "droplet")
+    .map(normalizeDOSnapshot);
+}
+
+async function waitForDOSnapshotIdByName(name: string, maxAttempts = 30): Promise<string> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const matches = listDOSnapshots().filter((s) => s.name === name);
+    if (matches.length === 1) return matches[0].id;
+    if (matches.length > 1) {
+      throw new Error(
+        `Ambiguous: ${matches.length} snapshots named '${name}'. Use snapshot ID instead.`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error(`Snapshot '${name}' not found after creation wait.`);
 }
 
 function getDODropletPublicIPv4(dropletId: string): string {
@@ -1112,7 +1152,21 @@ export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "
 }
 
 export async function listSnapshotsCmd(): Promise<void> {
-  requireRunloopFeature("snapshot list");
+  if (isDigitalOceanProvider()) {
+    const rows = listDOSnapshots().map((s) => [
+      s.name,
+      s.id,
+      s.sourceId,
+      s.createdAt ? new Date(s.createdAt).toLocaleString() : "",
+    ]);
+    printTable(["NAME", "ID", "SOURCE DEVBOX", "CREATED"], rows);
+    const defaultSnap = getDefaultSnapshot();
+    if (defaultSnap) {
+      console.log(`\nDefault snapshot: ${defaultSnap}`);
+    }
+    return;
+  }
+
   const client = getClient();
 
   const rows: string[][] = [];
@@ -1134,12 +1188,17 @@ export async function listSnapshotsCmd(): Promise<void> {
 }
 
 export async function deleteSnapshot(nameOrId: string): Promise<void> {
-  requireRunloopFeature("snapshot delete");
   const snapshotId = await resolveSnapshotId(nameOrId);
-  const client = getClient();
 
   console.log(`Deleting snapshot ${snapshotId}...`);
-  await client.devboxes.diskSnapshots.delete(snapshotId);
+  if (isDigitalOceanProvider()) {
+    execFileSync("doctl", ["compute", "snapshot", "delete", snapshotId], {
+      stdio: "inherit",
+    });
+  } else {
+    const client = getClient();
+    await client.devboxes.diskSnapshots.delete(snapshotId);
+  }
   console.log("Done.");
 }
 
@@ -1368,8 +1427,41 @@ export async function snapshotDevbox(
   nameOrId: string,
   snapshotName?: string,
 ): Promise<string> {
-  requireRunloopFeature("snapshot create");
   const { id } = await resolveDevbox(nameOrId);
+
+  if (isDigitalOceanProvider()) {
+    const effectiveName =
+      snapshotName && snapshotName.trim()
+        ? snapshotName.trim()
+        : `thopter-snapshot-${coerceTagValue(nameOrId)}-${Date.now()}`;
+
+    const existing = listDOSnapshots().filter((s) => s.name === effectiveName);
+    if (existing.length > 0) {
+      throw new Error(
+        `A snapshot named '${effectiveName}' already exists (${existing.map((s) => s.id).join(", ")}). Choose a different name or delete the existing one first.`,
+      );
+    }
+
+    console.log(`Snapshotting droplet ${id} as '${effectiveName}'...`);
+    execFileSync(
+      "doctl",
+      [
+        "compute",
+        "droplet-action",
+        "snapshot",
+        id,
+        "--snapshot-name",
+        effectiveName,
+        "--wait",
+      ],
+      { stdio: "inherit" },
+    );
+    const createdId = await waitForDOSnapshotIdByName(effectiveName);
+    console.log(`Snapshot created: ${createdId}`);
+    console.log(`Named: ${effectiveName}`);
+    return createdId;
+  }
+
   const client = getClient();
 
   // Check for duplicate snapshot name
@@ -1403,8 +1495,40 @@ export async function replaceSnapshot(
   devboxNameOrId: string,
   snapshotName: string,
 ): Promise<string> {
-  requireRunloopFeature("snapshot replace");
   const { id: devboxId } = await resolveDevbox(devboxNameOrId);
+
+  if (isDigitalOceanProvider()) {
+    const old = listDOSnapshots().filter((s) => s.name === snapshotName);
+    if (old.length === 0) {
+      throw new Error(
+        `No snapshot named '${snapshotName}' to replace. Use 'snapshot create' instead.`,
+      );
+    }
+    for (const s of old) {
+      console.log(`Deleting old snapshot ${s.id}...`);
+      execFileSync("doctl", ["compute", "snapshot", "delete", s.id], {
+        stdio: "inherit",
+      });
+    }
+    console.log(`Snapshotting droplet ${devboxId} as '${snapshotName}'...`);
+    execFileSync(
+      "doctl",
+      [
+        "compute",
+        "droplet-action",
+        "snapshot",
+        devboxId,
+        "--snapshot-name",
+        snapshotName,
+        "--wait",
+      ],
+      { stdio: "inherit" },
+    );
+    const createdId = await waitForDOSnapshotIdByName(snapshotName);
+    console.log(`Replaced snapshot '${snapshotName}': ${createdId}`);
+    return createdId;
+  }
+
   const client = getClient();
 
   // Find existing snapshot(s) with this name
