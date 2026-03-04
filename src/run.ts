@@ -155,9 +155,28 @@ async function cloneRepos(
     ].join(" && ");
 
     console.log(`Cloning ${repo}...`);
-    const cloneResult = await executeCommandById(devboxId, cloneScript);
+    let cloneResult = await executeCommandById(devboxId, cloneScript);
     if (cloneResult.stdout) process.stdout.write(cloneResult.stdout);
     if (cloneResult.stderr) process.stderr.write(cloneResult.stderr);
+
+    if (cloneResult.exitCode !== 0) {
+      // Snapshot-based boots can inherit damaged git state (e.g. corrupted .git/index).
+      // One-shot self-heal: remove existing checkout and re-clone cleanly.
+      console.log(`Repository setup failed for ${repo}; attempting clean re-clone...`);
+      const recloneScript = [
+        `mkdir -p "${WORKSPACE_DIR}"`,
+        `cd "${WORKSPACE_DIR}"`,
+        `rm -rf "${repoName}"`,
+        `git clone "https://github.com/${repo}.git" "${repoName}"`,
+        `cd "${repoName}"`,
+        `git fetch origin`,
+        `git checkout "${checkout.branch}"`,
+        `git reset --hard "origin/${checkout.branch}"`,
+      ].join(" && ");
+      cloneResult = await executeCommandById(devboxId, recloneScript);
+      if (cloneResult.stdout) process.stdout.write(cloneResult.stdout);
+      if (cloneResult.stderr) process.stderr.write(cloneResult.stderr);
+    }
 
     if (cloneResult.exitCode !== 0) {
       console.error(`\nError: Repository setup failed for ${repo} (exit ${cloneResult.exitCode}).`);
