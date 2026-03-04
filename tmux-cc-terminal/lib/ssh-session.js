@@ -186,7 +186,15 @@ class SSHSession extends EventEmitter {
           return;
         }
         try {
-          const windows = await this.listWindows();
+          let windows = [];
+          for (let i = 0; i < 8; i++) {
+            windows = await this.listWindows();
+            if (windows.length > 0) break;
+            await new Promise((r) => setTimeout(r, 250));
+          }
+          if (windows.length === 0) {
+            throw new Error('tmux connected but reported 0 windows (startup handshake incomplete)');
+          }
           this.emit('connected', windows, {
             target: this._config.targetLabel || getTargetLabel(),
             session: sessionName,

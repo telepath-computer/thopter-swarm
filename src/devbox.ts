@@ -187,6 +187,66 @@ fi
 touch "$HOME/.thopter-init-complete"
 `.trim();
 
+/** Fast reconcile script for snapshot-based boots (no full reinstall). */
+const SNAPSHOT_INIT_SCRIPT = `
+set -euo pipefail
+
+THOPTER_INIT_LOG="$HOME/thopter-init.log"
+THOPTER_INIT_WARN="$HOME/.thopter-init-warnings"
+mkdir -p "$(dirname "$THOPTER_INIT_LOG")"
+: > "$THOPTER_INIT_WARN"
+exec > >(tee -a "$THOPTER_INIT_LOG") 2>&1
+
+redis_safe() {
+  if [ -z "\${THOPTER_REDIS_URL:-}" ] || [ -z "\${THOPTER_NAME:-}" ]; then
+    return 0
+  fi
+  redis-cli --tls -u "$THOPTER_REDIS_URL" "$@" >/dev/null 2>&1 || true
+}
+
+progress() {
+  local stage="$1"
+  local message="$2"
+  local now
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "[thopter-init][$stage] $message"
+  redis_safe SETEX "thopter:$THOPTER_NAME:create:stage" 3600 "$stage"
+  redis_safe SETEX "thopter:$THOPTER_NAME:create:message" 3600 "$message"
+  redis_safe SETEX "thopter:$THOPTER_NAME:create:timestamp" 3600 "$now"
+  redis_safe RPUSH "thopter:$THOPTER_NAME:create:logs" "$now [$stage] $message"
+  redis_safe LTRIM "thopter:$THOPTER_NAME:create:logs" -200 -1
+  redis_safe EXPIRE "thopter:$THOPTER_NAME:create:logs" 3600
+}
+
+echo "[thopter-init] snapshot reconcile starting at $(date -Is)"
+progress "start" "thopter cloud-init started (snapshot mode)"
+
+progress "snapshot-reconcile" "ensuring baseline runtime state"
+mkdir -p "$HOME/workspace"
+sudo /usr/sbin/cron 2>/dev/null || true
+export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+hash -r || true
+
+if ! command -v node >/dev/null 2>&1 || ! node -v >/dev/null 2>&1; then
+  echo "ERROR: node is missing or unhealthy in snapshot image."
+  exit 1
+fi
+
+if ! command -v npm >/dev/null 2>&1 || ! npm -v >/dev/null 2>&1; then
+  echo "ERROR: npm is missing or unhealthy in snapshot image."
+  exit 1
+fi
+
+if ! command -v claude >/dev/null 2>&1 || ! claude --version >/dev/null 2>&1; then
+  echo "ERROR: claude is missing or unhealthy in snapshot image."
+  exit 1
+fi
+
+echo "[thopter-init] snapshot reconcile complete at $(date -Is)"
+progress "done" "thopter cloud-init completed (snapshot mode)"
+touch "$HOME/.thopter-init-complete"
+`.trim();
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS_DIR = resolve(__dirname, "..", "scripts");
 
@@ -300,6 +360,13 @@ function coerceTagValue(input: string): string {
   const trimmed = collapsed.replace(/^[-:]+|[-:]+$/g, "");
   const out = trimmed || "unknown";
   return out.slice(0, 220);
+}
+
+function coerceHostname(input: string): string {
+  const base = coerceTagValue(input).replace(/[:_]/g, "-");
+  const trimmed = base.replace(/^-+|-+$/g, "");
+  const host = trimmed || "thopter";
+  return host.slice(0, 63);
 }
 
 function mapDOStatus(status: string): string {
@@ -1054,6 +1121,12 @@ export async function createDevbox(opts: {
       initEnvForUser.push(`THOPTER_REDIS_URL=${shellSingleQuote(redisUrlForCreate)}`);
     }
     const userInitCmd = `${initEnvForUser.join(" ")} bash /tmp/thopter-init.sh`;
+    const initScript = snapshotId ? SNAPSHOT_INIT_SCRIPT : INIT_SCRIPT;
+    if (snapshotId) {
+      log("Using snapshot-optimized cloud-init profile.");
+    } else {
+      log("Using full cloud-init profile.");
+    }
     const cloudInit = [
       "#!/bin/bash",
       "set -euo pipefail",
@@ -1066,7 +1139,7 @@ export async function createDevbox(opts: {
       "chmod 700 /home/user/.ssh || true",
       "chmod 600 /home/user/.ssh/authorized_keys || true",
       "cat >/tmp/thopter-init.sh <<'THOPTER_INIT'",
-      INIT_SCRIPT,
+      initScript,
       "THOPTER_INIT",
       "chown user:user /tmp/thopter-init.sh",
       "chmod +x /tmp/thopter-init.sh",
@@ -1110,6 +1183,16 @@ export async function createDevbox(opts: {
     try {
       await waitForDOSSHReady(dropletId, log, "user");
       await waitForDOInitComplete(dropletId, log);
+      const hostName = coerceHostname(opts.name);
+      log(`Setting hostname to '${hostName}'...`);
+      const hostCmd = [
+        `sudo hostnamectl set-hostname ${shellSingleQuote(hostName)}`,
+        `echo ${shellSingleQuote(hostName)} | sudo tee /etc/hostname >/dev/null`,
+      ].join(" && ");
+      const hostResult = doExecSync(dropletId, hostCmd, { retryMax: 60 });
+      if (hostResult.status !== 0) {
+        throw new Error(hostResult.stderr || "failed to set hostname");
+      }
       log("Provisioning runtime...");
 
       const envLines: string[] = [];
