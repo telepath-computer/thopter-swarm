@@ -42,6 +42,7 @@ export function ThopterCard({ thopter }: Props) {
   const resumeThopter = useStore((s) => s.resumeThopter)
   const destroyThopter = useStore((s) => s.destroyThopter)
   const provider = useStore((s) => s.provider)
+  const hasUnread = useStore((s) => s.thopterNotifications[thopter.name]?.unread ?? false)
   const [confirmDestroy, setConfirmDestroy] = useState(false)
   const [confirmSuspend, setConfirmSuspend] = useState(false)
   const [confirmResume, setConfirmResume] = useState(false)
@@ -66,7 +67,12 @@ export function ThopterCard({ thopter }: Props) {
       }}
     >
       <CardHeader className="gap-1.5 pb-0">
-        <CardTitle className="text-sm">{thopter.name}</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-1.5">
+          {thopter.name}
+          {hasUnread && (
+            <span className="size-2 rounded-full bg-destructive shrink-0 animate-pulse" />
+          )}
+        </CardTitle>
         <CardAction>
           <Badge variant="outline" className={cn('text-[10px] gap-1.5 font-medium border', cfg.color)}>
             <span className={cn('size-1.5 rounded-full', cfg.dot)} />

@@ -10,11 +10,20 @@ import type {
   InfrastructureProvider,
 } from '../services/types'
 
+/** Per-thopter notification state: only the latest notification matters */
+export interface ThopterNotificationState {
+  latest: NtfyNotification // Most recent notification for this thopter
+  unread: boolean // Whether attention is needed
+}
+
 export interface StoreState {
   // Internal state (data layer)
   thopters: Record<string, ThopterInfo>
   transcripts: Record<string, TranscriptEntry[]>
-  notifications: NtfyNotification[]
+  /** Per-thopter notification state — keyed by thopterName */
+  thopterNotifications: Record<string, ThopterNotificationState>
+  /** Notifications that couldn't be associated with a thopter */
+  unassociatedNotifications: NtfyNotification[]
   repos: RepoConfig[]
   snapshots: SnapshotInfo[]
   config: AppConfig | null
@@ -26,13 +35,13 @@ export interface StoreState {
   liveTerminals: string[] // thopter names with active live terminal sessions
   draftMessages: Record<string, string>
   provider: InfrastructureProvider
+  /** Timestamp of last user interaction per detail view, for smart dismissal */
+  lastDetailInteraction: Record<string, number>
 
   // Display state (UI layer)
   activeTab: 'dashboard' | string
   openTabs: string[]
-  isSidebarOpen: boolean
   autoRefresh: boolean
-  unreadNotificationCount: number
 }
 
 export interface StoreActions {
@@ -60,13 +69,15 @@ export interface StoreActions {
   setActiveTab(tab: string): void
   openTab(name: string): void
   closeTab(name: string): void
-  toggleSidebar(): void
   setDraftMessage(name: string, message: string): void
   setAutoRefresh(enabled: boolean): void
-  markNotificationsRead(): void
+
+  // Notification actions
   addNotification(notification: NtfyNotification): void
-  removeNotification(id: string): void
-  clearNotifications(): void
+  dismissNotification(thopterName: string): void
+  dismissAllNotifications(): void
+  /** Record a user interaction on a detail view (for smart dismissal) */
+  recordDetailInteraction(thopterName: string): void
 }
 
 export type Store = StoreState & StoreActions
