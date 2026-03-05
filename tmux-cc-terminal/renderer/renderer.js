@@ -94,6 +94,22 @@ function createTmuxTerminal(container, adapter, options = {}) {
   let _resizeInFlight = false;
   let _queuedResize = null;
 
+  function getCellMetrics(term) {
+    if (!term) return null;
+    const core = term._core;
+    const cssCell = core?._renderService?.dimensions?.css?.cell;
+    if (cssCell && Number.isFinite(cssCell.width) && Number.isFinite(cssCell.height) &&
+        cssCell.width > 0 && cssCell.height > 0) {
+      return { cellW: cssCell.width, cellH: cssCell.height };
+    }
+    const measure = core?._charSizeService?.measurements;
+    if (measure && Number.isFinite(measure.width) && Number.isFinite(measure.height) &&
+        measure.width > 0 && measure.height > 0) {
+      return { cellW: measure.width, cellH: measure.height };
+    }
+    return null;
+  }
+
   function dispatchClientResize(cols, rows) {
     const run = () => {
       _resizeInFlight = true;
@@ -121,20 +137,29 @@ function createTmuxTerminal(container, adapter, options = {}) {
     const tab = tabs.get(activeWindowId);
     if (!tab) return;
 
-    let cols, rows;
+    let cols;
+    let rows;
 
-    if (tab.paneIds.length === 1) {
+    // Structural source of truth: terminal cell metrics + viewport pixels.
+    // This avoids self-referential pane-ratio math that can cancel out on resize.
+    const activePane = panes.get(tab.activePaneId || tab.paneIds[0]);
+    const metrics = activePane ? getCellMetrics(activePane.term) : null;
+    const containerPxW = terminalContainer.clientWidth;
+    const containerPxH = terminalContainer.clientHeight;
+    if (metrics && containerPxW > 0 && containerPxH > 0) {
+      cols = Math.max(1, Math.floor(containerPxW / metrics.cellW));
+      rows = Math.max(1, Math.floor(containerPxH / metrics.cellH));
+    }
+
+    if (!cols || !rows) {
+      if (tab.paneIds.length === 1) {
       const pane = panes.get(tab.paneIds[0]);
       if (!pane) return;
       cols = pane.term.cols;
       rows = pane.term.rows;
-    } else if (tab.paneLayout && tab.paneLayout.length > 0) {
-      const pl = tab.paneLayout;
-      if (pl.some((p) => p.zoomed)) {
-        const active = pl.find((p) => p.active) || pl[0];
-        cols = active.width;
-        rows = active.height;
-      } else {
+      } else if (tab.paneLayout && tab.paneLayout.length > 0) {
+        // Fallback to tmux-reported totals.
+        const pl = tab.paneLayout;
         let maxRight = 0;
         let maxBottom = 0;
         for (const p of pl) {
@@ -143,9 +168,9 @@ function createTmuxTerminal(container, adapter, options = {}) {
         }
         cols = maxRight;
         rows = maxBottom;
+      } else {
+        return;
       }
-    } else {
-      return;
     }
 
     if (cols > 0 && rows > 0 && (force || cols !== _lastClientCols || rows !== _lastClientRows)) {
@@ -970,7 +995,6 @@ function createTmuxTerminal(container, adapter, options = {}) {
 
     tab.paneLayout = paneList;
     applyPaneLayout(windowId, paneList);
-    setTimeout(() => sendClientSize(true), 20);
   });
 
   adapter.on('window-pane-changed', (windowId, paneId) => {
