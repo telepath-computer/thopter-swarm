@@ -29,6 +29,12 @@ interface Props {
 
 type ViewState = 'idle' | 'connecting' | 'connected' | 'error' | 'exited'
 
+function focusTmuxInput(container: HTMLDivElement | null) {
+  if (!container) return
+  const input = container.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null
+  input?.focus()
+}
+
 export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo: spawnInfoProp }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const adapterRef = useRef<InstanceType<typeof TmuxAdapter> | null>(null)
@@ -167,6 +173,10 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
 
     adapter.on('connected', () => {
       setState('connected')
+      // The connecting overlay can steal focus during first connect.
+      // Re-focus xterm input after the overlay unmounts.
+      setTimeout(() => focusTmuxInput(container), 0)
+      setTimeout(() => focusTmuxInput(container), 120)
     })
 
     adapter.on('disconnected', (reason: string) => {
@@ -202,6 +212,12 @@ export function TmuxLiveTerminalView({ name, devboxId, visible = true, spawnInfo
       }
     }
   }, [connect])
+
+  useEffect(() => {
+    if (state === 'connected') {
+      focusTmuxInput(containerRef.current)
+    }
+  }, [state])
 
   return (
     <div className="flex-1 relative bg-[#0d1117]">
