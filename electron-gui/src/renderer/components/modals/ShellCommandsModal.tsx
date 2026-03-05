@@ -17,7 +17,6 @@ interface Props {
 }
 
 const BASE_COMMANDS: { label: string; command: (name: string) => string }[] = [
-  { label: 'Attach (tmux)', command: (n) => `thopter attach ${n}` },
   { label: 'SSH', command: (n) => `thopter ssh ${n}` },
   { label: 'Tail (follow)', command: (n) => `thopter tail ${n} -f` },
   { label: 'Status', command: (n) => `thopter status ${n}` },

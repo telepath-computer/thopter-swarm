@@ -408,19 +408,20 @@ export class RealThopterService implements ThopterService {
   }
 
   /**
-   * Check if a thopter has tmux and Claude running via CLI.
+   * Check if Claude is running via CLI.
    */
   async checkClaude(name: string): Promise<ClaudeReadyStatus> {
     try {
       const output = await execThopter('check', name, '--json');
-      return JSON.parse(output) as ClaudeReadyStatus;
+      const parsed = JSON.parse(output) as { claude?: boolean };
+      return { claude: !!parsed.claude };
     } catch {
-      return { tmux: false, claude: false };
+      return { claude: false };
     }
   }
 
   /**
-   * Fetch the latest tmux screen capture from Redis.
+   * Fetch the latest screen capture from Redis.
    */
   async getScreenDump(name: string): Promise<string | null> {
     const redis = createRedis();
@@ -492,7 +493,7 @@ export class RealThopterService implements ThopterService {
   }
 
   /**
-   * Open iTerm2 with SSH connection to the thopter's tmux session.
+   * Open iTerm2 with SSH connection to the thopter.
    * Uses osascript (macOS) to create a new iTerm2 window with the attach command.
    */
   attachThopter(name: string): void {

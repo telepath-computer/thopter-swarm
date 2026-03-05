@@ -84,7 +84,7 @@ export const useStore = create<Store>((set, get) => ({
       const result = await service.checkClaude(name)
       set((s) => ({ claudeReady: { ...s.claudeReady, [name]: result } }))
     } catch {
-      set((s) => ({ claudeReady: { ...s.claudeReady, [name]: { tmux: false, claude: false } } }))
+      set((s) => ({ claudeReady: { ...s.claudeReady, [name]: { claude: false } } }))
     }
   },
 
@@ -153,7 +153,7 @@ export const useStore = create<Store>((set, get) => ({
     set((s) => {
       const update: Partial<typeof s> = { detailViewMode: { ...s.detailViewMode, [name]: mode } }
       // Track live terminal sessions so they persist across tab switches
-      if ((mode === 'ssh' || mode === 'tmux') && !s.liveTerminals.includes(name)) {
+      if (mode === 'ssh' && !s.liveTerminals.includes(name)) {
         update.liveTerminals = [...s.liveTerminals, name]
       }
       return update

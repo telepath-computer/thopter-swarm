@@ -5,7 +5,6 @@ import { StatusPanel } from './StatusPanel'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from './TerminalView'
 import { LiveTerminalView } from './LiveTerminalView'
-import { TmuxLiveTerminalView } from './TmuxLiveTerminalView'
 import { ActionBar } from './ActionBar'
 
 interface Props {
@@ -61,14 +60,14 @@ export function ThopterDetail({ tabName }: Props) {
     return () => unsubscribeTranscript(tabName)
   }, [tabName, fetchTranscript, subscribeTranscript, unsubscribeTranscript])
 
-  // Check tmux/Claude readiness when tab opens (only for running devboxes).
+  // Check Claude readiness when tab opens (only for running devboxes).
   // If not ready, poll every 5s until it is.
   useEffect(() => {
     if (thopter?.devboxStatus !== 'running') return
     checkClaude(tabName)
   }, [tabName, thopter?.devboxStatus, checkClaude])
 
-  const isClaudeReady = claudeReady?.tmux && claudeReady?.claude
+  const isClaudeReady = !!claudeReady?.claude
   useEffect(() => {
     if (thopter?.devboxStatus !== 'running') return
     if (isClaudeReady) return
@@ -77,8 +76,8 @@ export function ThopterDetail({ tabName }: Props) {
   }, [tabName, thopter?.devboxStatus, isClaudeReady, checkClaude])
 
   const hasLiveTerminal = liveTerminals.includes(tabName)
-  const sshVisible = isVisible && viewMode === 'ssh'
-  const tmuxVisible = isVisible && viewMode === 'tmux'
+  const effectiveViewMode = viewMode
+  const sshVisible = isVisible && effectiveViewMode === 'ssh'
 
   if (!thopter) {
     return (
@@ -98,7 +97,7 @@ export function ThopterDetail({ tabName }: Props) {
           onClick={() => setDetailViewMode(tabName, 'transcript')}
           className={cn(
             'px-2.5 py-1 text-xs rounded font-medium transition-colors',
-            viewMode === 'transcript'
+            effectiveViewMode === 'transcript'
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground hover:bg-muted',
           )}
@@ -109,7 +108,7 @@ export function ThopterDetail({ tabName }: Props) {
           onClick={() => setDetailViewMode(tabName, 'terminal')}
           className={cn(
             'px-2.5 py-1 text-xs rounded font-medium transition-colors',
-            viewMode === 'terminal'
+            effectiveViewMode === 'terminal'
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground hover:bg-muted',
           )}
@@ -120,52 +119,33 @@ export function ThopterDetail({ tabName }: Props) {
           onClick={() => setDetailViewMode(tabName, 'ssh')}
           className={cn(
             'px-2.5 py-1 text-xs rounded font-medium transition-colors',
-            viewMode === 'ssh'
+            effectiveViewMode === 'ssh'
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground hover:bg-muted',
           )}
         >
           SSH
         </button>
-        <button
-          onClick={() => setDetailViewMode(tabName, 'tmux')}
-          className={cn(
-            'px-2.5 py-1 text-xs rounded font-medium transition-colors',
-            viewMode === 'tmux'
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-          )}
-        >
-          Tmux
-        </button>
       </div>
 
       {/* Content area */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
         {/* Transcript and Screen unmount when not active (stateless) */}
-        {viewMode === 'transcript' && <TranscriptView name={thopter.name} />}
-        {viewMode === 'terminal' && <TerminalView name={thopter.name} />}
+        {effectiveViewMode === 'transcript' && <TranscriptView name={thopter.name} />}
+        {effectiveViewMode === 'terminal' && <TerminalView name={thopter.name} />}
 
-        {/* SSH and Tmux terminals stay mounted once activated, hidden/shown via CSS */}
+        {/* SSH terminal stays mounted once activated, hidden/shown via CSS */}
         {hasLiveTerminal && (
-          <>
-            <div
-              className="absolute inset-0 flex flex-col"
-              style={{ visibility: sshVisible ? 'visible' : 'hidden', pointerEvents: sshVisible ? undefined : 'none' }}
-            >
-              <LiveTerminalView name={thopter.name} visible={sshVisible} />
-            </div>
-            <div
-              className="absolute inset-0 flex flex-col"
-              style={{ visibility: tmuxVisible ? 'visible' : 'hidden', pointerEvents: tmuxVisible ? undefined : 'none' }}
-            >
-              <TmuxLiveTerminalView name={thopter.name} devboxId={thopter.id} visible={tmuxVisible} />
-            </div>
-          </>
+          <div
+            className="absolute inset-0 flex flex-col"
+            style={{ visibility: sshVisible ? 'visible' : 'hidden', pointerEvents: sshVisible ? undefined : 'none' }}
+          >
+            <LiveTerminalView name={thopter.name} visible={sshVisible} />
+          </div>
         )}
       </div>
 
-      {viewMode === 'terminal' && (
+      {effectiveViewMode === 'terminal' && (
         <ActionBar name={thopter.name} status={thopter.status} devboxStatus={thopter.devboxStatus} claudeReady={claudeReady} />
       )}
     </div>

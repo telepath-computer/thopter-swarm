@@ -29,7 +29,6 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
   const fitAddonRef = useRef<FitAddon | null>(null)
   const ptyRef = useRef<ReturnType<typeof pty.spawn> | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
-  const wheelCleanupRef = useRef<(() => void) | null>(null)
   const [state, setState] = useState<ViewState>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -162,8 +161,8 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
       ptyProcess.write(data)
     })
 
-    // Handle OSC 52 clipboard sequences from tmux/neovim.
-    // When tmux copies text in copy-mode (with set-clipboard on), it emits
+    // Handle OSC 52 clipboard sequences from terminal apps (e.g. neovim).
+    // When an app copies text with set-clipboard on, it emits
     // OSC 52: \e]52;c;BASE64\a — xterm.js doesn't handle this by default.
     // We decode the base64 payload and write to the system clipboard.
     term.parser.registerOscHandler(52, (data: string) => {
@@ -192,55 +191,6 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
       }
       ptyProcess.write(Buffer.from(bytes))
     })
-
-    // Custom wheel → SGR mouse scroll handler.
-    // xterm.js's CoreMouseService handles clicks but NOT wheel events. The
-    // Viewport consumes wheel events internally: in alternate screen without
-    // mouse tracking it sends arrow keys; with mouse tracking it does nothing.
-    // This handler intercepts wheel events on .xterm-screen and generates SGR
-    // mouse scroll sequences routed through triggerDataEvent (the same code
-    // path click events use). See docs/xterm-tmux-scroll.md for full details.
-    const xtermScreen = container.querySelector('.xterm-screen') as HTMLElement | null
-    const wheelHandler = (e: WheelEvent) => {
-      const currentTerm = termRef.current
-      if (!currentTerm) return
-
-      // Only act when in the alternate buffer (tmux, vim, less, etc.).
-      // In normal buffer, xterm.js handles scrollback natively.
-      if (currentTerm.buffer.active !== currentTerm.buffer.alternate) return
-
-      // Convert pixel position to 1-based terminal cell coordinates.
-      // tmux uses these to determine which pane the scroll targets.
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-      const cellWidth = rect.width / currentTerm.cols
-      const cellHeight = rect.height / currentTerm.rows
-      const col = Math.min(currentTerm.cols, Math.max(1, Math.floor((e.clientX - rect.left) / cellWidth) + 1))
-      const row = Math.min(currentTerm.rows, Math.max(1, Math.floor((e.clientY - rect.top) / cellHeight) + 1))
-
-      const lines = Math.max(1, Math.round(Math.abs(e.deltaY) / 25))
-      const button = e.deltaY < 0 ? 64 : 65 // SGR: 64=scroll-up, 65=scroll-down
-      const seq = `\x1b[<${button};${col};${row}M`
-
-      // Route through xterm.js's internal data event — the same path that
-      // click events use (CoreMouseService → triggerDataEvent → onData → pty.write).
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const core = (currentTerm as any)._core
-      for (let i = 0; i < lines; i++) {
-        if (core?.coreService?.triggerDataEvent) {
-          core.coreService.triggerDataEvent(seq, true)
-        }
-      }
-      e.preventDefault()
-      e.stopPropagation()
-    }
-    if (wheelCleanupRef.current) {
-      wheelCleanupRef.current()
-      wheelCleanupRef.current = null
-    }
-    if (xtermScreen) {
-      xtermScreen.addEventListener('wheel', wheelHandler, { passive: false })
-      wheelCleanupRef.current = () => xtermScreen.removeEventListener('wheel', wheelHandler)
-    }
 
     // Handle exit
     ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
@@ -286,10 +236,6 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
   // Clean up on unmount (no auto-connect — user clicks "Connect")
   useEffect(() => {
     return () => {
-      if (wheelCleanupRef.current) {
-        wheelCleanupRef.current()
-        wheelCleanupRef.current = null
-      }
       if (ptyRef.current) {
         try { ptyRef.current.kill() } catch { /* ignore */ }
         ptyRef.current = null

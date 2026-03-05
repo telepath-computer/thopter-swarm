@@ -20,11 +20,8 @@ function getUnavailableReason(devboxStatus: DevboxStatus, claudeReady?: ClaudeRe
   if (!claudeReady) {
     return null // Still checking, allow optimistically
   }
-  if (!claudeReady.tmux) {
-    return 'No tmux session on this thopter. Claude needs to be launched.'
-  }
   if (!claudeReady.claude) {
-    return 'tmux is running but Claude is not active in any pane.'
+    return 'Claude is not active on this thopter.'
   }
   return null
 }
@@ -63,7 +60,7 @@ export function ActionBar({ name, devboxStatus, claudeReady }: Props) {
             <button
               onClick={() => checkClaudeFn(name)}
               className="ml-auto shrink-0 text-amber-400 hover:text-amber-300 transition-colors p-0.5"
-              title="Re-check tmux/Claude status"
+              title="Re-check Claude status"
             >
               <RefreshCw className="size-3.5" />
             </button>

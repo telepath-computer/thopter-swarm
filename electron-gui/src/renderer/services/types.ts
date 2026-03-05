@@ -106,7 +106,6 @@ export interface NtfyNotification {
 export type Unsubscribe = () => void;
 
 export interface ClaudeReadyStatus {
-  tmux: boolean;
   claude: boolean;
 }
 
