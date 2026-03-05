@@ -142,18 +142,15 @@ html, body {
   right: 0;
   bottom: 0;
   display: block;
-  padding: 4px;
+  padding: 0;
 }
 
-/* Border between panes in a split layout.
-   Padding is reduced from 4px to 1px so that the total overhead
-   (padding + border = 4px per pane) stays under one character cell.
-   This ensures xterm's computed cols match tmux's pane allocation. */
 .terminal-wrapper.split-pane {
-  border: 1px solid #45475a;
-  padding: 1px;
+  outline: 1px solid #45475a;
+  outline-offset: -1px;
+  padding: 0;
 }
 
 .terminal-wrapper.split-pane.active-pane {
-  border-color: #89b4fa;
+  outline-color: #89b4fa;
 }

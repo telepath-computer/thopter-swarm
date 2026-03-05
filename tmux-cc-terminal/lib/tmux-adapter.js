@@ -8,12 +8,12 @@ const { SSHSession } = require('./ssh-session');
  * with pane geometry and state data.
  *
  * This encapsulates the orchestration logic that was originally in main.js:
- * - On `connected`: queries listPanes() + capturePaneState() for every pane
+ * - On `connected`: queries listPanes() for every pane
  * - On `layout-change`: queries listPanes() to get geometry data
  * - On `window-add`: queries listWindows() to get the pane ID
  *
  * Events emitted match the shape the renderer expects:
- *   'connected'            (allPanes[], connInfo)
+ *   'connected'            (allPanes[], connInfo, bootstrapByPane)
  *   'output'               (paneId, data)
  *   'window-add'           ({ windowId, paneId, name })
  *   'window-close'         (windowId)
@@ -86,10 +86,25 @@ class TmuxAdapter extends EventEmitter {
       }
     });
 
-    // Enriched events: connected → full pane state for all windows
+    const withTimeout = async (promise, timeoutMs, fallbackValue) => {
+      let timer = null;
+      try {
+        return await Promise.race([
+          promise,
+          new Promise((resolve) => {
+            timer = setTimeout(() => resolve(fallbackValue), timeoutMs);
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
+
+    // Enriched events: connected → pane list + best-effort bootstrap state
     session.on('connected', async (windows, connInfo) => {
       const allPanes = [];
       const windowPaneLists = new Map();
+      const bootstrapByPane = new Map();
 
       for (const win of windows) {
         let paneList;
@@ -102,35 +117,33 @@ class TmuxAdapter extends EventEmitter {
         windowPaneLists.set(win.windowId, paneList);
 
         for (const pl of paneList) {
-          let paneState = null;
-          let pendingOutput = '';
-          try {
-            paneState = await session.capturePaneState(pl.paneId, 500);
-          } catch (e) {
-            console.error('capture-pane-state error:', e.message);
-          }
-          try {
-            pendingOutput = await session.capturePendingOutput(pl.paneId);
-          } catch (e) {
-            console.error('capture-pending-output error:', e.message);
-          }
           allPanes.push({
             windowId: win.windowId,
             paneId: pl.paneId,
             name: win.name,
-            paneState,
-            pendingOutput,
           });
         }
       }
 
-      this.emit('connected', allPanes, connInfo);
+      await Promise.all(
+        allPanes.map(async (pane) => {
+          const bootstrap = await withTimeout(
+            session.capturePaneBootstrap(pane.paneId, { scrollbackLines: 2000 }),
+            1800,
+            null
+          );
+          if (bootstrap) {
+            bootstrapByPane.set(pane.paneId, bootstrap);
+          }
+        })
+      );
 
-      // Send layout for windows with multiple panes
+      this.emit('connected', allPanes, connInfo, Object.fromEntries(bootstrapByPane));
+
+      // Send layout for all windows so renderer gets authoritative pane geometry
+      // immediately (including single-pane windows).
       for (const [windowId, paneList] of windowPaneLists) {
-        if (paneList.length > 1) {
-          this.emit('layout-change', windowId, paneList);
-        }
+        this.emit('layout-change', windowId, paneList);
       }
     });
 
@@ -182,6 +195,24 @@ class TmuxAdapter extends EventEmitter {
   async killPane(paneId) {
     if (this._session && this._session.connected) {
       return this._session.killPane(paneId);
+    }
+  }
+
+  async resizePane(paneId, direction, amount) {
+    if (this._session && this._session.connected) {
+      return this._session.resizePane(paneId, direction, amount);
+    }
+  }
+
+  async togglePaneZoom(paneId) {
+    if (this._session && this._session.connected) {
+      return this._session.togglePaneZoom(paneId);
+    }
+  }
+
+  async selectPaneDirection(paneId, direction) {
+    if (this._session && this._session.connected) {
+      return this._session.selectPaneDirection(paneId, direction);
     }
   }
 

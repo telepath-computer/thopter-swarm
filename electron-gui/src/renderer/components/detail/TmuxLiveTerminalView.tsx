@@ -371,14 +371,15 @@ function getTmuxCCStyles(): string {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
       display: block;
-      padding: 4px;
+      padding: 0;
     }
     .terminal-wrapper.split-pane {
-      border: 1px solid #30363d;
-      padding: 1px;
+      outline: 1px solid #30363d;
+      outline-offset: -1px;
+      padding: 0;
     }
     .terminal-wrapper.split-pane.active-pane {
-      border-color: #58a6ff;
+      outline-color: #58a6ff;
     }
   `
 }

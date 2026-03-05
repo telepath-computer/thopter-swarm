@@ -329,40 +329,43 @@ class SSHSession extends EventEmitter {
 
     let scrollback = '';
     let screen = '';
+    let altScreen = '';
 
-    if (alternateOn) {
-      // In alternate screen (vim, less, etc.): capture only the visible screen.
-      // No scrollback in alternate mode.
-      const screenLines = await this.sendCommand(
-        `capture-pane -pe -t ${paneId}`
-      );
-      screen = screenLines.join('\r\n');
-    } else {
-      // Normal mode: capture scrollback (above visible area) + visible screen separately.
-      // In tmux, line 0 is the first visible line; line -1 is the most recent
-      // scrollback line (just above the visible area).  So -S -N -E -1
-      // captures the last N lines of scrollback without overlapping the
-      // visible screen (which is captured separately below).
-      if (scrollbackLines > 0) {
-        try {
-          const sbLines = await this.sendCommand(
-            `capture-pane -pe -t ${paneId} -S -${scrollbackLines} -E -1`
-          );
-          scrollback = sbLines.join('\r\n');
-        } catch (_e) {
-          // No scrollback available (e.g. fresh pane)
-        }
+    // iTerm-like bootstrap: always try to capture normal history, alternate
+    // history, and the visible screen. tmux tolerates missing parts.
+    if (scrollbackLines > 0) {
+      try {
+        const sbLines = await this.sendCommand(
+          `capture-pane -peq -t ${paneId} -S -${scrollbackLines} -E -1`
+        );
+        scrollback = sbLines.join('\r\n');
+      } catch (_e) {
+        // No normal scrollback available.
       }
+    }
 
-      // Visible screen
+    try {
       const screenLines = await this.sendCommand(
-        `capture-pane -pe -t ${paneId}`
+        `capture-pane -peq -t ${paneId}`
       );
       screen = screenLines.join('\r\n');
+    } catch (_e) {
+      // If this fails we'll still return metadata so the caller can continue.
+    }
+
+    if (scrollbackLines > 0) {
+      try {
+        const altLines = await this.sendCommand(
+          `capture-pane -peq -a -t ${paneId} -S -${scrollbackLines}`
+        );
+        altScreen = altLines.join('\r\n');
+      } catch (_e) {
+        // Alternate screen history unsupported or empty.
+      }
     }
 
     return {
-      scrollback, screen, alternateOn, cursorX, cursorY,
+      scrollback, screen, altScreen, alternateOn, cursorX, cursorY,
       cursorVisible, scrollRegionUpper, scrollRegionLower,
       keypadCursorFlag, keypadFlag,
       mouseAnyFlag, mouseButtonFlag, mouseStandardFlag, mouseSgrFlag,
@@ -390,13 +393,38 @@ class SSHSession extends EventEmitter {
   }
 
   /**
+   * Capture a best-effort bootstrap snapshot for a pane.
+   * Returns null on failure.
+   *
+   * @param {string} paneId
+   * @param {Object} [opts]
+   * @param {number} [opts.scrollbackLines=2000]
+   * @returns {Promise<Object|null>}
+   */
+  async capturePaneBootstrap(paneId, opts = {}) {
+    const scrollbackLines = Number.isFinite(opts.scrollbackLines)
+      ? Math.max(0, Math.floor(opts.scrollbackLines))
+      : 2000;
+    try {
+      const state = await this.capturePaneState(paneId, scrollbackLines);
+      const pendingOutput = await this.capturePendingOutput(paneId);
+      return {
+        ...state,
+        pendingOutput,
+      };
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  /**
    * List panes in a window with their geometry.
    * @param {string} windowId
-   * @returns {Promise<Array<{paneId: string, active: boolean, left: number, top: number, width: number, height: number}>>}
+   * @returns {Promise<Array<{paneId: string, active: boolean, left: number, top: number, width: number, height: number, zoomed: boolean}>>}
    */
   async listPanes(windowId) {
     const lines = await this.sendCommand(
-      `list-panes -t ${windowId} -F '#{pane_id} #{pane_active} #{pane_left} #{pane_top} #{pane_width} #{pane_height}'`
+      `list-panes -t ${windowId} -F '#{pane_id} #{pane_active} #{pane_left} #{pane_top} #{pane_width} #{pane_height} #{window_zoomed_flag}'`
     );
     return lines
       .filter((l) => l.trim())
@@ -409,6 +437,7 @@ class SSHSession extends EventEmitter {
           top: parseInt(p[3], 10),
           width: parseInt(p[4], 10),
           height: parseInt(p[5], 10),
+          zoomed: p[6] === '1',
         };
       });
   }
@@ -437,6 +466,34 @@ class SSHSession extends EventEmitter {
    */
   async killPane(paneId) {
     return this.sendCommand(`kill-pane -t ${paneId}`);
+  }
+
+  /**
+   * Resize a pane in a direction by N cells.
+   * @param {string} paneId
+   * @param {'L'|'R'|'U'|'D'} direction
+   * @param {number} amount
+   */
+  async resizePane(paneId, direction, amount = 1) {
+    const n = Math.max(1, Math.floor(amount));
+    return this.sendCommand(`resize-pane -t ${paneId} -${direction} ${n}`);
+  }
+
+  /**
+   * Toggle zoom for a pane.
+   * @param {string} paneId
+   */
+  async togglePaneZoom(paneId) {
+    return this.sendCommand(`resize-pane -Z -t ${paneId}`);
+  }
+
+  /**
+   * Move pane focus in a direction, anchored from the current pane.
+   * @param {string} paneId
+   * @param {'L'|'R'|'U'|'D'} direction
+   */
+  async selectPaneDirection(paneId, direction) {
+    return this.sendCommand(`select-pane -t ${paneId} -${direction}`);
   }
 
   /**

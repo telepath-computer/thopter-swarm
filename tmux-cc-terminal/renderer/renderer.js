@@ -34,6 +34,9 @@ function createTmuxTerminal(container, adapter, options = {}) {
   let activeWindowId = null;
   let _suppressResize = false;
   const _pendingOutputBuffer = new Map();
+  const _liveOutputDuringHydration = new Map();
+  const _hydratingPanes = new Set();
+  const _splitters = [];
 
   // Create internal DOM structure
   const tabBar = document.createElement('div');
@@ -88,8 +91,32 @@ function createTmuxTerminal(container, adapter, options = {}) {
 
   let _lastClientCols = 0;
   let _lastClientRows = 0;
+  let _resizeInFlight = false;
+  let _queuedResize = null;
 
-  function sendClientSize() {
+  function dispatchClientResize(cols, rows) {
+    const run = () => {
+      _resizeInFlight = true;
+      Promise.resolve(adapter.resize(cols, rows))
+        .catch(() => { /* ignore transient resize errors */ })
+        .finally(() => {
+          _resizeInFlight = false;
+          if (_queuedResize) {
+            const next = _queuedResize;
+            _queuedResize = null;
+            dispatchClientResize(next.cols, next.rows);
+          }
+        });
+    };
+
+    if (_resizeInFlight) {
+      _queuedResize = { cols, rows };
+      return;
+    }
+    run();
+  }
+
+  function sendClientSize(force = false) {
     if (!activeWindowId) return;
     const tab = tabs.get(activeWindowId);
     if (!tab) return;
@@ -101,31 +128,18 @@ function createTmuxTerminal(container, adapter, options = {}) {
       if (!pane) return;
       cols = pane.term.cols;
       rows = pane.term.rows;
-    } else if (tab.paneLayout && tab.paneLayout.length >= 2) {
+    } else if (tab.paneLayout && tab.paneLayout.length > 0) {
       const pl = tab.paneLayout;
-      const withTerms = pl.map((p) => ({ ...p, pane: panes.get(p.paneId) }))
-        .filter((p) => p.pane);
-
-      if (withTerms.length < 2) return;
-
-      const allSameTop = withTerms.every((p) => p.top === withTerms[0].top);
-      const allSameLeft = withTerms.every((p) => p.left === withTerms[0].left);
-
-      if (allSameTop) {
-        const sorted = withTerms.sort((a, b) => a.left - b.left);
-        cols = sorted.reduce((sum, p) => sum + p.pane.term.cols, 0)
-          + (sorted.length - 1);
-        rows = Math.max(...sorted.map((p) => p.pane.term.rows));
-      } else if (allSameLeft) {
-        const sorted = withTerms.sort((a, b) => a.top - b.top);
-        cols = Math.max(...sorted.map((p) => p.pane.term.cols));
-        rows = sorted.reduce((sum, p) => sum + p.pane.term.rows, 0)
-          + (sorted.length - 1);
+      if (pl.some((p) => p.zoomed)) {
+        const active = pl.find((p) => p.active) || pl[0];
+        cols = active.width;
+        rows = active.height;
       } else {
-        let maxRight = 0, maxBottom = 0;
-        for (const p of withTerms) {
-          maxRight = Math.max(maxRight, p.left + p.pane.term.cols);
-          maxBottom = Math.max(maxBottom, p.top + p.pane.term.rows);
+        let maxRight = 0;
+        let maxBottom = 0;
+        for (const p of pl) {
+          maxRight = Math.max(maxRight, p.left + p.width);
+          maxBottom = Math.max(maxBottom, p.top + p.height);
         }
         cols = maxRight;
         rows = maxBottom;
@@ -134,10 +148,95 @@ function createTmuxTerminal(container, adapter, options = {}) {
       return;
     }
 
-    if (cols > 0 && rows > 0 && (cols !== _lastClientCols || rows !== _lastClientRows)) {
+    if (cols > 0 && rows > 0 && (force || cols !== _lastClientCols || rows !== _lastClientRows)) {
       _lastClientCols = cols;
       _lastClientRows = rows;
-      adapter.resize(cols, rows);
+      dispatchClientResize(cols, rows);
+    }
+  }
+
+  function isPaneVisible(pane) {
+    if (!pane || !pane.wrapper) return false;
+    return pane.wrapper.style.display !== 'none';
+  }
+
+  function writeTerm(term, data) {
+    return new Promise((resolve) => term.write(data, resolve));
+  }
+
+  async function restorePaneBootstrap(paneId, bootstrap) {
+    if (!bootstrap) return;
+    const pane = panes.get(paneId);
+    if (!pane) return;
+    const term = pane.term;
+
+    term.reset();
+
+    const scrollback = bootstrap.scrollback || '';
+    const screen = bootstrap.screen || '';
+    const altScreen = bootstrap.altScreen || '';
+    const pendingOutput = bootstrap.pendingOutput || '';
+
+    if (bootstrap.alternateOn) {
+      // Enter alt-screen first to keep full-screen TUIs in the right buffer.
+      await writeTerm(term, '\x1b[?1049h');
+      const altPayload = altScreen || screen;
+      if (altPayload) {
+        await writeTerm(term, altPayload);
+      }
+    } else {
+      if (scrollback) {
+        await writeTerm(term, scrollback + '\r\n');
+      }
+      if (screen) {
+        await writeTerm(term, screen);
+      }
+    }
+
+    let modes = '';
+
+    // Wrap mode (DECAWM)
+    modes += bootstrap.wrapFlag ? '\x1b[?7h' : '\x1b[?7l';
+    // Insert mode (IRM)
+    modes += bootstrap.insertFlag ? '\x1b[4h' : '\x1b[4l';
+    // Cursor visibility (DECTCEM)
+    modes += bootstrap.cursorVisible ? '\x1b[?25h' : '\x1b[?25l';
+    // Cursor keys mode (DECCKM)
+    modes += bootstrap.keypadCursorFlag ? '\x1b[?1h' : '\x1b[?1l';
+    // Keypad application mode
+    modes += bootstrap.keypadFlag ? '\x1b=' : '\x1b>';
+
+    // Mouse modes
+    if (bootstrap.mouseAnyFlag) {
+      modes += '\x1b[?1003h';
+    } else if (bootstrap.mouseButtonFlag) {
+      modes += '\x1b[?1002h';
+    } else if (bootstrap.mouseStandardFlag) {
+      modes += '\x1b[?1000h';
+    } else {
+      modes += '\x1b[?1000l\x1b[?1002l\x1b[?1003l';
+    }
+    modes += bootstrap.mouseSgrFlag ? '\x1b[?1006h' : '\x1b[?1006l';
+
+    // Scroll region
+    const top = Number.isFinite(bootstrap.scrollRegionUpper) ? bootstrap.scrollRegionUpper + 1 : 1;
+    const bottom = Number.isFinite(bootstrap.scrollRegionLower) ? bootstrap.scrollRegionLower + 1 : pane.term.rows;
+    if (bottom > top) {
+      modes += `\x1b[${top};${bottom}r`;
+    } else {
+      modes += '\x1b[r';
+    }
+
+    // Cursor position (1-based in ANSI)
+    const cx = Math.max(1, (bootstrap.cursorX || 0) + 1);
+    const cy = Math.max(1, (bootstrap.cursorY || 0) + 1);
+    modes += `\x1b[${cy};${cx}H`;
+
+    if (modes) {
+      await writeTerm(term, modes);
+    }
+    if (pendingOutput) {
+      await writeTerm(term, pendingOutput);
     }
   }
 
@@ -197,7 +296,7 @@ function createTmuxTerminal(container, adapter, options = {}) {
 
     panes.set(paneId, { term, fitAddon, windowId, wrapper });
 
-    if (_pendingOutputBuffer.has(paneId)) {
+    if (_pendingOutputBuffer.has(paneId) && !_hydratingPanes.has(paneId)) {
       const buffered = _pendingOutputBuffer.get(paneId);
       for (const data of buffered) {
         term.write(data);
@@ -296,7 +395,7 @@ function createTmuxTerminal(container, adapter, options = {}) {
       setTimeout(() => {
         for (const pid of tab.paneIds) {
           const pane = panes.get(pid);
-          if (pane) pane.fitAddon.fit();
+          if (isPaneVisible(pane)) pane.fitAddon.fit();
         }
         sendClientSize();
         const activePane = panes.get(tab.activePaneId);
@@ -358,6 +457,210 @@ function createTmuxTerminal(container, adapter, options = {}) {
     }
   }
 
+  function clearSplitters() {
+    while (_splitters.length > 0) {
+      const el = _splitters.pop();
+      el.remove();
+    }
+  }
+
+  function createSplitters(windowId, paneList, totalW, totalH) {
+    clearSplitters();
+
+    if (windowId !== activeWindowId || paneList.length <= 1 || paneList.some((p) => p.zoomed)) return;
+
+    const containerRect = terminalContainer.getBoundingClientRect();
+    const cellW = containerRect.width / Math.max(1, totalW);
+    const cellH = containerRect.height / Math.max(1, totalH);
+    const seen = new Set();
+
+    const makeSplitter = (style, cursor, onStart) => {
+      const splitter = document.createElement('div');
+      splitter.style.position = 'absolute';
+      splitter.style.zIndex = '30';
+      splitter.style.background = 'rgba(88, 166, 255, 0.12)';
+      splitter.style.pointerEvents = 'auto';
+      splitter.style.cursor = cursor;
+      Object.assign(splitter.style, style);
+      splitter.addEventListener('pointerdown', onStart);
+      terminalContainer.appendChild(splitter);
+      _splitters.push(splitter);
+    };
+
+    const overlapRange = (aStart, aEnd, bStart, bEnd) => ({
+      start: Math.max(aStart, bStart),
+      end: Math.min(aEnd, bEnd),
+    });
+
+    for (let i = 0; i < paneList.length; i++) {
+      for (let j = i + 1; j < paneList.length; j++) {
+        const a = paneList[i];
+        const b = paneList[j];
+
+        const aRight = a.left + a.width;
+        const bRight = b.left + b.width;
+        const aBottom = a.top + a.height;
+        const bBottom = b.top + b.height;
+
+        // Vertical boundary (left/right panes)
+        let leftPane = null;
+        let rightPane = null;
+        let gutterStartX = null;
+        let gutterWidthX = null;
+        if (Math.abs(aRight - b.left) <= 1) {
+          leftPane = a;
+          rightPane = b;
+          gutterStartX = Math.min(aRight, b.left);
+          gutterWidthX = Math.max(1, Math.abs(b.left - aRight));
+        } else if (Math.abs(bRight - a.left) <= 1) {
+          leftPane = b;
+          rightPane = a;
+          gutterStartX = Math.min(bRight, a.left);
+          gutterWidthX = Math.max(1, Math.abs(a.left - bRight));
+        }
+
+        if (leftPane && rightPane && gutterStartX !== null && gutterWidthX !== null) {
+          const ov = overlapRange(
+            leftPane.top,
+            leftPane.top + leftPane.height,
+            rightPane.top,
+            rightPane.top + rightPane.height,
+          );
+          if (ov.end - ov.start > 0) {
+            const key = `v:${gutterStartX}:${gutterWidthX}:${ov.start}:${ov.end}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              makeSplitter(
+                {
+                  left: `${(gutterStartX / totalW) * 100}%`,
+                  top: `${(ov.start / totalH) * 100}%`,
+                  width: `${(gutterWidthX / totalW) * 100}%`,
+                  height: `${((ov.end - ov.start) / totalH) * 100}%`,
+                },
+                'col-resize',
+                (e) => {
+                  e.preventDefault();
+                  const startX = e.clientX;
+                  let requested = 0;
+                  let applied = 0;
+                  let pumping = false;
+
+                  const pump = async () => {
+                    if (pumping) return;
+                    pumping = true;
+                    try {
+                      while (true) {
+                        const delta = requested - applied;
+                        if (delta === 0) break;
+                        if (delta > 0) {
+                          if (adapter.resizePane) await adapter.resizePane(leftPane.paneId, 'R', delta);
+                        } else {
+                          if (adapter.resizePane) await adapter.resizePane(leftPane.paneId, 'L', -delta);
+                        }
+                        applied += delta;
+                      }
+                    } finally {
+                      pumping = false;
+                    }
+                  };
+
+                  const onMove = (ev) => {
+                    requested = Math.trunc((ev.clientX - startX) / Math.max(1, cellW));
+                    void pump();
+                  };
+                  const onUp = () => {
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                  };
+                  window.addEventListener('pointermove', onMove);
+                  window.addEventListener('pointerup', onUp);
+                },
+              );
+            }
+          }
+        }
+
+        // Horizontal boundary (top/bottom panes)
+        let topPane = null;
+        let bottomPane = null;
+        let gutterStartY = null;
+        let gutterHeightY = null;
+        if (Math.abs(aBottom - b.top) <= 1) {
+          topPane = a;
+          bottomPane = b;
+          gutterStartY = Math.min(aBottom, b.top);
+          gutterHeightY = Math.max(1, Math.abs(b.top - aBottom));
+        } else if (Math.abs(bBottom - a.top) <= 1) {
+          topPane = b;
+          bottomPane = a;
+          gutterStartY = Math.min(bBottom, a.top);
+          gutterHeightY = Math.max(1, Math.abs(a.top - bBottom));
+        }
+
+        if (topPane && bottomPane && gutterStartY !== null && gutterHeightY !== null) {
+          const ov = overlapRange(
+            topPane.left,
+            topPane.left + topPane.width,
+            bottomPane.left,
+            bottomPane.left + bottomPane.width,
+          );
+          if (ov.end - ov.start > 0) {
+            const key = `h:${gutterStartY}:${gutterHeightY}:${ov.start}:${ov.end}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              makeSplitter(
+                {
+                  left: `${(ov.start / totalW) * 100}%`,
+                  top: `${(gutterStartY / totalH) * 100}%`,
+                  width: `${((ov.end - ov.start) / totalW) * 100}%`,
+                  height: `${(gutterHeightY / totalH) * 100}%`,
+                },
+                'row-resize',
+                (e) => {
+                  e.preventDefault();
+                  const startY = e.clientY;
+                  let requested = 0;
+                  let applied = 0;
+                  let pumping = false;
+
+                  const pump = async () => {
+                    if (pumping) return;
+                    pumping = true;
+                    try {
+                      while (true) {
+                        const delta = requested - applied;
+                        if (delta === 0) break;
+                        if (delta > 0) {
+                          if (adapter.resizePane) await adapter.resizePane(topPane.paneId, 'D', delta);
+                        } else {
+                          if (adapter.resizePane) await adapter.resizePane(topPane.paneId, 'U', -delta);
+                        }
+                        applied += delta;
+                      }
+                    } finally {
+                      pumping = false;
+                    }
+                  };
+
+                  const onMove = (ev) => {
+                    requested = Math.trunc((ev.clientY - startY) / Math.max(1, cellH));
+                    void pump();
+                  };
+                  const onUp = () => {
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                  };
+                  window.addEventListener('pointermove', onMove);
+                  window.addEventListener('pointerup', onUp);
+                },
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
   function clearAll() {
     for (const [, pane] of panes) {
       pane.term.dispose();
@@ -365,6 +668,8 @@ function createTmuxTerminal(container, adapter, options = {}) {
     }
     panes.clear();
     _pendingOutputBuffer.clear();
+    _liveOutputDuringHydration.clear();
+    _hydratingPanes.clear();
 
     for (const [, tab] of tabs) {
       tab.tabEl.remove();
@@ -383,14 +688,62 @@ function createTmuxTerminal(container, adapter, options = {}) {
     _suppressResize = true;
 
     try {
+      if (paneList.some((p) => p.zoomed)) {
+        clearSplitters();
+        const activePl = paneList.find((pl) => pl.active) || paneList[0];
+        if (activePl) tab.activePaneId = activePl.paneId;
+
+        for (const pid of tab.paneIds) {
+          const p = panes.get(pid);
+          if (!p) continue;
+          if (pid === tab.activePaneId) {
+            p.wrapper.style.position = 'absolute';
+            p.wrapper.style.left = '0';
+            p.wrapper.style.top = '0';
+            p.wrapper.style.width = '100%';
+            p.wrapper.style.height = '100%';
+            p.wrapper.style.right = 'auto';
+            p.wrapper.style.bottom = 'auto';
+            p.wrapper.style.display = 'block';
+            p.wrapper.classList.remove('split-pane', 'active-pane');
+            if (isVisible) {
+              if (Number.isFinite(activePl.width) && Number.isFinite(activePl.height) && activePl.width > 0 && activePl.height > 0) {
+                p.term.resize(activePl.width, activePl.height);
+              } else {
+                p.fitAddon.fit();
+              }
+            }
+          } else {
+            p.wrapper.style.display = 'none';
+            p.wrapper.classList.remove('active-pane');
+          }
+        }
+        return;
+      }
+
       if (paneList.length <= 1) {
+        clearSplitters();
+        const onlyPaneId = paneList[0] ? paneList[0].paneId : tab.paneIds[0];
         for (const pid of tab.paneIds) {
           const p = panes.get(pid);
           if (p) {
-            p.wrapper.style.cssText = '';
-            p.wrapper.classList.add('active');
-            p.wrapper.classList.remove('split-pane', 'active-pane');
-            if (isVisible) p.fitAddon.fit();
+            if (pid === onlyPaneId) {
+              p.wrapper.style.cssText = '';
+              p.wrapper.style.display = 'block';
+              p.wrapper.classList.add('active');
+              p.wrapper.classList.remove('split-pane', 'active-pane');
+              if (isVisible) {
+                const only = paneList[0];
+                if (only && Number.isFinite(only.width) && Number.isFinite(only.height) && only.width > 0 && only.height > 0) {
+                  p.term.resize(only.width, only.height);
+                } else {
+                  p.fitAddon.fit();
+                }
+              }
+            } else {
+              p.wrapper.style.display = 'none';
+              p.wrapper.classList.remove('active-pane');
+            }
           }
         }
         return;
@@ -405,6 +758,7 @@ function createTmuxTerminal(container, adapter, options = {}) {
 
       const totalW = maxRight || 1;
       const totalH = maxBottom || 1;
+      createSplitters(windowId, paneList, totalW, totalH);
 
       for (const pl of paneList) {
         const pane = panes.get(pl.paneId);
@@ -431,48 +785,17 @@ function createTmuxTerminal(container, adapter, options = {}) {
           pane.wrapper.classList.remove('active-pane');
         }
 
-        if (isVisible) pane.fitAddon.fit();
+        if (isVisible) {
+          if (Number.isFinite(pl.width) && Number.isFinite(pl.height) && pl.width > 0 && pl.height > 0) {
+            pane.term.resize(pl.width, pl.height);
+          } else {
+            pane.fitAddon.fit();
+          }
+        }
       }
     } finally {
       _suppressResize = false;
     }
-  }
-
-  function buildModeRestoreSequence(paneState) {
-    let seq = '';
-    if (!paneState.cursorVisible) {
-      seq += '\x1b[?25l';
-    }
-    const regionLower = paneState.scrollRegionLower;
-    const paneHeight = paneState.paneHeight;
-    if (paneState.scrollRegionUpper > 0 || (regionLower > 0 && regionLower < paneHeight - 1)) {
-      seq += `\x1b[${paneState.scrollRegionUpper + 1};${regionLower + 1}r`;
-    }
-    if (paneState.keypadCursorFlag) {
-      seq += '\x1b[?1h';
-    }
-    if (paneState.keypadFlag) {
-      seq += '\x1b=';
-    }
-    if (paneState.mouseStandardFlag) {
-      seq += '\x1b[?1000h';
-    }
-    if (paneState.mouseButtonFlag) {
-      seq += '\x1b[?1002h';
-    }
-    if (paneState.mouseAnyFlag) {
-      seq += '\x1b[?1003h';
-    }
-    if (paneState.mouseSgrFlag) {
-      seq += '\x1b[?1006h';
-    }
-    if (paneState.wrapFlag === false) {
-      seq += '\x1b[?7l';
-    }
-    if (paneState.insertFlag) {
-      seq += '\x1b[4h';
-    }
-    return seq;
   }
 
   // ── ResizeObserver ──
@@ -481,9 +804,12 @@ function createTmuxTerminal(container, adapter, options = {}) {
     if (activeWindowId) {
       const tab = tabs.get(activeWindowId);
       if (tab) {
-        for (const pid of tab.paneIds) {
-          const pane = panes.get(pid);
-          if (pane) pane.fitAddon.fit();
+        const hasSplitLayout = !!(tab.paneLayout && tab.paneLayout.length > 1);
+        if (!hasSplitLayout) {
+          for (const pid of tab.paneIds) {
+            const pane = panes.get(pid);
+            if (isPaneVisible(pane)) pane.fitAddon.fit();
+          }
         }
       }
     }
@@ -491,12 +817,39 @@ function createTmuxTerminal(container, adapter, options = {}) {
   });
   resizeObserver.observe(terminalContainer);
 
+  const onGlobalKeyDown = (e) => {
+    if (!(e.metaKey && e.ctrlKey)) return;
+
+    const active = document.activeElement;
+    if (!active || !container.contains(active)) return;
+    if (!activeWindowId) return;
+    const tab = tabs.get(activeWindowId);
+    if (!tab || !tab.activePaneId) return;
+
+    const key = String(e.key || '').toLowerCase();
+    if (key === 'enter' || key === 'return' || key === 'numpadenter') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (adapter.togglePaneZoom) adapter.togglePaneZoom(tab.activePaneId);
+      return;
+    }
+
+    const dirMap = { h: 'L', j: 'D', k: 'U', l: 'R' };
+    const dir = dirMap[key];
+    if (dir) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (adapter.selectPaneDirection) adapter.selectPaneDirection(tab.activePaneId, dir);
+    }
+  };
+  window.addEventListener('keydown', onGlobalKeyDown, true);
+
   // ── Event Handlers (adapter uses EventEmitter .on()) ──
 
   let _layoutChangeCounter = 0;
   let _layoutCounting = false;
 
-  adapter.on('connected', (windows, connInfo) => {
+  adapter.on('connected', async (windows, connInfo, bootstrapByPane = {}) => {
     clearAll();
     const target = connInfo
       ? `${connInfo.target} [${connInfo.session}]`
@@ -507,52 +860,44 @@ function createTmuxTerminal(container, adapter, options = {}) {
     connectBtn.style.display = 'none';
     detachBtn.style.display = '';
 
+    _hydratingPanes.clear();
     for (const win of windows) {
-      const { term } = createTerminalPane(win.paneId, win.windowId, win.name);
+      if (bootstrapByPane && bootstrapByPane[win.paneId]) {
+        _hydratingPanes.add(win.paneId);
+      }
+    }
 
-      if (win.paneState) {
-        const {
-          scrollback, screen, alternateOn, cursorX, cursorY,
-        } = win.paneState;
+    for (const win of windows) {
+      createTerminalPane(win.paneId, win.windowId, win.name);
+    }
 
-        if (alternateOn) {
-          const lines = screen.split('\r\n');
-          let cmd = '\x1b[?1049h';
-          const rowsToWrite = Math.min(lines.length, term.rows);
-          for (let i = 0; i < rowsToWrite; i++) {
-            cmd += `\x1b[${i + 1};1H${lines[i]}`;
-          }
-          cmd += `\x1b[${cursorY + 1};${cursorX + 1}H`;
-          cmd += buildModeRestoreSequence(win.paneState);
-          term.write(cmd);
-        } else {
-          const screenLines = screen.split('\r\n');
-          while (screenLines.length > cursorY + 1 && screenLines[screenLines.length - 1].trim() === '') {
-            screenLines.pop();
-          }
-
-          let data = '';
-          if (scrollback) {
-            data += scrollback + '\r\n';
-          }
-          data += screenLines.join('\r\n');
-          term.write(data);
-
-          const scrollbackLineCount = scrollback ? scrollback.split('\r\n').length : 0;
-          const totalLines = scrollbackLineCount + screenLines.length;
-          const paneRows = win.paneState.paneHeight || term.rows;
-          const baseY = Math.max(0, totalLines - paneRows);
-          const cursorViewportY = (scrollbackLineCount + cursorY) - baseY;
-          term.write(`\x1b[${cursorViewportY + 1};${cursorX + 1}H`);
-
-          term.write(buildModeRestoreSequence(win.paneState));
+    for (const win of windows) {
+      const bootstrap = bootstrapByPane ? bootstrapByPane[win.paneId] : null;
+      if (bootstrap) {
+        try {
+          await restorePaneBootstrap(win.paneId, bootstrap);
+        } catch (_e) {
+          // Keep going; live output continues to function even if hydration fails.
         }
+      }
+      _hydratingPanes.delete(win.paneId);
 
-        if (win.pendingOutput) {
-          term.write(win.pendingOutput);
+      if (_pendingOutputBuffer.has(win.paneId)) {
+        const buffered = _pendingOutputBuffer.get(win.paneId);
+        const pane = panes.get(win.paneId);
+        if (pane) {
+          for (const data of buffered) pane.term.write(data);
         }
+        _pendingOutputBuffer.delete(win.paneId);
+      }
 
-        continue;
+      if (_liveOutputDuringHydration.has(win.paneId)) {
+        const buffered = _liveOutputDuringHydration.get(win.paneId);
+        const pane = panes.get(win.paneId);
+        if (pane) {
+          for (const data of buffered) pane.term.write(data);
+        }
+        _liveOutputDuringHydration.delete(win.paneId);
       }
     }
 
@@ -560,10 +905,17 @@ function createTmuxTerminal(container, adapter, options = {}) {
       activateTab(windows[0].windowId);
     }
 
-    setTimeout(() => sendClientSize(), 50);
+    setTimeout(() => sendClientSize(true), 50);
   });
 
   adapter.on('output', (paneId, data) => {
+    if (_hydratingPanes.has(paneId)) {
+      if (!_liveOutputDuringHydration.has(paneId)) {
+        _liveOutputDuringHydration.set(paneId, []);
+      }
+      _liveOutputDuringHydration.get(paneId).push(data);
+      return;
+    }
     const pane = panes.get(paneId);
     if (pane) {
       pane.term.write(data);
@@ -618,7 +970,7 @@ function createTmuxTerminal(container, adapter, options = {}) {
 
     tab.paneLayout = paneList;
     applyPaneLayout(windowId, paneList);
-    setTimeout(() => sendClientSize(), 20);
+    setTimeout(() => sendClientSize(true), 20);
   });
 
   adapter.on('window-pane-changed', (windowId, paneId) => {
@@ -667,7 +1019,9 @@ function createTmuxTerminal(container, adapter, options = {}) {
 
   const api = {
     destroy() {
+      window.removeEventListener('keydown', onGlobalKeyDown, true);
       resizeObserver.disconnect();
+      clearSplitters();
       clearAll();
       container.innerHTML = '';
     },
@@ -839,7 +1193,7 @@ if (typeof window !== 'undefined' && window.tmux) {
   };
 
   // Wire IPC events to adapter
-  tmux.onConnected((windows, connInfo) => ipcAdapter.emit('connected', windows, connInfo));
+  tmux.onConnected((windows, connInfo, bootstrapByPane) => ipcAdapter.emit('connected', windows, connInfo, bootstrapByPane));
   tmux.onOutput((paneId, data) => ipcAdapter.emit('output', paneId, data));
   tmux.onWindowAdd((win) => ipcAdapter.emit('window-add', win));
   tmux.onWindowClose((windowId) => ipcAdapter.emit('window-close', windowId));

@@ -145,9 +145,9 @@ async function connectToTmux() {
     }
   });
 
-  adapter.on('connected', (allPanes, connInfo) => {
+  adapter.on('connected', (allPanes, connInfo, bootstrapByPane) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('tmux:connected', allPanes, connInfo);
+      mainWindow.webContents.send('tmux:connected', allPanes, connInfo, bootstrapByPane);
     }
   });
 

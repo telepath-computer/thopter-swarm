@@ -20,8 +20,8 @@ contextBridge.exposeInMainWorld('tmux', {
     });
   },
   onConnected: (callback) => {
-    ipcRenderer.on('tmux:connected', (_event, windows, connInfo) => {
-      callback(windows, connInfo);
+    ipcRenderer.on('tmux:connected', (_event, windows, connInfo, bootstrapByPane) => {
+      callback(windows, connInfo, bootstrapByPane);
     });
   },
   onDisconnected: (callback) => {
