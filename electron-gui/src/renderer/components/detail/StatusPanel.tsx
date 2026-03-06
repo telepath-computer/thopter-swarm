@@ -80,6 +80,7 @@ function AutoSaveField({
         value={draft}
         placeholder={placeholder}
         onChange={onChange}
+        spellCheck={false}
         rows={1}
       />
     </div>
