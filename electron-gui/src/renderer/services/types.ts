@@ -19,7 +19,8 @@ export interface ThopterInfo {
   owner: string | null;
   id: string | null;
   status: ThopterStatus | null;
-  task: string | null;
+  statusLine: string | null;
+  notes: string | null;
   heartbeat: string | null; // ISO 8601
   alive: boolean;
   claudeRunning: boolean;
@@ -132,7 +133,8 @@ export interface ThopterService {
   destroyThopter(name: string): Promise<void>;
   suspendThopter(name: string): Promise<void>;
   resumeThopter(name: string): Promise<void>;
-  updateTask(name: string, task: string): Promise<void>;
+  updateStatusLine(name: string, statusLine: string): Promise<void>;
+  updateNotes(name: string, notes: string): Promise<void>;
   attachThopter(name: string): void;
   reauthPrepare(opts: ReauthPrepareOpts): Promise<ReauthPrepareResult>;
   reauthFinalize(devboxName: string, snapshotName: string): Promise<void>;

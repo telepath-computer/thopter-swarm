@@ -78,10 +78,10 @@ function createRedis(): Redis {
   });
 }
 
-const REDIS_FIELDS = ['id', 'owner', 'status', 'task', 'heartbeat', 'alive', 'claude_running', 'last_message'] as const;
+const REDIS_FIELDS = ['id', 'owner', 'status', 'statusline', 'notes', 'heartbeat', 'alive', 'claude_running', 'last_message'] as const;
 
 function parseRedisValues(name: string, values: (string | null)[]): ThopterInfo {
-  const [id, owner, status, task, heartbeat, alive, claudeRunning, lastMessage] = values;
+  const [id, owner, status, statusLine, notes, heartbeat, alive, claudeRunning, lastMessage] = values;
   const isAlive = alive === '1';
 
   // Infer devbox status from Redis data (Runloop API not available here).
@@ -102,7 +102,8 @@ function parseRedisValues(name: string, values: (string | null)[]): ThopterInfo 
     owner,
     id,
     status: (status as ThopterStatus) ?? null,
-    task,
+    statusLine,
+    notes,
     heartbeat,
     alive: isAlive,
     claudeRunning: claudeRunning === '1',
@@ -184,7 +185,7 @@ export class RealThopterService implements ThopterService {
     const output = await execThopter('status', '--json');
     const raw = JSON.parse(output) as Array<{
       name: string; owner: string; id: string; devboxStatus: string;
-      status: string | null; task: string | null; heartbeat: string | null;
+      status: string | null; statusLine: string | null; notes: string | null; heartbeat: string | null;
       alive: boolean; claudeRunning: boolean; lastMessage: string | null;
     }>;
 
@@ -193,7 +194,8 @@ export class RealThopterService implements ThopterService {
       owner: t.owner,
       id: t.id,
       status: (t.status as ThopterStatus) ?? null,
-      task: t.task,
+      statusLine: t.statusLine,
+      notes: t.notes ?? null,
       heartbeat: t.heartbeat,
       alive: t.alive,
       claudeRunning: t.claudeRunning,
@@ -481,13 +483,26 @@ export class RealThopterService implements ThopterService {
   }
 
   /**
-   * Update the task description in Redis (same key the devbox hook writes to).
+   * Update the status line in Redis (same key the devbox hook writes to).
    */
-  async updateTask(name: string, task: string): Promise<void> {
+  async updateStatusLine(name: string, statusLine: string): Promise<void> {
     const redis = createRedis();
     await redis.connect();
     try {
-      await redis.set(`thopter:${name}:task`, task, 'EX', 86400);
+      await redis.set(`thopter:${name}:statusline`, statusLine, 'EX', 86400);
+    } finally {
+      redis.disconnect();
+    }
+  }
+
+  /**
+   * Update notes in Redis (operator-only field, not set by agents).
+   */
+  async updateNotes(name: string, notes: string): Promise<void> {
+    const redis = createRedis();
+    await redis.connect();
+    try {
+      await redis.set(`thopter:${name}:notes`, notes, 'EX', 86400);
     } finally {
       redis.disconnect();
     }

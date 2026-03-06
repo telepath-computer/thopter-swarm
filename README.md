@@ -186,7 +186,7 @@ A desktop GUI for managing thopters, built with Electron + React. Dashboard view
 
 **This is highly experimental.** It works for day-to-day use but expect rough edges.
 
-- **Dashboard**: live overview of all thopters with status, task, and action buttons
+- **Dashboard**: live overview of all thopters with status, status line, and action buttons
 - **Transcript view**: streaming Claude conversation from Redis
 - **Screen view**: tmux screen capture with send-message form
 - **Live terminal**: interactive SSH session via xterm.js (persists across tab switches)

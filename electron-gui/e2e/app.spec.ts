@@ -164,22 +164,24 @@ test('detail view shows transcript entries', async () => {
 // --- Action bar tests ---
 
 test('action bar visible in transcript mode with tell input', async () => {
-  const textarea = page.locator('textarea')
-  if (!(await textarea.isVisible().catch(() => false))) {
+  // The tell textarea has data-slot="textarea" (from the Textarea UI component),
+  // distinguishing it from the status line / notes textareas in the status panel.
+  const tellTextarea = page.locator('textarea[data-slot="textarea"]')
+  if (!(await tellTextarea.isVisible().catch(() => false))) {
     await openDetailTranscript()
   }
 
-  await expect(textarea).toBeVisible()
-  await textarea.fill('test message')
-  await expect(textarea).toHaveValue('test message')
+  await expect(tellTextarea).toBeVisible()
+  await tellTextarea.fill('test message')
+  await expect(tellTextarea).toHaveValue('test message')
 })
 
 test('action bar hidden in SSH mode', async () => {
   await ensureDetailView()
   // Switch to SSH
   await page.locator('button', { hasText: 'SSH' }).click()
-  // Textarea should not be visible
-  await expect(page.locator('textarea')).not.toBeVisible()
+  // Tell textarea should not be visible (status panel textareas are still there)
+  await expect(page.locator('textarea[data-slot="textarea"]')).not.toBeVisible()
 })
 
 // --- Actions dropdown tests ---
@@ -292,8 +294,8 @@ test('run tab: can navigate through steps', async () => {
   // Should be on prompt step
   await expect(page.locator('label').filter({ hasText: 'Task Description' })).toBeVisible()
 
-  // Enter a prompt
-  await page.locator('textarea').fill('Test task for playwright')
+  // Enter a prompt (use data-slot to target the Textarea UI component, not status panel fields)
+  await page.locator('textarea[data-slot="textarea"]').fill('Test task for playwright')
 
   // Click Next
   await page.getByRole('button', { name: 'Next' }).click()
@@ -320,4 +322,153 @@ test('reauth tab opens and closes', async () => {
   const closeBtn = page.getByLabel(/Close Re-Authenticate tab/)
   await closeBtn.click()
   await expect(page.getByText('Choose a machine')).not.toBeVisible()
+})
+
+// --- Notes & status line tests ---
+
+test('detail view shows status line and notes fields', async () => {
+  await goToDashboard()
+  await page.locator('[data-slot="card"]').first().click()
+
+  // Both auto-save fields should be visible (use placeholder to find them)
+  const statusLineField = page.getByPlaceholder('No status line set')
+  const notesField = page.getByPlaceholder('Add notes...')
+
+  await expect(statusLineField).toBeVisible()
+  await expect(notesField).toBeVisible()
+})
+
+test('status line field is always editable (no click-to-edit)', async () => {
+  await ensureDetailView()
+
+  const statusLineField = page.getByPlaceholder('No status line set')
+  await expect(statusLineField).toBeVisible()
+
+  // Should be directly typeable without needing to click an edit button
+  await statusLineField.focus()
+  await expect(statusLineField).toBeFocused()
+})
+
+test('notes field is always editable and supports multiline', async () => {
+  await ensureDetailView()
+
+  const notesField = page.getByPlaceholder('Add notes...')
+  await expect(notesField).toBeVisible()
+
+  // Clear and type multiline content — Enter should insert a newline, not submit
+  await notesField.fill('')
+  await notesField.type('line one')
+  await notesField.press('Enter')
+  await notesField.type('line two')
+
+  const value = await notesField.inputValue()
+  expect(value).toContain('line one')
+  expect(value).toContain('line two')
+  expect(value).toContain('\n')
+})
+
+test('notes field handles empty/null state gracefully', async () => {
+  await goToDashboard()
+
+  // Close any open detail tabs first to avoid duplicate placeholders
+  const closeBtns = page.locator('[aria-label*="Close"][aria-label*="tab"]')
+  const closeCount = await closeBtns.count()
+  for (let i = closeCount - 1; i >= 0; i--) {
+    const label = await closeBtns.nth(i).getAttribute('aria-label')
+    if (label && !label.includes('Dashboard')) {
+      await closeBtns.nth(i).click()
+    }
+  }
+
+  // Open a thopter that has no notes (mock data: index 1+ have null notes)
+  const cards = page.locator('[data-slot="card"]')
+  const count = await cards.count()
+  if (count >= 2) {
+    await cards.nth(1).click()
+  } else {
+    await cards.first().click()
+  }
+
+  const notesField = page.getByPlaceholder('Add notes...')
+  await expect(notesField).toBeVisible()
+
+  // Should show placeholder, value should be empty
+  const value = await notesField.inputValue()
+  expect(value).toBe('')
+})
+
+test('notes shown on dashboard card when present', async () => {
+  await goToDashboard()
+
+  // The first mock thopter (eager-falcon) has notes set.
+  // Notes render in an italic <p> inside the card.
+  const notesP = page.locator('[data-slot="card"] p.italic')
+  const count = await notesP.count()
+  // At least one card should have a visible notes paragraph
+  expect(count).toBeGreaterThanOrEqual(1)
+  await expect(notesP.first()).toBeVisible()
+})
+
+test('notes not shown on dashboard card when absent', async () => {
+  await goToDashboard()
+
+  // The second mock thopter has null notes — card should not show notes text
+  const secondCard = page.locator('[data-slot="card"]').nth(1)
+  // Should show status line but not a notes paragraph
+  await expect(secondCard.locator('p.italic')).not.toBeVisible()
+})
+
+test('status line and notes are side by side with divider', async () => {
+  await goToDashboard()
+
+  // Close any open detail tabs first to avoid duplicate locator matches
+  const closeBtns = page.locator('[aria-label*="Close"][aria-label*="tab"]')
+  const closeCount = await closeBtns.count()
+  for (let i = closeCount - 1; i >= 0; i--) {
+    const label = await closeBtns.nth(i).getAttribute('aria-label')
+    if (label && !label.includes('Dashboard')) {
+      await closeBtns.nth(i).click()
+    }
+  }
+
+  await page.locator('[data-slot="card"]').first().click()
+
+  // The status panel row containing both fields and the divider
+  const fieldRow = page.locator('.flex.gap-4').filter({ has: page.getByPlaceholder('Add notes...') })
+  await expect(fieldRow).toBeVisible()
+
+  // Should contain exactly 3 children: status line col, divider, notes col
+  const divider = fieldRow.locator('.w-px.bg-border')
+  await expect(divider).toBeVisible()
+})
+
+test('status line field auto-saves on debounce', async () => {
+  // Ensure only one detail tab is open
+  await goToDashboard()
+  const closeBtns = page.locator('[aria-label*="Close"][aria-label*="tab"]')
+  const closeCount = await closeBtns.count()
+  for (let i = closeCount - 1; i >= 0; i--) {
+    const label = await closeBtns.nth(i).getAttribute('aria-label')
+    if (label && !label.includes('Dashboard')) {
+      await closeBtns.nth(i).click()
+    }
+  }
+  await page.locator('[data-slot="card"]').first().click()
+
+  const statusLineField = page.getByPlaceholder('No status line set')
+  await expect(statusLineField).toBeVisible()
+  const originalValue = await statusLineField.inputValue()
+
+  // Type new content
+  await statusLineField.fill('new status from e2e test')
+
+  // Wait for debounce (250ms) + buffer
+  await page.waitForTimeout(400)
+
+  // Value should persist (still in the field)
+  await expect(statusLineField).toHaveValue('new status from e2e test')
+
+  // Restore original value
+  await statusLineField.fill(originalValue)
+  await page.waitForTimeout(400)
 })

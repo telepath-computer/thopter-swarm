@@ -153,7 +153,7 @@ DigitalOcean mapping:
    - `off` -> `suspended` (compat alias) or `powered_off` (preferred new term)
    - `new` -> `provisioning`
    - `archive` -> hidden/terminal
-3. Keep Redis annotations unchanged (task, heartbeat, last_message, etc.).
+3. Keep Redis annotations unchanged (statusline, heartbeat, last_message, etc.).
 
 ### SSH / attach
 

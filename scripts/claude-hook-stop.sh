@@ -9,7 +9,7 @@
 read -t 1 INPUT || true
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
-thopter-status waiting "Claude stopped, waiting for input" 2>/dev/null || true
+thopter-status-line waiting "Claude stopped, waiting for input" 2>/dev/null || true
 
 # Stream transcript entries to Redis for thopter tail (also updates last_message)
 [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" 2>/dev/null || true

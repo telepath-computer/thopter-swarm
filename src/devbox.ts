@@ -82,7 +82,8 @@ run_optional() {
 
 # Install essential tools
 progress "apt" "installing base packages"
-sudo apt-get update -qq && sudo apt-get install -y -qq git tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 xvfb xauth bash-completion > /dev/null
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt-get update -qq && sudo apt-get install -y -qq git tmux wget curl jq redis-tools cron ripgrep fd-find htop tree unzip bat less strace lsof ncdu dnsutils net-tools iproute2 xvfb xauth bash-completion gh > /dev/null
 sudo /usr/sbin/cron 2>/dev/null || true
 
 # Install Neovim (latest stable, NvChad requires 0.10+)
@@ -798,7 +799,7 @@ function installThopterScriptsDO(
 ): void {
   void name;
   const files: Array<{ archivePath: string; contents: string }> = [
-    { archivePath: "tmp/thopter-status", contents: readScript("thopter-status.sh") },
+    { archivePath: "tmp/thopter-status-line", contents: readScript("thopter-status-line.sh") },
     { archivePath: "tmp/thopter-heartbeat", contents: readScript("thopter-heartbeat.sh") },
     { archivePath: "tmp/thopter-cron-install.sh", contents: readScript("thopter-cron-install.sh") },
     { archivePath: "home/.config/nvim/lua/options.lua", contents: readScript("nvim-options.lua") },
@@ -835,7 +836,7 @@ function installThopterScriptsDO(
   uploadBundleToDO(dropletId, files, log);
 
   const installCmd =
-    "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && " +
+    "sudo install -m 755 /tmp/thopter-status-line /usr/local/bin/thopter-status-line && " +
     "sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && " +
     "sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && " +
     "chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh";
@@ -852,7 +853,7 @@ function installThopterScriptsDO(
 }
 
 /**
- * Upload thopter-status scripts and install cron heartbeat on a running devbox.
+ * Upload thopter-status-line scripts and install cron heartbeat on a running devbox.
  */
 async function installThopterScripts(
   devboxId: string,
@@ -863,8 +864,8 @@ async function installThopterScripts(
 
   // Upload scripts
   await client.devboxes.writeFileContents(devboxId, {
-    file_path: "/tmp/thopter-status",
-    contents: readScript("thopter-status.sh"),
+    file_path: "/tmp/thopter-status-line",
+    contents: readScript("thopter-status-line.sh"),
   });
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/tmp/thopter-heartbeat",
@@ -943,7 +944,7 @@ async function installThopterScripts(
 
   // Install scripts to /usr/local/bin, make hooks executable, register hooks, set up cron
   await client.devboxes.executeAsync(devboxId, {
-    command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
+    command: "sudo install -m 755 /tmp/thopter-status-line /usr/local/bin/thopter-status-line && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
   });
   await client.devboxes.executeAsync(devboxId, {
     command: thopterBashrcEnsureCommand(),
@@ -1329,7 +1330,7 @@ export async function createDevbox(opts: {
       });
     }
 
-    // Upload and install thopter-status scripts + cron
+    // Upload and install thopter-status-line scripts + cron
     log("Installing thopter scripts...");
     await installThopterScripts(devbox.id, opts.name);
 
@@ -1386,11 +1387,11 @@ export async function createDevbox(opts: {
 /**
  * Fetch live thopters from Runloop API + Redis, returning structured data.
  * This is the single source of truth — Runloop determines which devboxes are
- * alive, Redis provides agent annotations (status, task, heartbeat, etc.).
+ * alive, Redis provides agent annotations (status, status line, heartbeat, etc.).
  */
 export async function fetchThopters(): Promise<{
   name: string; owner: string; id: string; devboxStatus: string;
-  status: string | null; task: string | null; heartbeat: string | null;
+  status: string | null; statusLine: string | null; notes: string | null; heartbeat: string | null;
   alive: boolean; claudeRunning: boolean; lastMessage: string | null;
 }[]> {
   const { getRedisInfoForNames } = await import("./status.js");
@@ -1412,7 +1413,8 @@ export async function fetchThopters(): Promise<{
         id: db.id,
         devboxStatus: db.status,
         status: redis?.status ?? null,
-        task: redis?.task ?? null,
+        statusLine: redis?.statusLine ?? null,
+        notes: redis?.notes ?? null,
         heartbeat: redis?.heartbeat ?? null,
         alive: redis?.alive ?? false,
         claudeRunning: redis?.claudeRunning === "1",
@@ -1448,7 +1450,8 @@ export async function fetchThopters(): Promise<{
       id: db.id,
       devboxStatus: db.status,
       status: redis?.status ?? null,
-      task: redis?.task ?? null,
+      statusLine: redis?.statusLine ?? null,
+      notes: redis?.notes ?? null,
       heartbeat: redis?.heartbeat ?? null,
       alive: redis?.alive ?? false,
       claudeRunning: redis?.claudeRunning === "1",
@@ -1475,13 +1478,13 @@ export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "
         t.owner || "-",
         t.devboxStatus,
         t.status ?? "-",
-        t.task ?? "-",
+        t.statusLine ?? "-",
         t.claudeRunning ? "yes" : "no",
         t.heartbeat ? relativeTime(t.heartbeat) : "-",
         t.lastMessage ?? "-",
       ]);
       return formatTable(
-        ["NAME", "OWNER", "MACHINE", "AGENT", "TASK", "CLAUDE", "HEARTBEAT", "LAST MSG"],
+        ["NAME", "OWNER", "MACHINE", "AGENT", "STATUS LINE", "CLAUDE", "HEARTBEAT", "LAST MSG"],
         rows,
         { maxWidth: process.stdout.columns || 120, flexColumns: [4, 7] },
       );
@@ -1551,7 +1554,7 @@ export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "
     const redisMap = await getRedisInfoForNames(devboxes.map((db) => db.name));
     const cols = process.stdout.columns || 120;
 
-    // Compute fixed-column width needed in wide mode (everything except TASK and LAST MSG)
+    // Compute fixed-column width needed in wide mode (everything except STATUS LINE and LAST MSG)
     const wideFixedData = devboxes.map((db) => {
       const redis = redisMap.get(db.name);
       const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
@@ -1580,11 +1583,11 @@ export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "
     };
 
     if (tight) {
-      // Multi-line layout: fixed columns, then indented Task/Last message lines
+      // Multi-line layout: fixed columns, then indented Status line/Last message lines
       const indent = "  ";
-      const taskPrefix = "Task: ";
+      const statusLinePrefix = "Status line: ";
       const msgPrefix = "Last message: ";
-      const taskMax = cols - indent.length - taskPrefix.length;
+      const statusLineMax = cols - indent.length - statusLinePrefix.length;
       const msgMax = cols - indent.length - msgPrefix.length;
 
       const fixedRows = devboxes.map((db) => {
@@ -1620,11 +1623,11 @@ export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "
           .join("  ");
         lines.push(style ? `${style}${fixedLine}${reset}` : fixedLine);
 
-        // Task line (only if there's actual content)
-        const task = collapse(redis?.task ?? "");
-        if (task && task !== "-") {
-          const taskLine = `${indent}${taskPrefix}${truncate(task, taskMax)}`;
-          lines.push(style ? `${style}${taskLine}${reset}` : taskLine);
+        // Status line (only if there's actual content)
+        const sl = collapse(redis?.statusLine ?? "");
+        if (sl && sl !== "-") {
+          const slLine = `${indent}${statusLinePrefix}${truncate(sl, statusLineMax)}`;
+          lines.push(style ? `${style}${slLine}${reset}` : slLine);
         }
 
         // Last message line (only if there's actual content)
@@ -1644,7 +1647,7 @@ export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "
       );
       const rows: string[][] = devboxes.map((db) => {
         const redis = redisMap.get(db.name);
-        const task = collapse(redis?.task ?? "-");
+        const statusLine = collapse(redis?.statusLine ?? "-");
         const msg = collapse(redis?.lastMessage ?? "-");
         const claude = redis ? (redis.claudeRunning === "1" ? "yes" : redis.claudeRunning === "0" ? "no" : "-") : "-";
         const heartbeat = redis?.heartbeat ? relativeTime(redis.heartbeat) : "-";
@@ -1653,14 +1656,14 @@ export async function listDevboxes(opts?: { follow?: number; layout?: "wide" | "
           db.owner,
           db.status,
           redis?.status ?? "-",
-          task,
+          statusLine,
           claude,
           heartbeat,
           msg,
         ];
       });
       return formatTable(
-        ["NAME", "OWNER", "DEVBOX", "AGENT", "TASK", "CLAUDE", "HEARTBEAT", "LAST MSG"],
+        ["NAME", "OWNER", "DEVBOX", "AGENT", "STATUS LINE", "CLAUDE", "HEARTBEAT", "LAST MSG"],
         rows,
         { maxWidth: cols, flexColumns: [4, 7], rowStyles },
       );

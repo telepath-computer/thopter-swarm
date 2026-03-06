@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
-import { Clock, User, Cpu, Pause, Play, Trash2, Pencil, Check, TerminalSquare, MoreHorizontal } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Clock, User, Cpu, Pause, Play, Trash2, TerminalSquare, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
@@ -18,58 +17,72 @@ interface Props {
   onViewModeChange: (mode: 'transcript' | 'terminal' | 'ssh') => void
 }
 
-function EditableTask({ name, task }: { name: string; task: string | null }) {
-  const updateTask = useStore((s) => s.updateTask)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(task ?? '')
-  const inputRef = useRef<HTMLInputElement>(null)
+/**
+ * Auto-saving textarea field with 250ms debounce.
+ * Always editable — no static/edit toggle. Enter inserts newlines.
+ */
+function AutoSaveField({
+  value,
+  placeholder,
+  label,
+  onSave,
+}: {
+  value: string | null
+  placeholder: string
+  label: string
+  onSave: (value: string) => void
+}) {
+  const [draft, setDraft] = useState(value ?? '')
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savedRef = useRef(value ?? '')
 
+  // Sync from external updates (e.g. Redis poll) only when the user hasn't made local edits
   useEffect(() => {
-    if (!editing) setDraft(task ?? '')
-  }, [task, editing])
-
-  useEffect(() => {
-    if (editing) inputRef.current?.focus()
-  }, [editing])
-
-  const save = async () => {
-    setEditing(false)
-    const trimmed = draft.trim()
-    if (trimmed !== (task ?? '')) {
-      await updateTask(name, trimmed)
+    const incoming = value ?? ''
+    // Only update if the external value changed AND it differs from what we last saved
+    if (incoming !== savedRef.current) {
+      savedRef.current = incoming
+      setDraft(incoming)
     }
-  }
+  }, [value])
 
-  if (editing) {
-    return (
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <span className="text-muted-foreground/50 text-xs shrink-0">Task:</span>
-        <Input
-          ref={inputRef}
-          className="text-xs h-6 min-w-0"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') save()
-            if (e.key === 'Escape') { setEditing(false); setDraft(task ?? '') }
-          }}
-          onBlur={save}
-        />
-        <Button variant="ghost" size="icon" className="size-5 shrink-0" onClick={save}>
-          <Check className="size-3" />
-        </Button>
-      </div>
-    )
+  const debouncedSave = useCallback(
+    (text: string) => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => {
+        if (text !== savedRef.current) {
+          savedRef.current = text
+          onSave(text)
+        }
+      }, 250)
+    },
+    [onSave],
+  )
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
+  const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value
+    setDraft(text)
+    debouncedSave(text)
   }
 
   return (
-    <div
-      className="flex items-start gap-2 group cursor-pointer min-w-0 flex-1"
-      onClick={() => setEditing(true)}
-    >
-      <span className="text-muted-foreground/50 text-xs shrink-0 leading-5">Task:</span>
-      <span className="text-xs leading-5 break-words min-w-0">{task || <span className="text-muted-foreground/40 italic">No task set</span>}</span>
-      <Pencil className="size-3 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
+    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+      <span className="text-muted-foreground/50 text-[10px] leading-none">{label}</span>
+      <textarea
+        className="text-xs leading-relaxed bg-transparent border-none outline-none resize-none w-full min-h-[1.5em] placeholder:text-muted-foreground/30 field-sizing-content"
+        value={draft}
+        placeholder={placeholder}
+        onChange={onChange}
+        spellCheck={false}
+        rows={1}
+      />
     </div>
   )
 }
@@ -78,6 +91,8 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
   const suspendThopter = useStore((s) => s.suspendThopter)
   const resumeThopter = useStore((s) => s.resumeThopter)
   const destroyThopter = useStore((s) => s.destroyThopter)
+  const updateStatusLine = useStore((s) => s.updateStatusLine)
+  const updateNotes = useStore((s) => s.updateNotes)
   const provider = useStore((s) => s.provider)
   const [confirmDestroy, setConfirmDestroy] = useState(false)
   const [confirmSuspend, setConfirmSuspend] = useState(false)
@@ -94,6 +109,16 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
     { key: 'transcript' as const, label: 'Transcript' },
     { key: 'terminal' as const, label: 'Snapshot' },
   ]
+
+  const onSaveStatusLine = useCallback(
+    (text: string) => updateStatusLine(thopter.name, text),
+    [thopter.name, updateStatusLine],
+  )
+
+  const onSaveNotes = useCallback(
+    (text: string) => updateNotes(thopter.name, text),
+    [thopter.name, updateNotes],
+  )
 
   return (
     <div className="px-4 py-2 border-b bg-card/50 space-y-1.5">
@@ -180,8 +205,22 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
         </DropdownMenu>
       </div>
 
-      {/* Row 2: Task (full width, wraps naturally) */}
-      <EditableTask name={thopter.name} task={thopter.task} />
+      {/* Row 2: Status line + Notes side by side */}
+      <div className="flex gap-4 min-w-0">
+        <AutoSaveField
+          value={thopter.statusLine}
+          placeholder="No status line set"
+          label="Status line"
+          onSave={onSaveStatusLine}
+        />
+        <div className="w-px bg-border shrink-0" />
+        <AutoSaveField
+          value={thopter.notes}
+          placeholder="Add notes..."
+          label="Notes"
+          onSave={onSaveNotes}
+        />
+      </div>
 
       {/* Confirmation dialogs */}
       {showSuspendResume && (

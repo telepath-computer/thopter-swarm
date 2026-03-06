@@ -3,6 +3,7 @@ import { getService } from '@/services'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { createWrappedLinkProvider } from '@/lib/wrapped-link-provider'
 import '@xterm/xterm/css/xterm.css'
 import iosevkaRegular from '@/assets/fonts/IosevkaTermNerdFont-Regular.ttf'
 import iosevkaBold from '@/assets/fonts/IosevkaTermNerdFont-Bold.ttf'
@@ -110,7 +111,14 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     })
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
+    // WebLinksAddon handles single-line plain text URLs (Ctrl/Cmd+click).
+    // Our custom provider handles URLs that wrap across rows inside tmux.
     term.loadAddon(new WebLinksAddon((event, uri) => {
+      if (event.metaKey || event.ctrlKey) {
+        shell.openExternal(uri)
+      }
+    }))
+    term.registerLinkProvider(createWrappedLinkProvider(term, (event, uri) => {
       if (event.metaKey || event.ctrlKey) {
         shell.openExternal(uri)
       }

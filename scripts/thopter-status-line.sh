@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# thopter-status: report thopter status, logs, and health to redis.
+# thopter-status-line: report thopter status, logs, and health to redis.
 # Reads THOPTER_NAME, THOPTER_ID, THOPTER_REDIS_URL from environment.
 
 set -euo pipefail
@@ -89,17 +89,17 @@ cmd_message() {
     printf '%s' "$msg" | rcli -x SETEX "$PREFIX:last_message" 86400 > /dev/null
 }
 
-cmd_task() {
+cmd_statusline() {
     local desc="$*"
-    rcli SET "$PREFIX:task" "$desc" EX 86400 > /dev/null
-    echo "Task: $desc"
+    rcli SET "$PREFIX:statusline" "$desc" EX 86400 > /dev/null
+    echo "Status line: $desc"
 }
 
 cmd_show() {
-    echo "=== thopter-status: ${THOPTER_NAME} ==="
+    echo "=== thopter-status-line: ${THOPTER_NAME} ==="
     echo "ID:             $(rcli GET "$PREFIX:id")"
     echo "Status:         $(rcli GET "$PREFIX:status")"
-    echo "Task:           $(rcli GET "$PREFIX:task")"
+    echo "Status line:    $(rcli GET "$PREFIX:statusline")"
     echo "Heartbeat:      $(rcli GET "$PREFIX:heartbeat")"
     echo "Alive:          $(rcli GET "$PREFIX:alive")"
     echo "Claude running: $(rcli GET "$PREFIX:claude_running")"
@@ -111,28 +111,28 @@ cmd_show() {
 }
 
 case "${1:-}" in
-    log)       shift; cmd_log "$@" ;;
-    waiting)   shift; cmd_waiting "$@" ;;
-    done)      shift; cmd_done "$@" ;;
-    running)   cmd_running ;;
-    inactive)  cmd_inactive ;;
-    task)      shift; cmd_task "$@" ;;
-    message)   cmd_message ;;
-    heartbeat) cmd_heartbeat ;;
-    show)      cmd_show ;;
+    log)        shift; cmd_log "$@" ;;
+    waiting)    shift; cmd_waiting "$@" ;;
+    done)       shift; cmd_done "$@" ;;
+    running)    cmd_running ;;
+    inactive)   cmd_inactive ;;
+    statusline) shift; cmd_statusline "$@" ;;
+    message)    cmd_message ;;
+    heartbeat)  cmd_heartbeat ;;
+    show)       cmd_show ;;
     *)
-        echo "Usage: thopter-status {log|waiting|done|running|task|heartbeat|message|show} [args...]"
+        echo "Usage: thopter-status-line {log|waiting|done|running|statusline|heartbeat|message|show} [args...]"
         echo ""
         echo "Commands:"
-        echo "  log <message>        Add a timestamped log entry"
-        echo "  waiting [message]    Set status to waiting (optionally log why)"
-        echo "  done [message]       Set status to done (optionally log why)"
-        echo "  running              Set status to running"
-        echo "  inactive             Set status to inactive"
-        echo "  task <description>   Set the current task description"
-        echo "  message              Set last message (reads from stdin)"
-        echo "  heartbeat            Update heartbeat + check claude process (cron)"
-        echo "  show                 Show current status from redis"
+        echo "  log <message>           Add a timestamped log entry"
+        echo "  waiting [message]       Set status to waiting (optionally log why)"
+        echo "  done [message]          Set status to done (optionally log why)"
+        echo "  running                 Set status to running"
+        echo "  inactive                Set status to inactive"
+        echo "  statusline <text>       Set the status line (shown in dashboard)"
+        echo "  message                 Set last message (reads from stdin)"
+        echo "  heartbeat               Update heartbeat + check claude process (cron)"
+        echo "  show                    Show current status from redis"
         exit 1
         ;;
 esac

@@ -22,7 +22,7 @@ All secrets and config values that devboxes need go here. Written to `~/.thopter
 | Key | Required | Description |
 |-----|----------|-------------|
 | `GH_TOKEN` | yes | GitHub personal access token. Used for git clone/push and `gh` CLI. Also configures HTTPS credential store on devboxes. |
-| `THOPTER_REDIS_URL` | yes | Upstash Redis URL. Used by the CLI (`thopter status`, `thopter tail`) and on devboxes (heartbeats, status hooks). |
+| `THOPTER_REDIS_URL` | yes | Upstash Redis URL. Used by the CLI (`thopter status`, `thopter tail`) and on devboxes (heartbeats, status-line hooks). |
 | `THOPTER_NTFY_CHANNEL` | no | ntfy.sh channel name for push notifications. Subscribe at `https://ntfy.sh/<channel>`. |
 | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | no | Set to `1` to enable the experimental agent teams feature in Claude Code. Suggested during setup. |
 
