@@ -59,7 +59,7 @@ export function ThopterCard({ thopter }: Props) {
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-2 text-xs text-muted-foreground">
-        <p className="line-clamp-2 text-foreground/80">{thopter.task ?? 'No task'}</p>
+        <p className="line-clamp-2 text-foreground/80">{thopter.statusLine ?? 'No status line'}</p>
         <div className="flex items-center gap-3">
           {thopter.owner && (
             <span className="flex items-center gap-1">

@@ -57,7 +57,7 @@ export interface StoreActions {
   checkClaude(name: string): Promise<void>
   runThopter(opts: RunThopterOpts): Promise<string>
   tellThopter(name: string, message: string, interrupt?: boolean): Promise<void>
-  updateTask(name: string, task: string): Promise<void>
+  updateStatusLine(name: string, statusLine: string): Promise<void>
   destroyThopter(name: string): Promise<void>
   suspendThopter(name: string): Promise<void>
   resumeThopter(name: string): Promise<void>

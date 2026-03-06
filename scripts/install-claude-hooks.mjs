@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Install Claude Code hooks for thopter status reporting.
+// Install Claude Code hooks for thopter status-line reporting.
 // Idempotent: merges hooks into existing settings without overwriting.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";

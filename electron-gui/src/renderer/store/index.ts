@@ -101,14 +101,14 @@ export const useStore = create<Store>((set, get) => ({
     await service.tellThopter(name, message, interrupt)
   },
 
-  updateTask: async (name, task) => {
+  updateStatusLine: async (name, statusLine) => {
     const service = getService()
-    await service.updateTask(name, task)
+    await service.updateStatusLine(name, statusLine)
     // Update local state immediately
     set((s) => {
       const thopter = s.thopters[name]
       if (!thopter) return s
-      return { thopters: { ...s.thopters, [name]: { ...thopter, task } } }
+      return { thopters: { ...s.thopters, [name]: { ...thopter, statusLine } } }
     })
   },
 

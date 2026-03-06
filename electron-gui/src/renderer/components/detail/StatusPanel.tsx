@@ -18,15 +18,15 @@ interface Props {
   onViewModeChange: (mode: 'transcript' | 'terminal' | 'ssh') => void
 }
 
-function EditableTask({ name, task }: { name: string; task: string | null }) {
-  const updateTask = useStore((s) => s.updateTask)
+function EditableStatusLine({ name, statusLine }: { name: string; statusLine: string | null }) {
+  const updateStatusLine = useStore((s) => s.updateStatusLine)
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(task ?? '')
+  const [draft, setDraft] = useState(statusLine ?? '')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!editing) setDraft(task ?? '')
-  }, [task, editing])
+    if (!editing) setDraft(statusLine ?? '')
+  }, [statusLine, editing])
 
   useEffect(() => {
     if (editing) inputRef.current?.focus()
@@ -35,15 +35,15 @@ function EditableTask({ name, task }: { name: string; task: string | null }) {
   const save = async () => {
     setEditing(false)
     const trimmed = draft.trim()
-    if (trimmed !== (task ?? '')) {
-      await updateTask(name, trimmed)
+    if (trimmed !== (statusLine ?? '')) {
+      await updateStatusLine(name, trimmed)
     }
   }
 
   if (editing) {
     return (
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <span className="text-muted-foreground/50 text-xs shrink-0">Task:</span>
+        <span className="text-muted-foreground/50 text-xs shrink-0">Status line:</span>
         <Input
           ref={inputRef}
           className="text-xs h-6 min-w-0"
@@ -51,7 +51,7 @@ function EditableTask({ name, task }: { name: string; task: string | null }) {
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') save()
-            if (e.key === 'Escape') { setEditing(false); setDraft(task ?? '') }
+            if (e.key === 'Escape') { setEditing(false); setDraft(statusLine ?? '') }
           }}
           onBlur={save}
         />
@@ -67,8 +67,8 @@ function EditableTask({ name, task }: { name: string; task: string | null }) {
       className="flex items-start gap-2 group cursor-pointer min-w-0 flex-1"
       onClick={() => setEditing(true)}
     >
-      <span className="text-muted-foreground/50 text-xs shrink-0 leading-5">Task:</span>
-      <span className="text-xs leading-5 break-words min-w-0">{task || <span className="text-muted-foreground/40 italic">No task set</span>}</span>
+      <span className="text-muted-foreground/50 text-xs shrink-0 leading-5">Status line:</span>
+      <span className="text-xs leading-5 break-words min-w-0">{statusLine || <span className="text-muted-foreground/40 italic">No status line set</span>}</span>
       <Pencil className="size-3 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
     </div>
   )
@@ -180,8 +180,8 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
         </DropdownMenu>
       </div>
 
-      {/* Row 2: Task (full width, wraps naturally) */}
-      <EditableTask name={thopter.name} task={thopter.task} />
+      {/* Row 2: Status line (full width, wraps naturally) */}
+      <EditableStatusLine name={thopter.name} statusLine={thopter.statusLine} />
 
       {/* Confirmation dialogs */}
       {showSuspendResume && (

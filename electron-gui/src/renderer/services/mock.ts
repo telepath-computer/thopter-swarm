@@ -28,7 +28,7 @@ const THOPTER_NAMES = [
   'quiet-ember',
 ];
 
-const TASKS = [
+const STATUS_LINES = [
   'Implementing auth middleware for API routes',
   'Fixing CI pipeline flaky test in checkout flow',
   'Refactoring database connection pooling',
@@ -165,7 +165,7 @@ export class MockThopterService implements ThopterService {
         owner: OWNERS[i],
         id: `dvbx_mock_${name.replace('-', '_')}_${1000 + i}`,
         status: STATUSES[i],
-        task: TASKS[i],
+        statusLine: STATUS_LINES[i],
         heartbeat: minutesAgo(heartbeatMinutes),
         alive: STATUSES[i] !== 'done' && STATUSES[i] !== 'inactive',
         claudeRunning: STATUSES[i] === 'running',
@@ -241,7 +241,7 @@ export class MockThopterService implements ThopterService {
       owner: 'You',
       id: `dvbx_mock_${Date.now()}`,
       status: 'running',
-      task: opts.prompt.slice(0, 80),
+      statusLine: opts.prompt.slice(0, 80),
       heartbeat: new Date().toISOString(),
       alive: true,
       claudeRunning: true,
@@ -277,7 +277,7 @@ export class MockThopterService implements ThopterService {
       '│  Claude Code                                    v1.0.30 │',
       '╰──────────────────────────────────────────────────────────╯',
       '',
-      `> ${info.task ?? 'Working...'}`,
+      `> ${info.statusLine ?? 'Working...'}`,
       '',
       '  I\'ll start by reading the existing code to understand',
       '  the current implementation.',
@@ -357,10 +357,10 @@ export class MockThopterService implements ThopterService {
     info.devboxStatus = 'running';
   }
 
-  async updateTask(name: string, task: string): Promise<void> {
+  async updateStatusLine(name: string, statusLine: string): Promise<void> {
     const info = this.thopters.get(name);
     if (!info) throw new Error(`Unknown thopter '${name}'`);
-    info.task = task;
+    info.statusLine = statusLine;
   }
 
   attachThopter(name: string): void {

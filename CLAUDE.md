@@ -39,7 +39,7 @@ src/
   output.ts     Table formatting
 
 scripts/        Uploaded to devboxes at create time
-  thopter-status.sh             Redis status reporter CLI (used by hooks)
+  thopter-status-line.sh        Redis status-line reporter CLI (used by hooks)
   thopter-heartbeat.sh          Heartbeat cron (touch activity file, report to Redis)
   thopter-cron-install.sh       Installs heartbeat cron
   thopter-transcript-push.mjs   Streams transcript to Redis (for `thopter tail`)

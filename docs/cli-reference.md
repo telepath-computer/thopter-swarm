@@ -45,7 +45,7 @@ Full command reference for the `thopter` CLI. See the [README](../README.md) for
 | `thopter tail <name> -f` | Follow transcript in real time |
 | `thopter tail <name> -n 50` | Show last 50 entries |
 
-`thopter status` (aliased as `thopter list` / `thopter ls`) shows a combined view with devbox state from Runloop and agent state from Redis: task description, whether Claude is running, last heartbeat time.
+`thopter status` (aliased as `thopter list` / `thopter ls`) shows a combined view with devbox state from Runloop and agent state from Redis: status line, whether Claude is running, last heartbeat time.
 
 `thopter tail` streams Claude's transcript from Redis, showing a condensed view of each conversation turn (user messages, assistant responses, tool calls). Use `-f` to follow in real time — like `tail -f` for your thopter's Claude session.
 

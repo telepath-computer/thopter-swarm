@@ -28,18 +28,18 @@ export interface ThopterInfo {
   owner: string | null;
   id: string | null;
   status: string | null;
-  task: string | null;
+  statusLine: string | null;
   heartbeat: string | null;
   alive: boolean;
   claudeRunning: string | null;
   lastMessage: string | null;
 }
 
-const REDIS_FIELDS = ["id", "owner", "status", "task", "heartbeat", "alive", "claude_running", "last_message"] as const;
+const REDIS_FIELDS = ["id", "owner", "status", "statusline", "heartbeat", "alive", "claude_running", "last_message"] as const;
 
 function parseRedisValues(name: string, values: (string | null)[]): ThopterInfo {
-  const [id, owner, status, task, heartbeat, alive, claudeRunning, lastMessage] = values;
-  return { name, owner, id, status, task, heartbeat, alive: alive === "1", claudeRunning, lastMessage };
+  const [id, owner, status, statusLine, heartbeat, alive, claudeRunning, lastMessage] = values;
+  return { name, owner, id, status, statusLine, heartbeat, alive: alive === "1", claudeRunning, lastMessage };
 }
 
 /**
@@ -118,11 +118,11 @@ export async function showThopterStatus(name: string): Promise<void> {
   try {
     const prefix = `thopter:${name}`;
 
-    const [id, owner, status, task, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
+    const [id, owner, status, statusLine, heartbeat, alive, claudeRunning, lastMessage] = await redis.mget(
       `${prefix}:id`,
       `${prefix}:owner`,
       `${prefix}:status`,
-      `${prefix}:task`,
+      `${prefix}:statusline`,
       `${prefix}:heartbeat`,
       `${prefix}:alive`,
       `${prefix}:claude_running`,
@@ -139,7 +139,7 @@ export async function showThopterStatus(name: string): Promise<void> {
     console.log(`Devbox status:  ${devboxStatus}`);
     console.log(`Owner:          ${owner ?? "-"}`);
     console.log(`Agent status:   ${status ?? "-"}`);
-    console.log(`Task:           ${task ?? "-"}`);
+    console.log(`Status line:    ${statusLine ?? "-"}`);
     console.log(`Alive:          ${alive === "1" ? "yes" : "no"}`);
     console.log(`Claude running: ${claudeRunning === "1" ? "yes" : claudeRunning === "0" ? "no" : "-"}`);
     console.log(`Heartbeat:      ${heartbeat ? `${heartbeat} (${relativeTime(heartbeat)})` : "-"}`);
