@@ -1,6 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useStore } from '@/store'
-import { cn } from '@/lib/utils'
 import { StatusPanel } from './StatusPanel'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from './TerminalView'
@@ -76,8 +75,8 @@ export function ThopterDetail({ tabName }: Props) {
   }, [tabName, thopter?.devboxStatus, isClaudeReady, checkClaude])
 
   const hasLiveTerminal = liveTerminals.includes(tabName)
-  const effectiveViewMode = viewMode
-  const sshVisible = isVisible && effectiveViewMode === 'ssh'
+  const sshVisible = isVisible && viewMode === 'ssh'
+  const showActionBar = viewMode !== 'ssh'
 
   if (!thopter) {
     return (
@@ -89,50 +88,17 @@ export function ThopterDetail({ tabName }: Props) {
 
   return (
     <div ref={containerRef} className="flex flex-col h-full">
-      <StatusPanel thopter={thopter} />
-
-      {/* View mode toggle */}
-      <div className="flex items-center gap-1 px-4 py-1.5 border-b border-border bg-muted/30">
-        <button
-          onClick={() => setDetailViewMode(tabName, 'transcript')}
-          className={cn(
-            'px-2.5 py-1 text-xs rounded font-medium transition-colors',
-            effectiveViewMode === 'transcript'
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-          )}
-        >
-          Transcript
-        </button>
-        <button
-          onClick={() => setDetailViewMode(tabName, 'terminal')}
-          className={cn(
-            'px-2.5 py-1 text-xs rounded font-medium transition-colors',
-            effectiveViewMode === 'terminal'
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-          )}
-        >
-          Screen
-        </button>
-        <button
-          onClick={() => setDetailViewMode(tabName, 'ssh')}
-          className={cn(
-            'px-2.5 py-1 text-xs rounded font-medium transition-colors',
-            effectiveViewMode === 'ssh'
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-          )}
-        >
-          SSH
-        </button>
-      </div>
+      <StatusPanel
+        thopter={thopter}
+        viewMode={viewMode}
+        onViewModeChange={(mode) => setDetailViewMode(tabName, mode)}
+      />
 
       {/* Content area */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
         {/* Transcript and Screen unmount when not active (stateless) */}
-        {effectiveViewMode === 'transcript' && <TranscriptView name={thopter.name} />}
-        {effectiveViewMode === 'terminal' && <TerminalView name={thopter.name} />}
+        {viewMode === 'transcript' && <TranscriptView name={thopter.name} />}
+        {viewMode === 'terminal' && <TerminalView name={thopter.name} />}
 
         {/* SSH terminal stays mounted once activated, hidden/shown via CSS */}
         {hasLiveTerminal && (
@@ -145,7 +111,7 @@ export function ThopterDetail({ tabName }: Props) {
         )}
       </div>
 
-      {effectiveViewMode === 'terminal' && (
+      {showActionBar && (
         <ActionBar name={thopter.name} status={thopter.status} devboxStatus={thopter.devboxStatus} claudeReady={claudeReady} />
       )}
     </div>

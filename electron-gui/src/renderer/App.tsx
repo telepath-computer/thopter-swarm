@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { TooltipProvider } from './components/ui/tooltip'
 import { Header } from './components/layout/Header'
-import { TabBar } from './components/layout/TabBar'
 import { ToastNotifications } from './components/layout/ToastNotifications'
 import { Dashboard } from './components/dashboard/Dashboard'
 import { ThopterDetail } from './components/detail/ThopterDetail'
@@ -67,7 +66,6 @@ export default function App() {
     <TooltipProvider>
       <div className="flex flex-col h-screen bg-background text-foreground">
         <Header />
-        <TabBar />
         <main className="flex-1 overflow-hidden relative">
           <div className="absolute inset-0" style={{ visibility: activeTab === 'dashboard' ? 'visible' : 'hidden', pointerEvents: activeTab === 'dashboard' ? undefined : 'none' }}>
             <Dashboard />
