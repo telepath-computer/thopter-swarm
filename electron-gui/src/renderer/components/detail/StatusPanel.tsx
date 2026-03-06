@@ -35,12 +35,15 @@ function AutoSaveField({
   const [draft, setDraft] = useState(value ?? '')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedRef = useRef(value ?? '')
+  const lastEditRef = useRef(0)
 
-  // Sync from external updates (e.g. Redis poll) only when the user hasn't made local edits
+  // Suppress poll updates for debounce (250ms) + slosh (2s) after last keystroke.
+  // This prevents stale Redis poll data from overwriting in-progress typing.
+  const EDIT_GUARD_MS = 2500
+
   useEffect(() => {
     const incoming = value ?? ''
-    // Only update if the external value changed AND it differs from what we last saved
-    if (incoming !== savedRef.current) {
+    if (incoming !== savedRef.current && Date.now() - lastEditRef.current > EDIT_GUARD_MS) {
       savedRef.current = incoming
       setDraft(incoming)
     }
@@ -59,7 +62,6 @@ function AutoSaveField({
     [onSave],
   )
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
@@ -68,6 +70,7 @@ function AutoSaveField({
 
   const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value
+    lastEditRef.current = Date.now()
     setDraft(text)
     debouncedSave(text)
   }
