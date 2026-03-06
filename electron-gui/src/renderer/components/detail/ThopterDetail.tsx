@@ -14,7 +14,7 @@ export function ThopterDetail({ tabName }: Props) {
   const activeTab = useStore((s) => s.activeTab)
   const thopter = useStore((s) => s.thopters[tabName])
   const claudeReady = useStore((s) => s.claudeReady[tabName])
-  const viewMode = useStore((s) => s.detailViewMode[tabName] ?? 'transcript')
+  const viewMode = useStore((s) => s.detailViewMode[tabName] ?? 'ssh')
   const liveTerminals = useStore((s) => s.liveTerminals)
   const setDetailViewMode = useStore((s) => s.setDetailViewMode)
   const fetchTranscript = useStore((s) => s.fetchTranscript)
@@ -74,7 +74,7 @@ export function ThopterDetail({ tabName }: Props) {
     return () => clearInterval(interval)
   }, [tabName, thopter?.devboxStatus, isClaudeReady, checkClaude])
 
-  const hasLiveTerminal = liveTerminals.includes(tabName)
+  const hasLiveTerminal = liveTerminals.includes(tabName) || viewMode === 'ssh'
   const sshVisible = isVisible && viewMode === 'ssh'
   const showActionBar = viewMode !== 'ssh'
 
