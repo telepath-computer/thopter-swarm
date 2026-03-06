@@ -8,15 +8,17 @@ interface Props {
 export function TerminalView({ name }: Props) {
   const screenDump = useStore((s) => s.screenDumps[name])
   const fetchScreenDump = useStore((s) => s.fetchScreenDump)
+  const appFocused = useStore((s) => s.appFocused)
   const containerRef = useRef<HTMLDivElement>(null)
   const wasAtBottomRef = useRef(true)
 
-  // Poll for screen dump updates every 5s while visible
+  // Poll for screen dump updates every 5s while app is focused
   useEffect(() => {
+    if (!appFocused) return
     fetchScreenDump(name)
     const interval = setInterval(() => fetchScreenDump(name), 5_000)
     return () => clearInterval(interval)
-  }, [name, fetchScreenDump])
+  }, [name, appFocused, fetchScreenDump])
 
   // Track scroll position
   useEffect(() => {

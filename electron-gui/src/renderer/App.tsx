@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { TooltipProvider } from './components/ui/tooltip'
 import { Header } from './components/layout/Header'
 import { TabBar } from './components/layout/TabBar'
@@ -16,18 +16,46 @@ export default function App() {
   const openTabs = useStore((s) => s.openTabs)
   const refreshThopters = useStore((s) => s.refreshThopters)
   const autoRefresh = useStore((s) => s.autoRefresh)
+  const appFocused = useStore((s) => s.appFocused)
+  const setAppFocused = useStore((s) => s.setAppFocused)
   const addNotification = useStore((s) => s.addNotification)
 
-  // Initial load + auto-refresh every 30 seconds (when enabled)
+  // Track app visibility (window focus + page visibility)
   useEffect(() => {
+    const onVisibilityChange = () => setAppFocused(!document.hidden)
+    const onFocus = () => setAppFocused(true)
+    const onBlur = () => setAppFocused(false)
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [setAppFocused])
+
+  // Initial load + auto-refresh every 30 seconds (when enabled and app is focused).
+  // On refocus, refresh immediately if stale (>= 30s since last refresh).
+  const lastRefreshAt = useRef(0)
+  const doRefresh = () => {
     refreshThopters()
+    lastRefreshAt.current = Date.now()
+  }
+
+  useEffect(() => {
+    doRefresh()
   }, [refreshThopters])
 
   useEffect(() => {
-    if (!autoRefresh) return
-    const id = setInterval(refreshThopters, 30_000)
+    if (!autoRefresh || !appFocused) return
+    if (Date.now() - lastRefreshAt.current >= 30_000) {
+      doRefresh()
+    }
+    const id = setInterval(doRefresh, 30_000)
     return () => clearInterval(id)
-  }, [autoRefresh, refreshThopters])
+  }, [autoRefresh, appFocused, refreshThopters])
 
   // Subscribe to ntfy.sh notifications
   useEffect(() => {

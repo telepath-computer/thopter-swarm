@@ -23,6 +23,7 @@ export const useStore = create<Store>((set, get) => ({
   draftMessages: {},
   provider: 'unknown',
   lastDetailInteraction: {},
+  appFocused: true,
 
   // Display state
   activeTab: 'dashboard',
@@ -65,7 +66,7 @@ export const useStore = create<Store>((set, get) => ({
           [name]: [...(s.transcripts[name] || []), entry],
         },
       }))
-    })
+    }, () => !get().appFocused)
     transcriptSubs.set(name, unsub)
   },
 
@@ -194,6 +195,7 @@ export const useStore = create<Store>((set, get) => ({
   setDraftMessage: (name, message) => set((s) => ({ draftMessages: { ...s.draftMessages, [name]: message } })),
 
   setAutoRefresh: (enabled) => set({ autoRefresh: enabled }),
+  setAppFocused: (focused) => set({ appFocused: focused }),
 
   // Notification actions
   addNotification: (notification) => {

@@ -249,7 +249,7 @@ export class RealThopterService implements ThopterService {
    * Subscribe to new transcript entries via Redis polling.
    * Uses the transcript_seq counter (same pattern as CLI tail -f).
    */
-  subscribeTranscript(name: string, onEntry: (entry: TranscriptEntry) => void): Unsubscribe {
+  subscribeTranscript(name: string, onEntry: (entry: TranscriptEntry) => void, isPaused?: () => boolean): Unsubscribe {
     let stopped = false;
     let redis: Redis | null = null;
     let interval: ReturnType<typeof setInterval> | null = null;
@@ -278,6 +278,7 @@ export class RealThopterService implements ThopterService {
 
       interval = setInterval(async () => {
         if (stopped || !redis) return;
+        if (isPaused?.()) return;
         try {
           const key = `thopter:${name}:transcript`;
           const seqKey = `thopter:${name}:transcript_seq`;

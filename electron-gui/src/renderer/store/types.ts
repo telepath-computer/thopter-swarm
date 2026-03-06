@@ -37,6 +37,8 @@ export interface StoreState {
   provider: InfrastructureProvider
   /** Timestamp of last user interaction per detail view, for smart dismissal */
   lastDetailInteraction: Record<string, number>
+  /** Whether the app window is focused and visible (controls polling) */
+  appFocused: boolean
 
   // Display state (UI layer)
   activeTab: 'dashboard' | string
@@ -71,6 +73,7 @@ export interface StoreActions {
   closeTab(name: string): void
   setDraftMessage(name: string, message: string): void
   setAutoRefresh(enabled: boolean): void
+  setAppFocused(focused: boolean): void
 
   // Notification actions
   addNotification(notification: NtfyNotification): void
