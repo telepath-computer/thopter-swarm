@@ -115,7 +115,7 @@ export interface ThopterService {
   listThopters(): Promise<ThopterInfo[]>;
   getThopterStatus(name: string): Promise<ThopterInfo>;
   getTranscript(name: string, lines?: number): Promise<TranscriptEntry[]>;
-  subscribeTranscript(name: string, onEntry: (entry: TranscriptEntry) => void): Unsubscribe;
+  subscribeTranscript(name: string, onEntry: (entry: TranscriptEntry) => void, isPaused?: () => boolean): Unsubscribe;
   listSnapshots(): Promise<SnapshotInfo[]>;
   listRepos(): Promise<RepoConfig[]>;
   getConfig(): Promise<AppConfig>;

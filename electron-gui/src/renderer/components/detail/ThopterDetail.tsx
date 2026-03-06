@@ -24,6 +24,7 @@ export function ThopterDetail({ tabName }: Props) {
   const checkClaude = useStore((s) => s.checkClaude)
   const dismissNotification = useStore((s) => s.dismissNotification)
   const recordDetailInteraction = useStore((s) => s.recordDetailInteraction)
+  const appFocused = useStore((s) => s.appFocused)
   const hasUnread = useStore((s) => s.thopterNotifications[tabName]?.unread ?? false)
 
   const isVisible = activeTab === tabName
@@ -61,19 +62,21 @@ export function ThopterDetail({ tabName }: Props) {
   }, [tabName, fetchTranscript, subscribeTranscript, unsubscribeTranscript])
 
   // Check Claude readiness when tab opens (only for running devboxes).
-  // If not ready, poll every 5s until it is.
+  // If not ready, poll every 5s until it is — but only when view is focused.
   useEffect(() => {
     if (thopter?.devboxStatus !== 'running') return
+    if (!appFocused || !isVisible) return
     checkClaude(tabName)
-  }, [tabName, thopter?.devboxStatus, checkClaude])
+  }, [tabName, thopter?.devboxStatus, checkClaude, appFocused, isVisible])
 
   const isClaudeReady = !!claudeReady?.claude
   useEffect(() => {
     if (thopter?.devboxStatus !== 'running') return
     if (isClaudeReady) return
+    if (!appFocused || !isVisible) return
     const interval = setInterval(() => checkClaude(tabName), 5_000)
     return () => clearInterval(interval)
-  }, [tabName, thopter?.devboxStatus, isClaudeReady, checkClaude])
+  }, [tabName, thopter?.devboxStatus, isClaudeReady, checkClaude, appFocused, isVisible])
 
   const hasLiveTerminal = liveTerminals.includes(tabName)
   const effectiveViewMode = viewMode

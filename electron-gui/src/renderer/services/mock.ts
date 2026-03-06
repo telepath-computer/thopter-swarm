@@ -203,12 +203,13 @@ export class MockThopterService implements ThopterService {
     return transcript;
   }
 
-  subscribeTranscript(name: string, onEntry: (entry: TranscriptEntry) => void): Unsubscribe {
+  subscribeTranscript(name: string, onEntry: (entry: TranscriptEntry) => void, isPaused?: () => boolean): Unsubscribe {
     // Clear any existing subscription for this thopter
     const existing = this.subscriptionIntervals.get(name);
     if (existing) clearInterval(existing);
 
     const interval = setInterval(() => {
+      if (isPaused?.()) return;
       const entry = generateLiveEntry();
       // Add to stored transcript
       let transcript = this.transcripts.get(name);
