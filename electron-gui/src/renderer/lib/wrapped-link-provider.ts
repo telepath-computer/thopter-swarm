@@ -8,24 +8,25 @@
  * Strategy:
  * 1. When asked for links on row N, collect a window of rows around N.
  * 2. Join them and run a URL regex on the joined text.
- * 3. For each match, check whether it looks like a URL that was split mid-token
- *    (no whitespace between end-of-row and start-of-next-row).
+ * 3. For each match that spans a row boundary, verify the boundary falls
+ *    mid-URL (no whitespace gap) so we don't false-join unrelated rows.
  * 4. Map match offsets back to buffer coordinates.
  *
  * OSC 8 hyperlinks are handled separately by xterm.js's built-in linkHandler,
  * so this provider only deals with plain-text URLs.
+ *
+ * Note: provideLinks receives 1-based line numbers. IBufferCellPosition.y is
+ * also 1-based. But buffer.getLine() takes a 0-based index.
  */
 
 import type { Terminal, ILinkProvider, ILink, IBufferRange } from '@xterm/xterm'
 
-// URL regex — matches http(s) and common protocols, allowing wrapped continuation.
-// Intentionally permissive on the path/query portion to catch long GitHub URLs etc.
 const URL_RE = /https?:\/\/[^\s"'`<>(){}\[\]]+/g
 
-// Characters that are unlikely to end a URL (more likely the URL continues on the next line)
-const CONTINUATION_CHARS = /[a-zA-Z0-9\/_\-=&%.+~#@:]/
+// Characters that look like they're mid-URL (the URL continues on the next row)
+const CONTINUATION_CHARS = /[a-zA-Z0-9\/_\-=&%.+~#@:,;?!]/
 
-// Characters that typically terminate a URL when found at the very end
+// Trailing punctuation to strip (likely not part of the URL)
 const TRAILING_PUNCT = /[.,;:!?)>\]}"']+$/
 
 export function createWrappedLinkProvider(
@@ -37,23 +38,21 @@ export function createWrappedLinkProvider(
       const buffer = terminal.buffer.active
       const cols = terminal.cols
 
-      // Collect a window of rows: up to 5 above and 5 below the target line.
-      // This handles URLs that wrap across up to ~10 rows (~800+ chars at 80 cols).
-      const windowAbove = 5
-      const windowBelow = 5
-      const startRow = Math.max(1, bufferLineNumber - windowAbove)
-      const endRow = Math.min(buffer.length, bufferLineNumber + windowBelow)
+      // bufferLineNumber is 1-based. Collect a window of ±5 rows.
+      const windowSize = 5
+      const startLine = Math.max(1, bufferLineNumber - windowSize)
+      const endLine = Math.min(buffer.length, bufferLineNumber + windowSize)
 
       // Build joined text and track row boundaries.
-      // rowOffsets[i] = { row: bufferRow, startOffset: charOffset, text: rowText }
-      const segments: { row: number; offset: number; text: string }[] = []
+      // Each segment maps a 1-based line number to its offset in the joined string.
+      const segments: { line: number; offset: number; text: string }[] = []
       let joined = ''
 
-      for (let row = startRow; row <= endRow; row++) {
-        const line = buffer.getLine(row)
-        if (!line) continue
-        const text = line.translateToString(false, 0, cols)
-        segments.push({ row, offset: joined.length, text })
+      for (let line = startLine; line <= endLine; line++) {
+        const bufLine = buffer.getLine(line - 1) // getLine is 0-based
+        if (!bufLine) continue
+        const text = bufLine.translateToString(false, 0, cols)
+        segments.push({ line, offset: joined.length, text })
         joined += text
       }
 
@@ -67,25 +66,22 @@ export function createWrappedLinkProvider(
         const matchStart = match.index
         const matchEnd = matchStart + url.length
 
-        // Check that the URL isn't just stitched across a gap with whitespace.
-        // For each row boundary that falls inside the match, verify the row
-        // ended without whitespace and the next row starts without whitespace.
+        // For each row boundary inside the match, verify the text looks like
+        // a continuous URL (no whitespace at the join point).
         let valid = true
         for (let i = 0; i < segments.length - 1; i++) {
           const boundary = segments[i].offset + segments[i].text.length
           if (boundary > matchStart && boundary < matchEnd) {
-            // Check last char of this row's contribution to the match
-            const charBeforeBoundary = joined[boundary - 1]
-            const charAfterBoundary = joined[boundary]
+            const charBefore = joined[boundary - 1]
+            const charAfter = joined[boundary]
             if (
-              !charBeforeBoundary || !charAfterBoundary ||
-              /\s/.test(charBeforeBoundary) || /\s/.test(charAfterBoundary)
+              !charBefore || !charAfter ||
+              /\s/.test(charBefore) || /\s/.test(charAfter)
             ) {
               valid = false
               break
             }
-            // Also check that the char before boundary looks like mid-URL
-            if (!CONTINUATION_CHARS.test(charBeforeBoundary)) {
+            if (!CONTINUATION_CHARS.test(charBefore)) {
               valid = false
               break
             }
@@ -94,14 +90,15 @@ export function createWrappedLinkProvider(
 
         if (!valid) continue
 
-        // Strip common trailing punctuation that's likely not part of the URL
+        // Strip common trailing punctuation
         url = url.replace(TRAILING_PUNCT, '')
+        const urlEnd = matchStart + url.length
 
-        // Map match back to buffer coordinates
-        const range = offsetToRange(matchStart, matchStart + url.length, segments)
+        // Map match offsets to buffer coordinates (1-based)
+        const range = offsetToRange(matchStart, urlEnd, segments)
         if (!range) continue
 
-        // Only include links that overlap with the requested row
+        // Only return links that overlap the requested line
         if (range.start.y > bufferLineNumber || range.end.y < bufferLineNumber) continue
 
         links.push({
@@ -116,21 +113,32 @@ export function createWrappedLinkProvider(
   }
 }
 
+/** Map character offsets in the joined string back to 1-based buffer coordinates. */
 function offsetToRange(
   start: number,
   end: number,
-  segments: { row: number; offset: number; text: string }[],
+  segments: { line: number; offset: number; text: string }[],
 ): IBufferRange | null {
   let startPos: { x: number; y: number } | null = null
   let endPos: { x: number; y: number } | null = null
 
   for (const seg of segments) {
     const segEnd = seg.offset + seg.text.length
+
+    // Find which segment contains the start offset
     if (startPos === null && start >= seg.offset && start < segEnd) {
-      startPos = { x: start - seg.offset + 1, y: seg.row } // 1-based x
+      startPos = {
+        x: start - seg.offset + 1, // 1-based column
+        y: seg.line,                // 1-based line (already is)
+      }
     }
+
+    // Find which segment contains the end offset
     if (end > seg.offset && end <= segEnd) {
-      endPos = { x: end - seg.offset, y: seg.row } // 1-based, inclusive
+      endPos = {
+        x: end - seg.offset, // 1-based, inclusive
+        y: seg.line,
+      }
     }
   }
 

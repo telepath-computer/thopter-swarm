@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { getService } from '@/services'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { createWrappedLinkProvider } from '@/lib/wrapped-link-provider'
+// import { createWrappedLinkProvider } from '@/lib/wrapped-link-provider'
 import '@xterm/xterm/css/xterm.css'
 import iosevkaRegular from '@/assets/fonts/IosevkaTermNerdFont-Regular.ttf'
 import iosevkaBold from '@/assets/fonts/IosevkaTermNerdFont-Bold.ttf'
@@ -110,11 +110,7 @@ export function LiveTerminalView({ name, visible = true, spawnInfo: spawnInfoPro
     })
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
-    term.registerLinkProvider(createWrappedLinkProvider(term, (event, uri) => {
-      if (event.metaKey || event.ctrlKey) {
-        shell.openExternal(uri)
-      }
-    }))
+    // Plain-text link provider disabled — using OSC 8 only for now
     term.open(container)
 
     termRef.current = term
