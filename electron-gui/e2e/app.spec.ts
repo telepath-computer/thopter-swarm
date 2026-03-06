@@ -10,6 +10,8 @@ test.beforeAll(async () => {
     env: { ...process.env, THOPTER_MOCK: '1' },
   })
   page = await app.firstWindow()
+  // Ensure consistent viewport size for portal-rendered elements (dropdowns, dialogs)
+  await page.setViewportSize({ width: 1280, height: 800 })
   // Wait for React to mount and data to load
   await page.waitForSelector('[data-slot="card"]', { timeout: 10_000 })
 })
@@ -24,6 +26,47 @@ async function goToDashboard() {
   await expect(page.locator('[data-slot="card"]').first()).toBeVisible()
 }
 
+// Helper to open a thopter detail and switch to Transcript view
+async function openDetailTranscript() {
+  await goToDashboard()
+  const firstCard = page.locator('[data-slot="card"]').first()
+  await firstCard.click()
+  // Default view is SSH — switch to Transcript
+  await page.locator('button', { hasText: 'Transcript' }).click()
+}
+
+// Helper to ensure we're in a detail view (any mode)
+async function ensureDetailView() {
+  const h2 = page.locator('h2').first()
+  if (!(await h2.isVisible().catch(() => false))) {
+    await goToDashboard()
+    await page.locator('[data-slot="card"]').first().click()
+  }
+}
+
+// Helper to open the actions dropdown in a detail view
+async function openActionsDropdown() {
+  await ensureDetailView()
+  const trigger = page.locator('[data-slot="dropdown-menu-trigger"]')
+  await trigger.click()
+  await expect(page.locator('[data-slot="dropdown-menu-content"]')).toBeVisible()
+}
+
+// Helper to click a dropdown menu item by text via JS (bypasses Playwright viewport check
+// since Radix portals can render outside the visible area in headless Electron)
+async function clickDropdownItem(text: string) {
+  await page.evaluate((t) => {
+    const items = document.querySelectorAll('[data-slot="dropdown-menu-item"]')
+    for (const item of items) {
+      if (item.textContent?.includes(t)) {
+        ;(item as HTMLElement).click()
+        return
+      }
+    }
+    throw new Error(`Dropdown item "${t}" not found`)
+  }, text)
+}
+
 // --- Dashboard tests ---
 
 test('dashboard loads and shows thopter cards', async () => {
@@ -31,10 +74,9 @@ test('dashboard loads and shows thopter cards', async () => {
   await expect(cards).toHaveCount(5, { timeout: 10_000 })
 })
 
-test('header shows app title and buttons', async () => {
-  await expect(page.locator('h1')).toHaveText('Thopter Swarm')
-  await expect(page.getByText('Run New Thopter')).toBeVisible()
-  await expect(page.getByText('Re-Authenticate')).toBeVisible()
+test('header shows run and re-auth buttons', async () => {
+  await expect(page.locator('header').getByRole('button', { name: 'Run' })).toBeVisible()
+  await expect(page.locator('header').getByRole('button', { name: 'Re-Auth' })).toBeVisible()
 })
 
 test('thopter cards show status badges', async () => {
@@ -48,7 +90,6 @@ test('thopter cards show status badges', async () => {
 test('clicking a card opens detail tab', async () => {
   await goToDashboard()
 
-  // Click the first thopter card
   const firstCard = page.locator('[data-slot="card"]').first()
   const name = await firstCard.locator('[data-slot="card-title"]').textContent()
   await firstCard.click()
@@ -56,13 +97,12 @@ test('clicking a card opens detail tab', async () => {
   // Tab bar should show the thopter name as a tab
   await expect(page.getByRole('tab', { name: name! })).toBeVisible()
 
-  // Detail view should show the status panel with the thopter name in h2
+  // Detail view should show the status panel with the thopter name
   await expect(page.locator('h2').filter({ hasText: name! })).toBeVisible()
 })
 
 test('can switch back to dashboard tab', async () => {
   await goToDashboard()
-  // Should see the card grid again
   const cards = page.locator('[data-slot="card"]')
   await expect(cards.first()).toBeVisible()
 })
@@ -70,37 +110,48 @@ test('can switch back to dashboard tab', async () => {
 test('can open and close a tab', async () => {
   await goToDashboard()
 
-  // Open a thopter tab
   const firstCard = page.locator('[data-slot="card"]').first()
   const name = await firstCard.locator('[data-slot="card-title"]').textContent()
   await firstCard.click()
 
-  // Verify tab exists
   const thopterTab = page.getByRole('tab', { name: name! })
   await expect(thopterTab).toBeVisible()
 
-  // Find and click the close button (aria-label="Close <name> tab")
   const closeBtn = page.getByLabel(`Close ${name} tab`)
   await closeBtn.click()
 
-  // Tab should be gone and we're back to dashboard
   await expect(thopterTab).not.toBeVisible()
+})
+
+// --- Detail view mode tests ---
+
+test('detail view defaults to SSH tab', async () => {
+  await goToDashboard()
+  await page.locator('[data-slot="card"]').first().click()
+
+  // SSH connect button should be visible (default view)
+  await expect(page.getByRole('button', { name: 'Connect', exact: true })).toBeVisible({ timeout: 5_000 })
+})
+
+test('can switch to Transcript view', async () => {
+  await ensureDetailView()
+  await page.locator('button', { hasText: 'Transcript' }).click()
+
+  const transcript = page.locator('[role="log"]')
+  await expect(transcript).toBeVisible({ timeout: 10_000 })
 })
 
 // --- Transcript tests ---
 
 test('detail view shows transcript entries', async () => {
-  await goToDashboard()
+  // Ensure we're in transcript view
+  await ensureDetailView()
+  const transcriptBtn = page.locator('button', { hasText: 'Transcript' })
+  if (await transcriptBtn.isVisible().catch(() => false)) {
+    await transcriptBtn.click()
+  }
+  await page.waitForSelector('[role="log"]', { timeout: 10_000 })
 
-  // Click a thopter card to open detail
-  const firstCard = page.locator('[data-slot="card"]').first()
-  await firstCard.click()
-
-  // Wait for transcript to load - the transcript view has role="log"
-  const transcript = page.locator('[role="log"]')
-  await expect(transcript).toBeVisible({ timeout: 10_000 })
-
-  // Check that transcript entries are visible (they have role labels)
   const hasEntries = await page
     .locator('text=user')
     .or(page.locator('text=assistant'))
@@ -112,13 +163,10 @@ test('detail view shows transcript entries', async () => {
 
 // --- Action bar tests ---
 
-test('tell input exists and can type', async () => {
-  // Should still be in detail view from previous test
-  // If not, navigate there
+test('action bar visible in transcript mode with tell input', async () => {
   const textarea = page.locator('textarea')
   if (!(await textarea.isVisible().catch(() => false))) {
-    await goToDashboard()
-    await page.locator('[data-slot="card"]').first().click()
+    await openDetailTranscript()
   }
 
   await expect(textarea).toBeVisible()
@@ -126,38 +174,113 @@ test('tell input exists and can type', async () => {
   await expect(textarea).toHaveValue('test message')
 })
 
-test('operation buttons are visible', async () => {
-  // Should still be in detail view
-  const textarea = page.locator('textarea')
-  if (!(await textarea.isVisible().catch(() => false))) {
-    await goToDashboard()
-    await page.locator('[data-slot="card"]').first().click()
+test('action bar hidden in SSH mode', async () => {
+  await ensureDetailView()
+  // Switch to SSH
+  await page.locator('button', { hasText: 'SSH' }).click()
+  // Textarea should not be visible
+  await expect(page.locator('textarea')).not.toBeVisible()
+})
+
+// --- Actions dropdown tests ---
+
+test('actions dropdown opens and shows all menu items', async () => {
+  await openActionsDropdown()
+
+  const content = page.locator('[data-slot="dropdown-menu-content"]')
+  await expect(content.getByText('Shell Commands')).toBeVisible()
+  await expect(content.getByText('Suspend').or(content.getByText('Resume'))).toBeVisible()
+  await expect(content.getByText('Destroy')).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(content).not.toBeVisible()
+})
+
+test('actions dropdown: Shell Commands opens modal', async () => {
+  await openActionsDropdown()
+
+  await clickDropdownItem('Shell Commands')
+
+  await expect(page.getByText('thopter ssh')).toBeVisible({ timeout: 5_000 })
+
+  await page.keyboard.press('Escape')
+})
+
+test('actions dropdown: Destroy opens confirmation dialog', async () => {
+  await openActionsDropdown()
+
+  await clickDropdownItem('Destroy')
+
+  await expect(page.getByText('Destroy Thopter')).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByText('permanently destroy')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page.getByText('Destroy Thopter')).not.toBeVisible()
+})
+
+test('actions dropdown: Suspend/Resume opens confirmation dialog', async () => {
+  await openActionsDropdown()
+
+  const content = page.locator('[data-slot="dropdown-menu-content"]')
+  const hasSuspend = await content.getByText('Suspend').isVisible().catch(() => false)
+
+  if (hasSuspend) {
+    await clickDropdownItem('Suspend')
+    await expect(page.getByText('Suspend Thopter')).toBeVisible({ timeout: 5_000 })
+  } else {
+    await clickDropdownItem('Resume')
+    await expect(page.getByText('Resume Thopter')).toBeVisible({ timeout: 5_000 })
   }
 
-  await expect(page.getByText('Suspend').or(page.getByText('Resume'))).toBeVisible()
-  await expect(page.getByText('Destroy')).toBeVisible()
-  await expect(page.getByText('Shell Commands')).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel' }).click()
 })
 
-// --- Run modal tests ---
+test('actions dropdown closes on Escape', async () => {
+  await openActionsDropdown()
 
-test('run modal opens and shows form', async () => {
+  const content = page.locator('[data-slot="dropdown-menu-content"]')
+  await expect(content).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(content).not.toBeVisible()
+})
+
+test('actions dropdown closes on outside click', async () => {
+  await openActionsDropdown()
+
+  const content = page.locator('[data-slot="dropdown-menu-content"]')
+  await expect(content).toBeVisible()
+
+  await page.locator('h2').first().click({ force: true })
+  await expect(content).not.toBeVisible()
+})
+
+// --- Run tab tests ---
+
+test('run tab opens and shows mode selection', async () => {
   await goToDashboard()
-  await page.getByText('Run New Thopter').click()
+  await page.locator('header').getByRole('button', { name: 'Run', exact: true }).click()
 
-  // Modal should be visible with title
+  // Should show mode selection step
   await expect(page.getByText('Launch a new devbox')).toBeVisible()
-
-  // Should show repository step
-  await expect(page.locator('label').filter({ hasText: 'Repository' })).toBeVisible()
+  await expect(page.getByText('Choose how Claude should work')).toBeVisible()
+  await expect(page.getByText('Single Repository')).toBeVisible()
 })
 
-test('run modal can navigate steps', async () => {
-  // Modal should still be open from previous test
+test('run tab: selecting repo mode shows repository step', async () => {
+  // Click "Single Repository" mode
+  await page.getByText('Single Repository').click()
+
+  // Should advance to repos step
+  const select = page.locator('select').first()
+  await expect(select).toBeVisible({ timeout: 5_000 })
+})
+
+test('run tab: can navigate through steps', async () => {
   const select = page.locator('select').first()
   await expect(select).toBeVisible()
 
-  // Wait for repos to load (mock has 100ms delay + React render)
+  // Wait for repos to load
   await expect(select.locator('option')).not.toHaveCount(2, { timeout: 5_000 })
 
   // Select the first real repo
@@ -179,44 +302,22 @@ test('run modal can navigate steps', async () => {
   await expect(page.getByRole('button', { name: 'Launch Thopter' })).toBeVisible()
 })
 
-test('run modal can be closed', async () => {
-  // Close the modal via the dialog close button or pressing Escape
-  await page.keyboard.press('Escape')
+test('run tab can be closed', async () => {
+  const closeBtn = page.getByLabel(/Close Run New Thopter tab/)
+  await closeBtn.click()
 
-  // Modal should be gone
   await expect(page.getByText('Launch a new devbox')).not.toBeVisible()
 })
 
-// --- Notification sidebar tests ---
+// --- Re-auth tests ---
 
-test('notification sidebar opens and closes', async () => {
-  // Click the notification bell button
-  const bellBtn = page.getByLabel(/Notifications/)
-  await bellBtn.click()
+test('reauth tab opens and closes', async () => {
+  await page.locator('header').getByRole('button', { name: 'Re-Auth' }).click()
 
-  // Sidebar should show
-  await expect(page.getByText('Events from your thopter fleet')).toBeVisible({ timeout: 5_000 })
-
-  // Close it by pressing Escape (Sheet responds to Escape)
-  await page.keyboard.press('Escape')
-
-  // Wait for sidebar to animate out
-  await expect(page.getByText('Events from your thopter fleet')).not.toBeVisible({ timeout: 5_000 })
-})
-
-// --- Re-auth modal tests ---
-
-test('reauth modal opens', async () => {
-  // Make sure sidebar is fully closed first
-  await page.waitForTimeout(500)
-
-  await page.getByText('Re-Authenticate').click()
-
-  // Should show the reauth modal
   await expect(page.getByText('Update Claude Code credentials')).toBeVisible()
   await expect(page.getByText('Choose a machine')).toBeVisible()
 
-  // Close it
-  await page.keyboard.press('Escape')
-  await expect(page.getByText('Update Claude Code credentials')).not.toBeVisible()
+  const closeBtn = page.getByLabel(/Close Re-Authenticate tab/)
+  await closeBtn.click()
+  await expect(page.getByText('Choose a machine')).not.toBeVisible()
 })

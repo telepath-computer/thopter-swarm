@@ -90,9 +90,9 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
   const showSuspendResume = provider === 'runloop'
 
   const viewModes = [
-    { key: 'transcript' as const, label: 'Transcript' },
-    { key: 'terminal' as const, label: 'Screen' },
     { key: 'ssh' as const, label: 'SSH' },
+    { key: 'transcript' as const, label: 'Transcript' },
+    { key: 'terminal' as const, label: 'Snapshot' },
   ]
 
   return (
@@ -132,7 +132,7 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
               key={m.key}
               onClick={() => onViewModeChange(m.key)}
               className={cn(
-                'px-2 py-0.5 text-[11px] rounded font-medium transition-colors',
+                'px-2 py-0.5 text-[11px] rounded font-medium cursor-pointer transition-colors',
                 viewMode === m.key
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -146,7 +146,7 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
         {/* Actions dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-6 shrink-0">
+            <Button variant="outline" size="icon-xs" className="shrink-0">
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>

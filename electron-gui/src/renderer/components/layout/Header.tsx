@@ -39,7 +39,7 @@ export function Header() {
         role="tab"
         aria-selected={activeTab === 'dashboard'}
         className={cn(
-          'flex items-center gap-1.5 px-3 py-1 text-sm rounded-md transition-colors shrink-0',
+          'flex items-center gap-1.5 px-3 py-1 text-sm rounded-md cursor-pointer transition-colors shrink-0',
           activeTab === 'dashboard'
             ? 'bg-background font-medium shadow-sm'
             : 'text-muted-foreground hover:bg-background/50 hover:text-foreground'
@@ -72,7 +72,7 @@ export function Header() {
               role="tab"
               aria-selected={activeTab === tab}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1 text-sm',
+                'flex items-center gap-1.5 px-3 py-1 text-sm cursor-pointer',
                 activeTab === tab ? 'font-medium' : 'text-muted-foreground hover:text-foreground'
               )}
               onClick={() => setActiveTab(tab)}
