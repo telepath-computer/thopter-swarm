@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { TooltipProvider } from './components/ui/tooltip'
 import { Header } from './components/layout/Header'
 import { TabBar } from './components/layout/TabBar'
@@ -36,14 +36,24 @@ export default function App() {
     }
   }, [setAppFocused])
 
-  // Initial load + auto-refresh every 30 seconds (when enabled and app is focused)
-  useEffect(() => {
+  // Initial load + auto-refresh every 30 seconds (when enabled and app is focused).
+  // On refocus, refresh immediately if stale (>= 30s since last refresh).
+  const lastRefreshAt = useRef(0)
+  const doRefresh = () => {
     refreshThopters()
+    lastRefreshAt.current = Date.now()
+  }
+
+  useEffect(() => {
+    doRefresh()
   }, [refreshThopters])
 
   useEffect(() => {
     if (!autoRefresh || !appFocused) return
-    const id = setInterval(refreshThopters, 30_000)
+    if (Date.now() - lastRefreshAt.current >= 30_000) {
+      doRefresh()
+    }
+    const id = setInterval(doRefresh, 30_000)
     return () => clearInterval(id)
   }, [autoRefresh, appFocused, refreshThopters])
 
