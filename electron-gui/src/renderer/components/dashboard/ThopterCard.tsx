@@ -60,6 +60,9 @@ export function ThopterCard({ thopter }: Props) {
       </CardHeader>
       <CardContent className="space-y-2 text-xs text-muted-foreground">
         <p className="line-clamp-2 text-foreground/80">{thopter.statusLine ?? 'No status line'}</p>
+        {thopter.notes && (
+          <p className="line-clamp-2 text-muted-foreground/70 italic">{thopter.notes}</p>
+        )}
         <div className="flex items-center gap-3">
           {thopter.owner && (
             <span className="flex items-center gap-1">

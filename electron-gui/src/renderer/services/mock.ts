@@ -166,6 +166,7 @@ export class MockThopterService implements ThopterService {
         id: `dvbx_mock_${name.replace('-', '_')}_${1000 + i}`,
         status: STATUSES[i],
         statusLine: STATUS_LINES[i],
+        notes: i === 0 ? 'Check PR #42 before merging\nNeeds security review' : null,
         heartbeat: minutesAgo(heartbeatMinutes),
         alive: STATUSES[i] !== 'done' && STATUSES[i] !== 'inactive',
         claudeRunning: STATUSES[i] === 'running',
@@ -242,6 +243,7 @@ export class MockThopterService implements ThopterService {
       id: `dvbx_mock_${Date.now()}`,
       status: 'running',
       statusLine: opts.prompt.slice(0, 80),
+      notes: null,
       heartbeat: new Date().toISOString(),
       alive: true,
       claudeRunning: true,
@@ -361,6 +363,12 @@ export class MockThopterService implements ThopterService {
     const info = this.thopters.get(name);
     if (!info) throw new Error(`Unknown thopter '${name}'`);
     info.statusLine = statusLine;
+  }
+
+  async updateNotes(name: string, notes: string): Promise<void> {
+    const info = this.thopters.get(name);
+    if (!info) throw new Error(`Unknown thopter '${name}'`);
+    info.notes = notes;
   }
 
   attachThopter(name: string): void {

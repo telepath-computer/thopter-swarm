@@ -1390,7 +1390,7 @@ export async function createDevbox(opts: {
  */
 export async function fetchThopters(): Promise<{
   name: string; owner: string; id: string; devboxStatus: string;
-  status: string | null; statusLine: string | null; heartbeat: string | null;
+  status: string | null; statusLine: string | null; notes: string | null; heartbeat: string | null;
   alive: boolean; claudeRunning: boolean; lastMessage: string | null;
 }[]> {
   const { getRedisInfoForNames } = await import("./status.js");
@@ -1413,6 +1413,7 @@ export async function fetchThopters(): Promise<{
         devboxStatus: db.status,
         status: redis?.status ?? null,
         statusLine: redis?.statusLine ?? null,
+        notes: redis?.notes ?? null,
         heartbeat: redis?.heartbeat ?? null,
         alive: redis?.alive ?? false,
         claudeRunning: redis?.claudeRunning === "1",
@@ -1449,6 +1450,7 @@ export async function fetchThopters(): Promise<{
       devboxStatus: db.status,
       status: redis?.status ?? null,
       statusLine: redis?.statusLine ?? null,
+      notes: redis?.notes ?? null,
       heartbeat: redis?.heartbeat ?? null,
       alive: redis?.alive ?? false,
       claudeRunning: redis?.claudeRunning === "1",

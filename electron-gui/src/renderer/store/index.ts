@@ -112,6 +112,16 @@ export const useStore = create<Store>((set, get) => ({
     })
   },
 
+  updateNotes: async (name, notes) => {
+    const service = getService()
+    await service.updateNotes(name, notes)
+    set((s) => {
+      const thopter = s.thopters[name]
+      if (!thopter) return s
+      return { thopters: { ...s.thopters, [name]: { ...thopter, notes } } }
+    })
+  },
+
   destroyThopter: async (name) => {
     const service = getService()
     await service.destroyThopter(name)
