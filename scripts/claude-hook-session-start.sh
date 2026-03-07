@@ -9,7 +9,7 @@ TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 # Signal activity for heartbeat liveness detection
 [ -n "$TRANSCRIPT" ] && echo "$TRANSCRIPT" > /tmp/thopter-active || touch /tmp/thopter-active
 
-thopter-status-line log "session started" 2>/dev/null || true
+thopter-status log "session started" 2>/dev/null || true
 
 # Reset transcript cursor and push session marker for thopter tail
 [ -n "$TRANSCRIPT" ] && node /usr/local/bin/thopter-transcript-push "$TRANSCRIPT" --reset 2>/dev/null || true

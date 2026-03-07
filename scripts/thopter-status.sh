@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# thopter-status-line: report thopter status, logs, and health to redis.
+# thopter-status: report thopter status, logs, and health to redis.
 # Reads THOPTER_NAME, THOPTER_ID, THOPTER_REDIS_URL from environment.
 
 set -euo pipefail
@@ -96,7 +96,7 @@ cmd_statusline() {
 }
 
 cmd_show() {
-    echo "=== thopter-status-line: ${THOPTER_NAME} ==="
+    echo "=== thopter-status: ${THOPTER_NAME} ==="
     echo "ID:             $(rcli GET "$PREFIX:id")"
     echo "Status:         $(rcli GET "$PREFIX:status")"
     echo "Status line:    $(rcli GET "$PREFIX:statusline")"
@@ -121,7 +121,7 @@ case "${1:-}" in
     heartbeat)  cmd_heartbeat ;;
     show)       cmd_show ;;
     *)
-        echo "Usage: thopter-status-line {log|waiting|done|running|statusline|heartbeat|message|show} [args...]"
+        echo "Usage: thopter-status {log|waiting|done|running|statusline|heartbeat|message|show} [args...]"
         echo ""
         echo "Commands:"
         echo "  log <message>           Add a timestamped log entry"

@@ -55,7 +55,7 @@ export function subscribeMockNtfy(
   const MOCK_THOPTERS = ['eager-falcon', 'calm-horizon', 'bright-nebula', 'swift-current', 'quiet-ember'];
 
   const MOCK_MESSAGES = [
-    'Claude session stopped after completing task.',
+    'Claude session stopped after completing prompt.',
     'Finished: "Implementing auth middleware for API routes"',
     'npm run build failed with exit code 1',
     'Created PR #42: "Add rate limiting to API endpoints"',

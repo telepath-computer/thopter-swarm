@@ -38,7 +38,7 @@ ${branchInfo}
 
 IMPORTANT: You can only push to branches prefixed with \`thopter/\`. Create a \`thopter/\` branch for your work. You cannot push to \`main\` or \`master\` directly. If you want to propose changes, push to a \`thopter/\` branch and create a pull request.
 
-Your task:
+Your prompt:
 ${opts.userPrompt}`;
 }
 
@@ -58,7 +58,7 @@ function buildHomeDirPrompt(opts: {
 
 IMPORTANT: You can only push to branches prefixed with \`thopter/\`. Create a \`thopter/\` branch for your work. You cannot push to \`main\` or \`master\` directly. If you want to propose changes, push to a \`thopter/\` branch and create a pull request.
 
-Your task:
+Your prompt:
 ${opts.userPrompt}`;
 }
 

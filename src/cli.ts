@@ -41,7 +41,7 @@ examples:
   thopter use                            View current default
   thopter use --clear                    Clear default thopter
   thopter ssh .                          SSH into the default thopter
-  thopter run --repo owner/repo "prompt"  Launch Claude with a task
+  thopter run --repo owner/repo "prompt"  Launch Claude with a prompt
   thopter reauth                         Re-authenticate and update snapshot
   thopter sync setup                      Set up SyncThing config (run on laptop)
   thopter sync show                      Show current SyncThing config
@@ -192,7 +192,7 @@ function collect(value: string, previous: string[]): string[] {
 program
   .command("run")
   .description("Create a thopter and run Claude with a prompt")
-  .argument("<prompt>", "The task/prompt to give Claude")
+  .argument("<prompt>", "The prompt to give Claude")
   .option("--repo <owner/repo>", "GitHub repository to clone")
   .option("--branch <name>", "Git branch to start from")
   .option("--home", "Use ~/workspace as working directory (no single repo)")
