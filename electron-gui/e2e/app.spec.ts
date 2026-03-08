@@ -37,10 +37,12 @@ async function openDetailTranscript() {
 
 // Helper to ensure we're in a detail view (any mode)
 async function ensureDetailView() {
-  const h2 = page.locator('h2').first()
-  if (!(await h2.isVisible().catch(() => false))) {
+  // Check for the dropdown trigger which only exists in the detail StatusPanel
+  const trigger = page.locator('[data-slot="dropdown-menu-trigger"]')
+  if (!(await trigger.isVisible().catch(() => false))) {
     await goToDashboard()
     await page.locator('[data-slot="card"]').first().click()
+    await expect(trigger).toBeVisible({ timeout: 5_000 })
   }
 }
 
@@ -193,6 +195,17 @@ test('actions dropdown opens and shows all menu items', async () => {
   await expect(content.getByText('Shell Commands')).toBeVisible()
   await expect(content.getByText('Suspend').or(content.getByText('Resume'))).toBeVisible()
   await expect(content.getByText('Destroy')).toBeVisible()
+
+  // Verify the dropdown is actually visible on screen
+  const box = await content.boundingBox()
+  expect(box).not.toBeNull()
+  expect(box!.width).toBeGreaterThan(50)
+  expect(box!.height).toBeGreaterThan(30)
+  const viewport = page.viewportSize()!
+  expect(box!.x).toBeGreaterThanOrEqual(0)
+  expect(box!.y).toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width)
+  expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height)
 
   await page.keyboard.press('Escape')
   await expect(content).not.toBeVisible()

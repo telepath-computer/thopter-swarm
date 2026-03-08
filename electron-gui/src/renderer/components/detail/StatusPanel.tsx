@@ -3,7 +3,8 @@ import { Clock, User, Cpu, Pause, Play, Trash2, TerminalSquare, MoreHorizontal }
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+// Radix DropdownMenu's floating-ui popper fails in Electron (isPositioned never
+// becomes true). Use a simple CSS-positioned menu instead.
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog'
 import { ShellCommandsModal } from '@/components/modals/ShellCommandsModal'
 import { cn, relativeTime } from '@/lib/utils'
@@ -101,6 +102,8 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
   const [confirmSuspend, setConfirmSuspend] = useState(false)
   const [confirmResume, setConfirmResume] = useState(false)
   const [shellModalOpen, setShellModalOpen] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
+  const actionsRef = useRef<HTMLDivElement>(null)
 
   const status = thopter.status ?? 'inactive'
   const cfg = statusConfig[status] ?? statusConfig.inactive
@@ -112,6 +115,25 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
     { key: 'transcript' as const, label: 'Transcript' },
     { key: 'terminal' as const, label: 'Snapshot' },
   ]
+
+  // Close actions menu on click outside or Escape
+  useEffect(() => {
+    if (!actionsOpen) return
+    const onClickOutside = (e: MouseEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+        setActionsOpen(false)
+      }
+    }
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActionsOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [actionsOpen])
 
   const onSaveStatusLine = useCallback(
     (text: string) => updateStatusLine(thopter.name, text),
@@ -171,41 +193,66 @@ export function StatusPanel({ thopter, viewMode, onViewModeChange }: Props) {
           ))}
         </div>
 
-        {/* Actions dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon-xs" className="shrink-0">
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setShellModalOpen(true)}>
-              <TerminalSquare className="size-3.5 mr-2" />
-              Shell Commands
-            </DropdownMenuItem>
-            {showSuspendResume && (
-              <>
-                <DropdownMenuSeparator />
-                {isSuspended ? (
-                  <DropdownMenuItem onClick={() => setConfirmResume(true)}>
-                    <Play className="size-3.5 mr-2" />
-                    Resume
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onClick={() => setConfirmSuspend(true)}>
-                    <Pause className="size-3.5 mr-2" />
-                    Suspend
-                  </DropdownMenuItem>
-                )}
-              </>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDestroy(true)}>
-              <Trash2 className="size-3.5 mr-2" />
-              Destroy
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Actions menu — simple CSS-positioned dropdown (Radix floating-ui
+             fails in Electron: isPositioned never becomes true) */}
+        <div ref={actionsRef} className="relative shrink-0">
+          <Button
+            data-slot="dropdown-menu-trigger"
+            variant="outline"
+            size="icon-xs"
+            onClick={() => setActionsOpen((v) => !v)}
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+          {actionsOpen && (
+            <div
+              data-slot="dropdown-menu-content"
+              className="absolute right-0 top-full mt-1 z-50 min-w-[8rem] rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            >
+              <button
+                data-slot="dropdown-menu-item"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground"
+                onClick={() => { setActionsOpen(false); setShellModalOpen(true) }}
+              >
+                <TerminalSquare className="size-3.5" />
+                Shell Commands
+              </button>
+              {showSuspendResume && (
+                <>
+                  <div className="bg-border -mx-1 my-1 h-px" />
+                  {isSuspended ? (
+                    <button
+                      data-slot="dropdown-menu-item"
+                      className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => { setActionsOpen(false); setConfirmResume(true) }}
+                    >
+                      <Play className="size-3.5" />
+                      Resume
+                    </button>
+                  ) : (
+                    <button
+                      data-slot="dropdown-menu-item"
+                      className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => { setActionsOpen(false); setConfirmSuspend(true) }}
+                    >
+                      <Pause className="size-3.5" />
+                      Suspend
+                    </button>
+                  )}
+                </>
+              )}
+              <div className="bg-border -mx-1 my-1 h-px" />
+              <button
+                data-slot="dropdown-menu-item"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-hidden select-none hover:bg-destructive/10"
+                onClick={() => { setActionsOpen(false); setConfirmDestroy(true) }}
+              >
+                <Trash2 className="size-3.5" />
+                Destroy
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Row 2: Status line + Notes side by side */}
