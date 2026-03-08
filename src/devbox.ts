@@ -799,7 +799,7 @@ function installThopterScriptsDO(
 ): void {
   void name;
   const files: Array<{ archivePath: string; contents: string }> = [
-    { archivePath: "tmp/thopter-status-line", contents: readScript("thopter-status-line.sh") },
+    { archivePath: "tmp/thopter-status", contents: readScript("thopter-status.sh") },
     { archivePath: "tmp/thopter-heartbeat", contents: readScript("thopter-heartbeat.sh") },
     { archivePath: "tmp/thopter-cron-install.sh", contents: readScript("thopter-cron-install.sh") },
     { archivePath: "home/.config/nvim/lua/options.lua", contents: readScript("nvim-options.lua") },
@@ -836,7 +836,7 @@ function installThopterScriptsDO(
   uploadBundleToDO(dropletId, files, log);
 
   const installCmd =
-    "sudo install -m 755 /tmp/thopter-status-line /usr/local/bin/thopter-status-line && " +
+    "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && " +
     "sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && " +
     "sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && " +
     "chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh";
@@ -853,7 +853,7 @@ function installThopterScriptsDO(
 }
 
 /**
- * Upload thopter-status-line scripts and install cron heartbeat on a running devbox.
+ * Upload thopter-status scripts and install cron heartbeat on a running devbox.
  */
 async function installThopterScripts(
   devboxId: string,
@@ -864,8 +864,8 @@ async function installThopterScripts(
 
   // Upload scripts
   await client.devboxes.writeFileContents(devboxId, {
-    file_path: "/tmp/thopter-status-line",
-    contents: readScript("thopter-status-line.sh"),
+    file_path: "/tmp/thopter-status",
+    contents: readScript("thopter-status.sh"),
   });
   await client.devboxes.writeFileContents(devboxId, {
     file_path: "/tmp/thopter-heartbeat",
@@ -944,7 +944,7 @@ async function installThopterScripts(
 
   // Install scripts to /usr/local/bin, make hooks executable, register hooks, set up cron
   await client.devboxes.executeAsync(devboxId, {
-    command: "sudo install -m 755 /tmp/thopter-status-line /usr/local/bin/thopter-status-line && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
+    command: "sudo install -m 755 /tmp/thopter-status /usr/local/bin/thopter-status && sudo install -m 755 /tmp/thopter-heartbeat /usr/local/bin/thopter-heartbeat && sudo install -m 755 /tmp/thopter-transcript-push.mjs /usr/local/bin/thopter-transcript-push && chmod +x /home/user/.claude/hooks/*.sh && node /tmp/install-claude-hooks.mjs && bash /tmp/thopter-cron-install.sh",
   });
   await client.devboxes.executeAsync(devboxId, {
     command: thopterBashrcEnsureCommand(),
@@ -1330,7 +1330,7 @@ export async function createDevbox(opts: {
       });
     }
 
-    // Upload and install thopter-status-line scripts + cron
+    // Upload and install thopter-status scripts + cron
     log("Installing thopter scripts...");
     await installThopterScripts(devbox.id, opts.name);
 

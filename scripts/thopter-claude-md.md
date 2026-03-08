@@ -15,21 +15,21 @@ directly to `main` or `master`.
 
 ## Status Reporting
 
-The `thopter-status-line` CLI reports your status to a shared Redis dashboard.
+The `thopter-status` CLI reports your status to a shared Redis dashboard.
 Keep your status line up to date so your operator knows what you're
 working on:
 
 ```bash
-thopter-status-line statusline "implementing auth middleware"
+thopter-status statusline "implementing auth middleware"
 ```
 
 Update it whenever your goal changes. Other useful commands:
 
 ```bash
-thopter-status-line running        # mark yourself as actively working
-thopter-status-line waiting "msg"  # blocked / waiting for input
-thopter-status-line done "msg"     # finished current task
-thopter-status-line log "msg"      # append a timestamped log entry
+thopter-status running        # mark yourself as actively working
+thopter-status waiting "msg"  # blocked / waiting for input
+thopter-status done "msg"     # finished current status line
+thopter-status log "msg"      # append a timestamped log entry
 ```
 
 ## Environment

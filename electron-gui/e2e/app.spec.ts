@@ -292,10 +292,10 @@ test('run tab: can navigate through steps', async () => {
   await page.getByRole('button', { name: 'Next' }).click()
 
   // Should be on prompt step
-  await expect(page.locator('label').filter({ hasText: 'Task Description' })).toBeVisible()
+  await expect(page.locator('label').filter({ hasText: 'Prompt Description' })).toBeVisible()
 
   // Enter a prompt (use data-slot to target the Textarea UI component, not status panel fields)
-  await page.locator('textarea[data-slot="textarea"]').fill('Test task for playwright')
+  await page.locator('textarea[data-slot="textarea"]').fill('Test prompt for playwright')
 
   // Click Next
   await page.getByRole('button', { name: 'Next' }).click()

@@ -76,7 +76,7 @@ function summarizeToolUse(toolName, input) {
     case "WebFetch":
       return `WebFetch: ${input.url ?? "?"}`;
     case "Task":
-      return `Task: ${input.description ?? "subagent"}`;
+      return `Subagent: ${input.description ?? "subagent"}`;
     default:
       return `${toolName}: ${JSON.stringify(input).slice(0, 100)}`;
   }

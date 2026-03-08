@@ -13,7 +13,7 @@
 1. `thopter create` provisions a Runloop devbox with metadata tags (`managed_by=runloop-thopters`, `thopter_name=<name>`, `thopter_owner=<git-user>`)
 2. On fresh creates (no snapshot), an init script installs Claude Code, Codex, neovim, starship, tmux, and developer tools
 3. After the devbox is running, env vars from `~/.thopter.json` are written to `~/.thopter-env`, git credentials are configured via the credential store, and thopter scripts (hooks, heartbeat, status) are uploaded
-4. Claude Code hooks fire on session events (start, stop, notification, prompt, tool use) and report to Redis via `thopter-status-line`
+4. Claude Code hooks fire on session events (start, stop, notification, prompt, tool use) and report to Redis via `thopter-status`
 5. A cron job runs a heartbeat every ~10 seconds, setting an `alive` key with 30s TTL as a dead-man's switch
 6. Devboxes shut down after 12 hours (configurable via `--keep-alive`); reset with `thopter keepalive`
 
@@ -46,7 +46,7 @@ src/           TypeScript source
   output.ts    Table formatting helper
 
 scripts/       Devbox-side scripts (uploaded on create)
-  thopter-status-line.sh       Redis status reporter
+  thopter-status.sh            Redis status reporter
   thopter-heartbeat.sh         Heartbeat cron loop
   thopter-cron-install.sh      Installs heartbeat cron job
   thopter-transcript-push.mjs  Streams transcript entries to Redis (for thopter tail + last_message)

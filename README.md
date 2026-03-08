@@ -2,7 +2,7 @@
 
 CLI for managing Runloop.ai devboxes as autonomous Claude Code development environments.
 
-Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentials, developer tools, and Claude Code hooks that report status to Redis. Create one, point it at a repo and a task, and let Claude work autonomously while you monitor it from your laptop.
+Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentials, developer tools, and Claude Code hooks that report status to Redis. Create one, point it at a repo and a prompt, and let Claude work autonomously while you monitor it from your laptop.
 
 This is just an internal dev tool we use at [Telepath](https://telepath.computer), but we've made it open as a conversation starter, for feedback, and contributions. Message josh@telepath.computer to chat about it.
 
@@ -203,4 +203,3 @@ npm run dev          # launch in dev mode (connects to real Redis)
 ```
 
 The GUI shells out to the `thopter` CLI for mutations (run, destroy, suspend, etc.) and reads directly from Redis for live data (status, transcripts, screen dumps). Make sure the CLI is installed and configured first (`thopter setup`).
-

@@ -97,7 +97,7 @@ export function RunTab({ tabId }: { tabId: string }) {
 
   function handleNextFromPrompt() {
     if (!prompt.trim()) {
-      setError('Please enter a task description')
+      setError('Please enter a prompt description')
       return
     }
     setError(null)
@@ -162,7 +162,7 @@ export function RunTab({ tabId }: { tabId: string }) {
   const STEP_LABELS: { key: Step; label: string }[] = [
     { key: 'mode', label: 'Mode' },
     { key: 'repos', label: mode === 'home' ? 'Checkouts' : 'Repository' },
-    { key: 'prompt', label: 'Task' },
+    { key: 'prompt', label: 'Prompt' },
     { key: 'review', label: 'Launch' },
   ]
 
@@ -175,7 +175,7 @@ export function RunTab({ tabId }: { tabId: string }) {
             Run New Thopter
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Launch a new devbox with Claude Code working on a task.
+            Launch a new devbox with Claude Code working on a prompt.
           </p>
         </div>
 
@@ -195,7 +195,7 @@ export function RunTab({ tabId }: { tabId: string }) {
         {step === 'mode' && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Choose how Claude should work on this task.
+              Choose how Claude should work on this prompt.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -383,11 +383,11 @@ export function RunTab({ tabId }: { tabId: string }) {
           </div>
         )}
 
-        {/* Step 3: Task prompt */}
+        {/* Step 3: Prompt */}
         {step === 'prompt' && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Task Description</Label>
+              <Label>Prompt Description</Label>
               <p className="text-xs text-muted-foreground">
                 Describe what Claude should work on. This becomes the initial prompt.
               </p>
@@ -496,7 +496,7 @@ export function RunTab({ tabId }: { tabId: string }) {
               )}
               <Separator />
               <div>
-                <span className="text-muted-foreground">Task</span>
+                <span className="text-muted-foreground">Prompt</span>
                 <p className="mt-1 text-xs whitespace-pre-wrap line-clamp-4">{prompt}</p>
               </div>
               {(customName || snapshotId || (showKeepAlive && keepAlive)) && (

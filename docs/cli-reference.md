@@ -6,7 +6,7 @@ Full command reference for the `thopter` CLI. See the [README](../README.md) for
 
 | Command | Description |
 |---------|-------------|
-| `thopter run "<prompt>"` | Create a thopter and run Claude with a task |
+| `thopter run "<prompt>"` | Create a thopter and run Claude with a prompt |
 | `thopter run --repo owner/repo "<prompt>"` | Clone a repo first, then run Claude |
 | `thopter run --branch feature "<prompt>"` | Specify a branch to work on |
 | `thopter run --name my-worker "<prompt>"` | Name the thopter (auto-generated otherwise) |
