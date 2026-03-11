@@ -17,7 +17,6 @@ The active provider is currently DigitalOcean, but this config file still contai
 | `claudeMdPath` | string | no | Path to a custom CLAUDE.md uploaded to new thopters. |
 | `repos` | array | no | Predefined repositories for `thopter run`. |
 | `uploads` | array | no | Files to upload to newly created thopters after provisioning. |
-| `syncthing` | object | no | Local SyncThing configuration for pairing with thopters. |
 | `envVars` | object | no | Key-value map of environment variables injected into new thopters. |
 | `docs` | string | no | Ignored by the CLI. Convenience pointer to this reference doc. |
 
@@ -52,17 +51,6 @@ Each entry has this shape:
 { "local": "/path/on/laptop", "remote": "/path/on/thopter" }
 ```
 
-## `syncthing`
-
-The local SyncThing config shape is:
-
-```json
-{
-  "deviceId": "MFZWI3D-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX",
-  "folderName": "my-sync-folder"
-}
-```
-
 ## Example: DigitalOcean-First
 
 ```json
@@ -83,10 +71,6 @@ The local SyncThing config shape is:
   "uploads": [
     { "local": "/Users/jw/.npmrc", "remote": "/home/user/.npmrc" }
   ],
-  "syncthing": {
-    "deviceId": "MFZWI3D-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX",
-    "folderName": "thopter-sync"
-  },
   "envVars": {
     "GH_TOKEN": "ghp_abc123...",
     "THOPTER_REDIS_URL": "rediss://default:abc123@us1-example.upstash.io:6379",

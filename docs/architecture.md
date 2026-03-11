@@ -41,7 +41,6 @@ DigitalOcean is not a drop-in replacement for RunLoop, so a few semantics differ
 - no thopter-specific suspend/resume lifecycle equivalent
 - no keep-alive timer reset behavior equivalent to the old model
 - droplets are regular VMs accessed over SSH rather than provider-proxied devboxes
-- SyncThing auto-pairing on `create` is not implemented yet in DigitalOcean mode
 
 The CLI keeps some old commands for compatibility, but in DigitalOcean mode unsupported operations fail fast with explicit messages.
 
@@ -72,7 +71,6 @@ src/
   status.ts      Unified provider + Redis status
   setup.ts       Interactive local setup wizard
   config.ts      ~/.thopter.json management
-  sync.ts        SyncThing integration
 
 scripts/
   thopter-status.sh

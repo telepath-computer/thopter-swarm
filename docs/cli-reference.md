@@ -29,7 +29,6 @@ See the [README](../README.md) for the practical workflow.
 | `thopter create --snapshot <name-or-id>` | Restore from a specific snapshot |
 | `thopter create --fresh` | Ignore the default snapshot and create fresh |
 | `thopter create -a` | Create and immediately SSH in |
-| `thopter create --no-sync` | Skip SyncThing setup hooks |
 | `thopter destroy <name>` | Permanently delete a thopter |
 | `thopter snapshot list` | List snapshots |
 | `thopter snapshot create <thopter> [name]` | Snapshot a thopter |
@@ -109,14 +108,3 @@ Env vars are stored locally in `~/.thopter.json` and written into new thopters a
 | `thopter setup` | Interactive first-time setup |
 | `thopter config get [key]` | Show config |
 | `thopter config set <key> <value>` | Set a config value |
-
-## SyncThing
-
-| Command | Description |
-|---------|-------------|
-| `thopter sync setup` | Configure local SyncThing integration |
-| `thopter sync show` | Show current SyncThing config |
-| `thopter sync pair <name>` | Pair a thopter with your local SyncThing |
-| `thopter sync unpair <name>` | Remove a thopter from local SyncThing |
-
-In DigitalOcean mode, `thopter sync pair` is the reliable way to connect a thopter. Auto-pair on `create` is not implemented yet.

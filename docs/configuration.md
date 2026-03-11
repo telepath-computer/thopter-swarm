@@ -117,20 +117,6 @@ You can push local files to each new thopter after provisioning:
 
 This is useful for dotfiles, package manager auth, or other per-user bootstrap material.
 
-## SyncThing
-
-SyncThing config lives under the `syncthing` key in `~/.thopter.json`.
-
-Typical workflow:
-
-```bash
-thopter sync setup
-thopter sync pair my-thopter
-thopter sync show
-```
-
-In DigitalOcean mode, manual pairing works. Automatic SyncThing pairing during `thopter create` is not implemented yet.
-
 ## Legacy Fields
 
 These still exist mainly for compatibility with the older RunLoop-based code path:

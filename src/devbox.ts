@@ -28,7 +28,6 @@ import {
   getUploads,
   getStopNotifications,
   getStopNotificationQuietPeriod,
-  getSyncthingConfig,
 } from "./config.js";
 
 /** Tool installation script that runs inside the devbox on first create. */
@@ -1062,7 +1061,6 @@ export async function createDevbox(opts: {
   snapshotId?: string;
   fresh?: boolean;
   keepAlive?: number;
-  noSync?: boolean;
 }): Promise<string> {
   const log = makeTimedLogger(Date.now());
 
@@ -1254,11 +1252,6 @@ export async function createDevbox(opts: {
         }
       }
 
-      if (!opts.noSync && getSyncthingConfig()) {
-        log("WARNING: SyncThing auto-pair on create is not implemented in DigitalOcean mode yet.");
-        log("  Set up later manually once DO sync integration is migrated.");
-      }
-
       log(`Create complete: ${dropletId}`);
       printPostCreateChecklist(log);
       return dropletId;
@@ -1342,25 +1335,6 @@ export async function createDevbox(opts: {
           file_path: entry.remote,
           contents: readFileSync(entry.local, "utf-8"),
         });
-      }
-    }
-
-    // Install SyncThing if configured in ~/.thopter.json
-    if (!opts.noSync) {
-      const syncConfig = getSyncthingConfig();
-      if (syncConfig) {
-        try {
-          const { installSyncthingOnDevbox, pairDeviceLocally } = await import("./sync.js");
-          const devboxDeviceId = await installSyncthingOnDevbox(devbox.id, syncConfig);
-          if (devboxDeviceId) {
-            await pairDeviceLocally(devboxDeviceId, opts.name);
-          }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          log(`WARNING: SyncThing setup failed: ${msg}`);
-          log("  Devbox is ready, but file sync is not configured.");
-          log("  To set up later: thopter sync pair " + opts.name);
-        }
       }
     }
 

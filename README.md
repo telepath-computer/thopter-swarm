@@ -122,7 +122,6 @@ The DigitalOcean migration is functional, but it is not feature-identical with R
 
 - `create`, `run`, `status`, `tail`, `tell`, `ssh`, `exec`, `destroy`, and snapshots work in DigitalOcean mode
 - `suspend`, `resume`, and `keepalive` remain in the CLI for compatibility, but DigitalOcean mode currently rejects them explicitly
-- `sync` works, but SyncThing auto-pairing during `thopter create` is not implemented in DigitalOcean mode yet; use `thopter sync pair <name>`
 - some help text, package metadata, and config names still say "Runloop" because the cleanup is incomplete
 
 That mismatch is intentional for now: preserve familiar CLI surface first, then make the provider model cleaner.
@@ -154,7 +153,6 @@ See [docs/cli-reference.md](docs/cli-reference.md) for command details.
 - [DigitalOcean setup notes](do-setup.md)
 - [RunLoop mode notes](docs/runloop.md)
 - [Clipboard setup](docs/clipboard.md)
-- [SyncThing file sync design](docs/syncthing-artifact-sync.md)
 - [Design docs and ideas](docs/)
 
 ## Electron GUI (Experimental)
