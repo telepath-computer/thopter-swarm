@@ -1,84 +1,107 @@
 # CLAUDE.md
 
-CLI (`./thopter`) for managing Runloop.ai devboxes as autonomous Claude Code dev environments. Creates cloud VMs with Claude Code, git creds, monitoring hooks, and dev tools pre-configured.
+CLI (`./thopter`) for managing remote thopters as autonomous Claude Code dev environments.
+
+The active runtime path is **DigitalOcean droplets**. RunLoop support still exists in parts of the codebase for compatibility, but it is not the primary mode. Thopters are instrumented with Claude Code hooks that push status, logs, transcript activity, and notifications into Redis-backed dashboards and `ntfy.sh`.
 
 ## Build
 
-```
-npm install && npm run build   # always build (tsc) before committing
-./thopter --help               # CLI via tsx wrapper → src/cli.ts
+```bash
+npm install
+npm run build
+./thopter --help
 ```
 
-No test suite exists. TypeScript compilation (`npm run build`) is the only validation step.
+There is no real automated test suite. `npm run build` is the required validation step before committing.
 
 ### Electron GUI
 
-```
+```bash
 cd electron-gui
-npm install && npm run rebuild   # rebuild node-pty for Electron
-npm run dev                      # launch (real Redis)
-npm run dev:mock                 # launch (mock data, no Redis)
+npm install
+npm run rebuild
+npm run dev
+npm run dev:mock
 ```
 
-The GUI shells out to the `thopter` CLI for mutations and reads Redis directly for live data.
+The GUI shells out to the `thopter` CLI for mutations and reads Redis directly for live state, notifications, and terminal/dashboard data.
 
 ## Source Map
 
-```
+```text
 src/
-  cli.ts        CLI entrypoint (Commander.js). All subcommands registered here.
-  devbox.ts     Devbox lifecycle: create, list, destroy, ssh, exec, suspend/resume, snapshot
-  run.ts        `thopter run`: create devbox + clone repo + launch Claude in tmux
+  cli.ts        CLI entrypoint. All subcommands registered here.
+  devbox.ts     Thopter lifecycle: create, list, destroy, ssh, exec, snapshots
+  run.ts        `thopter run`: create thopter + clone repo + launch Claude in tmux
   tail.ts       `thopter tail`: stream Claude transcript from Redis
   tell.ts       `thopter tell`: send messages to a running Claude session via tmux
-  status.ts     Redis status queries (heartbeat, agent state, last message)
+  status.ts     Redis-backed status queries and detailed thopter status output
   config.ts     ~/.thopter.json read/write, env loading
   setup.ts      Interactive setup wizard
-  client.ts     Runloop SDK singleton (@runloop/api-client)
-  names.ts      Random name generator (friendly-words)
+  client.ts     RunLoop SDK singleton for the legacy compatibility path
+  provider.ts   Active provider selector (`digitalocean` is hard-coded today)
+  do-ssh-key.ts DigitalOcean SSH key registration helpers
+  names.ts      Random name generator
   output.ts     Table formatting
 
-scripts/        Uploaded to devboxes at create time
+scripts/        Uploaded to thopters at create time
   thopter-status.sh             Redis status-line reporter CLI (used by hooks)
-  thopter-heartbeat.sh          Heartbeat cron (touch activity file, report to Redis)
+  thopter-heartbeat.sh          Heartbeat cron + screen dump capture
   thopter-cron-install.sh       Installs heartbeat cron
-  thopter-transcript-push.mjs   Streams transcript to Redis (for `thopter tail`)
+  thopter-transcript-push.mjs   Streams transcript entries to Redis
   install-claude-hooks.mjs      Merges hooks into Claude settings.json
-  claude-hook-*.sh              Claude Code event hooks (start, stop, prompt, tool-use, notification)
-  thopter-claude-md.md          Default ~/.claude/CLAUDE.md deployed to devboxes
-  starship.toml / tmux.conf / nvim-options.lua   Devbox tool configs
+  claude-hook-*.sh              Claude Code event hooks
+  thopter-claude-md.md          Default ~/.claude/CLAUDE.md deployed to thopters
+  starship.toml / tmux.conf / nvim-options.lua   Thopter tool configs
 
-electron-gui/   Electron desktop app (experimental)
+electron-gui/   Electron desktop app
   src/main/index.ts                     Electron main process
   src/renderer/App.tsx                  Root React component
-  src/renderer/store/                   Zustand store (state + actions)
-  src/renderer/services/                Service layer (real.ts = Redis + CLI, mock.ts = dev data)
-  src/renderer/components/dashboard/    Dashboard + ThopterCard
-  src/renderer/components/detail/       ThopterDetail, TranscriptView, TerminalView, LiveTerminalView, ActionBar, StatusPanel
-  src/renderer/components/layout/       Header, TabBar, NotificationSidebar
-  src/renderer/components/modals/       RunTab, ReauthTab, ShellCommandsModal, ConfirmDialog
-  src/renderer/components/ui/           shadcn/ui primitives
-  electron.vite.config.ts              Vite config (node-pty in externals)
+  src/renderer/store/                   Zustand store
+  src/renderer/services/                Real + mock service layers
+  src/renderer/components/dashboard/    Dashboard + thopter cards
+  src/renderer/components/detail/       Detail views, transcript, terminals, actions
+  src/renderer/components/layout/       Header, tabs, notifications
+  src/renderer/components/modals/       Run/reauth/modals
+  src/renderer/components/ui/           UI primitives
 ```
 
 ## Key Architecture
 
-- **Devboxes**: Runloop KVM microVMs. Tagged `managed_by=runloop-thopters` + `thopter_name` + `thopter_owner`.
-- **Snapshots**: "Golden snapshot" pattern — configure once, stamp out clones. `thopter snapshot default` sets the base image.
-- **Status/monitoring**: Upstash Redis. Heartbeat cron (10s interval, 30s TTL dead-man switch). Claude hooks report events. `thopter status` and `thopter tail` read from Redis.
-- **Env vars**: `~/.thopter.json` `envVars` → written to `~/.thopter-env` on devbox at create time.
-- **SSH**: Via `rli` CLI (`@runloop/rl-cli`), not raw SSH.
+- **Provider**: DigitalOcean-first. The current selector is hard-coded in [`src/provider.ts`](src/provider.ts).
+- **Machines**: droplets bootstrapped over SSH, then provisioned with Claude Code, Codex, tmux, git credentials, helper scripts, and hooks.
+- **Snapshots**: "golden snapshot" workflow. Configure a thopter once, then stamp out clones with `thopter snapshot default`.
+- **Status/monitoring**: Redis. Heartbeat cron, Claude hooks, transcript streaming, status line reporting, and GUI/dashboard state all flow through Redis.
+- **Notifications**: `THOPTER_NTFY_CHANNEL` enables `ntfy.sh` notifications driven by hook events.
+- **SSH**: normal SSH in DigitalOcean mode. Some older comments/help text still reflect the RunLoop era.
+- **Lifecycle caveat**: `suspend`, `resume`, and `keepalive` remain in the CLI for compatibility, but are not supported in DigitalOcean mode.
 
 ## Config Reference
 
-See `thopter-json-reference.md` for all `~/.thopter.json` keys. Key ones: `runloopApiKey`, `defaultSnapshotName`, `defaultRepo`, `defaultBranch`, `envVars` (must include `GH_TOKEN`, `THOPTER_REDIS_URL`), `claudeMdPath`, `uploads`.
+See [`thopter-json-reference.md`](thopter-json-reference.md) for `~/.thopter.json`.
+
+Important keys:
+
+- `defaultSnapshotName`
+- `defaultRepo`
+- `defaultBranch`
+- `defaultThopter`
+- `envVars` including `GH_TOKEN` and `THOPTER_REDIS_URL`
+- `claudeMdPath`
+- `uploads`
+
+Legacy/secondary:
+
+- `runloopApiKey` exists for the older RunLoop path and is not used by the active DigitalOcean provider
 
 ## Stack
 
-**CLI**: TypeScript (ES2022, NodeNext modules, strict). Deps: `@runloop/api-client`, `commander`, `ioredis`, `friendly-words`. Output to `dist/` but runtime uses `tsx` directly.
+**CLI**: TypeScript (ES2022, NodeNext modules, strict). Deps include `commander`, `ioredis`, `friendly-words`, and the legacy `@runloop/api-client`.
 
-**GUI**: Electron + React 18 + Zustand + Tailwind CSS v4. Uses merged context (`nodeIntegration: true`) — renderer uses `window.require` for Node.js modules (ioredis, node-pty, child_process). Built with electron-vite. xterm.js + node-pty for live terminals.
+**GUI**: Electron + React 18 + Zustand + Tailwind CSS v4 + xterm.js + node-pty.
 
-## Task List
+## Notes
 
-`todo` file in repo root has open work items and brainstorming notes.
+- Treat the repo as DigitalOcean-first when updating docs or behavior.
+- Do not reintroduce SyncThing references; that experiment was removed.
+- `todo` in the repo root contains open work items and notes.
