@@ -1,205 +1,181 @@
 # Thopter Swarm
 
-CLI for managing Runloop.ai devboxes as autonomous Claude Code development environments.
+CLI for managing cloud thopters as autonomous Claude Code development environments.
 
-Each "thopter" is a cloud microVM pre-configured with Claude Code, git credentials, developer tools, and Claude Code hooks that report status to Redis. Create one, point it at a repo and a prompt, and let Claude work autonomously while you monitor it from your laptop.
+Today, the active backend is **DigitalOcean droplets**. The project started on RunLoop, and some names, config keys, and command semantics still reflect that history for compatibility while the codebase is being cleaned up. Longer term, this likely becomes a small **multi-provider** layer rather than a DigitalOcean-only tool.
 
-This is just an internal dev tool we use at [Telepath](https://telepath.computer), but we've made it open as a conversation starter, for feedback, and contributions. Message josh@telepath.computer to chat about it.
+Each thopter is a remote Linux machine pre-configured with Claude Code, Codex, git credentials, developer tools, and Claude Code hooks. Those hooks collect status and message activity, push it into Redis for dashboards/transcript views, and can fan out notifications through `ntfy.sh`. Create one, point it at a repo and prompt, and let it work while you monitor or interrupt it from your laptop.
+
+This is an internal Telepath tool published mainly as a reference implementation and conversation starter. If someone else finds it useful, the README should at least describe the real current state.
+
+## Current State
+
+- Active provider: `digitalocean` (`thopter provider`)
+- Runtime model: DigitalOcean droplets accessed over normal SSH
+- Status/monitoring: Redis-backed heartbeats, transcript tailing, status line reporting, and hook-driven message collection
+- Compatibility: some RunLoop-era names remain in code and config, including `runloopApiKey`
+- Direction: provider abstraction exists in embryo; multi-provider support is plausible but not finished
 
 ## Rationale
 
-We think the optimal way to run Claude Code (or any coding agent) is with:
-- yolo mode
-- push notifications (for when it's done or needs input)
-- multiple instances in parallel
-- remote/cloud machines (for detachable, long-running sessions attachable any device, and to not dog down your laptop's resources)
-- full shell access
-- "golden" bootstrap images that are ready to get to work (pre-authenticated, repos checked out, deps installed, configured how you like it)
-- connected to your git repos (to interact with issues, pull/create branches, make PRs, etc)
-- safely (e.g. a rogue agent can't do catastrophic damage)
-- frictonless devex (launching and managing must be hesistation-free)
-- Anthropic's max plan for cost savings
-- mobile access and notifs for launching and monitoring workers (not implemented here yet, on the TODO list)
+The target developer experience is:
 
-This is Telepath's attempt to get this developer experience by wrapping a capable VM sandbox provider with a management and monitoring layer built for day to day developer claude code use.
+- long-running remote agents instead of tying up your laptop
+- multiple workers in parallel
+- detachable sessions you can reconnect to from anywhere
+- full shell access
+- golden machine snapshots that are ready to work
+- git/GitHub integration
+- status visibility, transcript tailing, and push notifications
+- hook-driven dashboards and notifications rather than blind SSH-only sessions
+- enough safety rails and conventions to use this day to day
+
+Thopter Swarm is the thin management layer around that workflow, not the sandbox product itself.
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- A [Runloop.ai](https://runloop.ai) account and API key
-- A public Redis instance with a password-protected access URL for status monitoring and tailing activity on thopters, like [Upstash](https://upstash.com)
-- The runloop CLI: `npm install -g @runloop/rl-cli`
-- Iterm2 is the recommended terminal app for the best experience with detachable tmux sessions on thopters (via tmux control mode)
-- [ntfy.sh](https://ntfy.sh/) account and mac os desktop app so thopters can notify you from CC hooks. The desktop app provides the most reliable notifications (there's an iOS/android app too)
-- A github user with access to your repo(s) and a fine-grained PAT that allows issues read/write and content read/write. It's highly recommended to lock down your important branches with rulesets so that this user cannot modify them at all (only submit PRs to them.)
+- A DigitalOcean account
+- `doctl` installed and authenticated
+- `~/.ssh/id_rsa` and `~/.ssh/id_rsa.pub` on your machine
+- A Redis instance reachable from both your laptop and droplets, such as Upstash
+- Optional but recommended: an `ntfy.sh` topic for push notifications
+- A GitHub user/token with access to the repos your thopters will clone and push from
+- iTerm2 if you want the nicest `thopter attach` tmux experience
 
-### Install
+Install `doctl` and authenticate:
+
+```bash
+brew install doctl
+doctl auth init --context thopters
+doctl auth switch --context thopters
+```
+
+Then install Thopter Swarm:
 
 ```bash
 git clone <this-repo>
 cd thopter-swarm
 npm install
-npm run build   # not strictly necessary, but does a typescript validation
-npm link        # installs the 'thopter' command globally
+npm run build
+npm link
 ```
 
-### First-time Setup
-
-**Telepath team:** see our "~/.thopter.json starter" in our 1password vault, put that in your homedir that first and then you can run setup but with our preconfigured values.
+### First-Time Setup
 
 ```bash
 thopter setup
 ```
 
-This walks you through configuring critical environment variables for:
-1. Runloop API key
-2. Redis URL
-3. GitHub token
-4. ntfy.sh push notifications (optional but highly recommended) *
+In DigitalOcean mode, setup currently does this:
 
-\* For push notifications: before setup, go to [ntfy.sh](https://ntfy.sh/), sign-up for a free account, click "Subscribe to topic," click "Generate name," note the topic name provided, and then enter that topic name during Thopterswarm setup process.   
+1. Verifies `doctl` is authenticated
+2. Verifies `~/.ssh/id_rsa(.pub)` exists
+3. Ensures your local RSA public key is registered with DigitalOcean
+4. Prompts for Redis and devbox environment variables
+5. Optionally configures `ntfy.sh`
 
-All config is saved to `~/.thopter.json`.
+All local config lives in `~/.thopter.json`.
 
-### Your First Thopter
+### Create a Golden Thopter
 
 ```bash
-# Create a fresh devbox (installs Claude, Codex, Neovim, tmux, etc.) with a random name like adventurous-quesadilla
 thopter create --fresh
-
-# SSH in, look around, authenticate Claude, set things up
 thopter ssh adventurous-quesadilla
+```
 
-# Once you're happy, snapshot it as your golden image
+Authenticate Claude/Codex, clone the repos you use a lot, install whatever tools you want in your baseline, then snapshot it:
+
+```bash
 thopter snapshot create adventurous-quesadilla josh-golden
-# set this image as default for new thopters (just edits ~/.thopter.json)
 thopter snapshot default josh-golden
+```
 
-# Now all future creates use your golden snapshot (fast boot, ready to go)
+Now future creates can restore from that snapshot:
+
+```bash
 thopter create worker-1
 thopter create worker-2
 ```
 
 ### Dispatch Work
 
-Once you have a golden snapshot, you can dispatch Claude to work on tasks with a single command:
-
 ```bash
-thopter run --repo owner/repo "fix the login bug described in issue #42 and submit a PR"
+thopter run --repo owner/repo "fix the login bug described in issue #42 and open a PR"
 ```
 
-This creates a thopter, clones the repo, and launches Claude with your prompt in a tmux session. Set up predefined repos with `thopter repos add` to get a numbered chooser when running without `--repo`. You can then:
+That creates a thopter, clones the repo, and launches Claude in a tmux session. From there:
 
 ```bash
-thopter status              # see all your thopters and what they're doing
-thopter tail worker-1 -f    # follow Claude's transcript in real time
-thopter tell worker-1 "also fix the tests"  # send a follow-up message
-thopter attach worker-1     # attach to tmux (iTerm2 -CC mode)
-thopter ssh worker-1        # SSH in to poke around
+thopter status
+thopter tail worker-1 -f
+thopter tell worker-1 "also fix the tests"
+thopter attach worker-1
+thopter ssh worker-1
 ```
 
-**Highly recommended: use iterm2 for your terminal to enable a nice tmux experience for detachable thopter sessions.** `thopter attach` expects that. you can also just use `thopter ssh` and your own terminal, your own terminal multiplexer, or not, as you like. It's just a runloop-managed linux VM, we're just adding devex conveniences over that.
+## DigitalOcean Notes
 
-### Day-to-day Workflow
+The DigitalOcean migration is functional, but it is not feature-identical with RunLoop.
 
-```bash
-thopter status                # overview of all thopters
-thopter status my-thopter     # detailed status + logs for one
-thopter tail my-thopter -f    # follow Claude's transcript in real time
-thopter tell my-thopter "also fix the tests"      # send a follow-up
-thopter tell my-thopter -i "stop, work on X now"  # interrupt and redirect
+- `create`, `run`, `status`, `tail`, `tell`, `ssh`, `exec`, `destroy`, and snapshots work in DigitalOcean mode
+- `suspend`, `resume`, and `keepalive` remain in the CLI for compatibility, but DigitalOcean mode currently rejects them explicitly
+- `sync` works, but SyncThing auto-pairing during `thopter create` is not implemented in DigitalOcean mode yet; use `thopter sync pair <name>`
+- some help text, package metadata, and config names still say "Runloop" because the cleanup is incomplete
 
-thopter suspend my-thopter    # pause (preserves disk, stops billing)
-thopter resume my-thopter     # wake up later
-thopter keepalive my-thopter  # reset 12 hour auto-suspend countdown timer
-
-thopter destroy my-thopter    # done for good
-```
-
-### File Sync (SyncThing)
-
-Sync a folder in real-time between your laptop and all your devboxes. Agents write files, they appear on your machine instantly. You edit a file, the agent sees it immediately. Uses [SyncThing](https://syncthing.net) — peer-to-peer, encrypted, no cloud accounts.
-
-**How it works:** Your laptop is the hub. Each devbox syncs with your laptop. If your laptop is offline, agents keep working — changes sync when you reconnect. No port forwarding needed; SyncThing handles NAT traversal automatically.
-
-**Setup (one-time, on your laptop):**
-
-```bash
-# 1. Install SyncThing
-brew install syncthing          # macOS
-# or: sudo apt install syncthing  # Linux
-
-# 2. Start it (runs on login after this)
-brew services start syncthing   # macOS
-# or: sudo systemctl enable --now syncthing@$USER  # Linux
-
-# 3. Run setup (creates folder, registers with SyncThing, saves config)
-thopter sync setup
-```
-
-That's it. From now on, `thopter create` automatically installs SyncThing on each new devbox and pairs it with your laptop. The sync folder can be anything — a git repo, a plain directory, whatever you want.
-
-```bash
-# Pair an existing devbox manually
-thopter sync pair my-thopter
-
-# Skip sync on create
-thopter create my-thopter --no-sync
-
-# Check what's configured
-thopter sync show
-```
-
-**For multiple developers:** Each person runs `thopter sync setup` with their own folder name and paths. The config lives in `~/.thopter.json` — per-developer, no conflicts.
-
-See [docs/syncthing-artifact-sync.md](docs/syncthing-artifact-sync.md) for the full design doc.
-
-## CLI Reference
-
-The CLI has commands for dispatching work (`run`, `tell`), managing lifecycle (`create`, `suspend`, `resume`, `keepalive`, `destroy`), connecting (`ssh`, `attach`, `exec`), monitoring (`status`, `tail`), snapshots, env vars, and configuration.
-
-See [docs/cli-reference.md](docs/cli-reference.md) for the full command reference.
+That mismatch is intentional for now: preserve familiar CLI surface first, then make the provider model cleaner.
 
 ## Configuration
 
-All config lives in `~/.thopter.json`, managed via `thopter setup`, `thopter config`, and `thopter env`. The key env vars are `GH_TOKEN` (GitHub access) and `THOPTER_REDIS_URL` (status monitoring). Optional: `THOPTER_NTFY_CHANNEL` for push notifications via ntfy.sh.
+Important config and env values:
 
-See [docs/configuration.md](docs/configuration.md) for detailed setup (GitHub tokens, notifications, custom CLAUDE.md, file uploads) and [thopter-json-reference.md](thopter-json-reference.md) for the complete config key reference.
+- `THOPTER_REDIS_URL`: required for status monitoring and transcript tailing
+- `GH_TOKEN`: required for repo access and `gh` inside thopters
+- `THOPTER_NTFY_CHANNEL`: optional push notifications
+- `defaultSnapshotName`: default snapshot used by `thopter create`
+- `runloopApiKey`: legacy compatibility field; not used by the active DigitalOcean provider
+
+See [docs/configuration.md](docs/configuration.md) and [thopter-json-reference.md](thopter-json-reference.md).
 
 ## Architecture
 
-TypeScript CLI built on Commander.js, using the Runloop.ai SDK for devbox lifecycle and Upstash Redis for monitoring. Devboxes are KVM microVMs provisioned with Claude Code, developer tools, and hooks that report status back to Redis.
+The CLI is TypeScript + Commander.js. The active provider is currently hard-coded in [src/provider.ts](src/provider.ts) to `digitalocean`. Droplets are provisioned, bootstrapped over SSH, and instrumented with scripts/hooks that push status and transcripts into Redis.
 
-See [docs/architecture.md](docs/architecture.md) for details on the stack, how provisioning works, devbox contents, and project structure.
+See [docs/architecture.md](docs/architecture.md) for the current architecture doc and [docs/digitalocean-migration-proposal.md](docs/digitalocean-migration-proposal.md) for the migration plan/history.
 
-## More
+## CLI Reference
 
-- [Clipboard setup](docs/clipboard.md) (Neovim + tmux + iTerm2 OSC 52)
+See [docs/cli-reference.md](docs/cli-reference.md) for command details.
+
+## More Docs
+
+- [DigitalOcean setup notes](do-setup.md)
+- [RunLoop mode notes](docs/runloop.md)
+- [Clipboard setup](docs/clipboard.md)
 - [SyncThing file sync design](docs/syncthing-artifact-sync.md)
 - [Design docs and ideas](docs/)
 
 ## Electron GUI (Experimental)
 
-A desktop GUI for managing thopters, built with Electron + React. Dashboard view, live transcript streaming, tmux screen captures, and interactive SSH terminals (xterm.js + node-pty).
+There is also an experimental Electron app for managing thopters. It is still rough, but it is more than a toy wrapper around the CLI.
 
-**This is highly experimental.** It works for day-to-day use but expect rough edges.
+The GUI gives you:
 
-- **Dashboard**: live overview of all thopters with status, status line, and action buttons
-- **Transcript view**: streaming Claude conversation from Redis
-- **Screen view**: tmux screen capture with send-message form
-- **Live terminal**: interactive SSH session via xterm.js (persists across tab switches)
-- **Run modal**: create new thopters with repo/branch/prompt selection
-- **Notifications**: ntfy.sh integration with sidebar
+- a dashboard view of running thopters and their current status
+- task context on each thopter, including notes/metadata attached to the worker
+- per-thopter tabs so each worker can stay open in its own view
+- an SSH terminal per thopter inside the app
+- integrated notification handling so activity can be tracked from the desktop UI
 
-Note: `node-pty` requires native compilation, so requires `build-essential` on Linux, Xcode Command Line Tools on macOS
+Under the hood, it shells out to the CLI for mutations and reads Redis directly for live state.
 
 ```bash
 cd electron-gui
 npm install
-npm run rebuild      # rebuild node-pty for Electron's Node ABI
-npm run dev          # launch in dev mode (connects to real Redis)
+npm run rebuild
+npm run dev
 ```
 
-The GUI shells out to the `thopter` CLI for mutations (run, destroy, suspend, etc.) and reads directly from Redis for live data (status, transcripts, screen dumps). Make sure the CLI is installed and configured first (`thopter setup`).
+It should still be treated as internal tooling rather than a polished product, but if you want a dashboard-oriented workflow instead of living in the CLI, this is the interface for that.

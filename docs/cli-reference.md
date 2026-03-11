@@ -1,6 +1,14 @@
 # CLI Reference
 
-Full command reference for the `thopter` CLI. See the [README](../README.md) for a quick start guide.
+Reference for the `thopter` CLI. The active provider is currently `digitalocean` (`thopter provider`), but some command descriptions still carry RunLoop-era wording.
+
+See the [README](../README.md) for the practical workflow.
+
+## Provider
+
+| Command | Description |
+|---------|-------------|
+| `thopter provider` | Print the active infrastructure provider |
 
 ## Dispatching Work
 
@@ -9,7 +17,7 @@ Full command reference for the `thopter` CLI. See the [README](../README.md) for
 | `thopter run "<prompt>"` | Create a thopter and run Claude with a prompt |
 | `thopter run --repo owner/repo "<prompt>"` | Clone a repo first, then run Claude |
 | `thopter run --branch feature "<prompt>"` | Specify a branch to work on |
-| `thopter run --name my-worker "<prompt>"` | Name the thopter (auto-generated otherwise) |
+| `thopter run --name my-worker "<prompt>"` | Name the thopter explicitly |
 | `thopter tell <name> "<message>"` | Send a message to a running Claude session |
 | `thopter tell <name> -i "<message>"` | Interrupt Claude first, then send the message |
 
@@ -17,76 +25,98 @@ Full command reference for the `thopter` CLI. See the [README](../README.md) for
 
 | Command | Description |
 |---------|-------------|
-| `thopter create [name]` | Create a devbox (auto-names if omitted) |
-| `thopter create --snapshot <id>` | Create from a specific snapshot |
-| `thopter create --fresh` | Create without using default snapshot |
+| `thopter create [name]` | Create a thopter |
+| `thopter create --snapshot <name-or-id>` | Restore from a specific snapshot |
+| `thopter create --fresh` | Ignore the default snapshot and create fresh |
 | `thopter create -a` | Create and immediately SSH in |
-| `thopter create --keep-alive <min>` | Set keep-alive time in minutes (default: 720) |
-| `thopter suspend <name>` | Suspend (preserves disk, can resume later) |
-| `thopter resume <name>` | Resume a suspended devbox |
-| `thopter keepalive <name>` | Reset the keep-alive timer |
-| `thopter destroy <name>` | Permanently shut down a devbox |
+| `thopter create --no-sync` | Skip SyncThing setup hooks |
+| `thopter destroy <name>` | Permanently delete a thopter |
+| `thopter snapshot list` | List snapshots |
+| `thopter snapshot create <thopter> [name]` | Snapshot a thopter |
+| `thopter snapshot replace <thopter> <name>` | Replace an existing snapshot |
+| `thopter snapshot destroy <name>` | Delete a snapshot |
+| `thopter snapshot default [name]` | View or set the default snapshot |
+| `thopter snapshot default --clear` | Clear the default snapshot |
+
+### Lifecycle Caveats In DigitalOcean Mode
+
+These commands are present for compatibility, but are not supported by the active provider:
+
+| Command | Current behavior |
+|---------|------------------|
+| `thopter suspend <name>` | Fails with an explicit unsupported message |
+| `thopter resume <name>` | Fails with an explicit unsupported message |
+| `thopter keepalive <name>` | Fails with an explicit unsupported message |
 
 ## Connecting
 
 | Command | Description |
 |---------|-------------|
-| `thopter ssh <name>` | SSH into a devbox (via `rli`) |
+| `thopter ssh <name>` | SSH into a thopter |
 | `thopter attach <name>` | Attach to tmux in iTerm2 control mode (`-CC`) |
-| `thopter exec <name> -- <cmd...>` | Run a command and print output |
+| `thopter exec <name> -- <cmd...>` | Run a one-off command remotely |
 
 ## Monitoring
 
 | Command | Description |
 |---------|-------------|
-| `thopter status` | Unified view of all thopters (Runloop + Redis) |
-| `thopter status <name>` | Detailed status + logs for one thopter |
-| `thopter tail <name>` | Show last 20 transcript entries |
+| `thopter status` | Unified provider + Redis view of all thopters |
+| `thopter status <name>` | Detailed status for one thopter |
+| `thopter tail <name>` | Show recent transcript entries |
 | `thopter tail <name> -f` | Follow transcript in real time |
-| `thopter tail <name> -n 50` | Show last 50 entries |
+| `thopter tail <name> -n 50` | Show more transcript entries |
+| `thopter check <name>` | Check whether tmux and Claude are running |
 
-`thopter status` (aliased as `thopter list` / `thopter ls`) shows a combined view with devbox state from Runloop and agent state from Redis: status line, whether Claude is running, last heartbeat time.
+`thopter status` combines provider-side machine state with Redis-side agent state such as the status line, heartbeat freshness, and recent activity.
 
-`thopter tail` streams Claude's transcript from Redis, showing a condensed view of each conversation turn (user messages, assistant responses, tool calls). Use `-f` to follow in real time — like `tail -f` for your thopter's Claude session.
+`thopter tail` streams the Claude transcript from Redis.
 
-`thopter tell` sends a message to a running Claude session via tmux without needing to attach. Use `-i` / `--interrupt` to send Escape first (interrupting Claude's current work) before injecting the message. After sending, it automatically tails the transcript so you can see Claude's response. Ctrl-C to stop tailing.
-
-## Snapshots
-
-| Command | Description |
-|---------|-------------|
-| `thopter snapshot list` | List all snapshots |
-| `thopter snapshot create <devbox> [name]` | Snapshot a devbox |
-| `thopter snapshot replace <devbox> <name>` | Replace an existing snapshot |
-| `thopter snapshot destroy <name>` | Delete a snapshot |
-| `thopter snapshot default [name]` | View or set default snapshot |
-| `thopter snapshot default --clear` | Clear default snapshot |
-
-## Predefined Repos
+## Convenience Commands
 
 | Command | Description |
 |---------|-------------|
-| `thopter repos list` | List predefined repos |
-| `thopter repos add` | Add a predefined repo (interactive) |
-| `thopter repos remove` | Remove a predefined repo (interactive) |
-| `thopter repos edit` | Edit a predefined repo (interactive) |
+| `thopter use <name>` | Set the default thopter |
+| `thopter use` | Show the default thopter |
+| `thopter use --clear` | Clear the default thopter |
 
-Predefined repos appear as a numbered chooser when running `thopter run` without `--repo`. Each entry can pin a branch or leave it unpinned (prompts at run time, defaults to `main`). Multiple entries for the same repo with different branches are supported.
+When a command accepts a thopter name, `.` can be used to refer to the default thopter.
+
+## Repositories
+
+| Command | Description |
+|---------|-------------|
+| `thopter repos list` | List predefined repositories |
+| `thopter repos add` | Add a predefined repository |
+| `thopter repos remove` | Remove a predefined repository |
+| `thopter repos edit` | Edit a predefined repository |
+
+These repos appear as a chooser when `thopter run` is used without `--repo`.
 
 ## Environment Variables
 
 | Command | Description |
 |---------|-------------|
-| `thopter env list` | List configured env vars (values masked) |
-| `thopter env set <KEY> [VALUE]` | Set a devbox env var (prompts if value omitted) |
-| `thopter env delete <KEY>` | Remove a devbox env var |
+| `thopter env list` | List configured env vars (masked) |
+| `thopter env set <KEY> [VALUE]` | Set a devbox env var |
+| `thopter env delete <KEY>` | Delete a devbox env var |
 
-Env vars are stored in `~/.thopter.json` and written to `~/.thopter-env` inside each devbox at create time.
+Env vars are stored locally in `~/.thopter.json` and written into new thopters as `~/.thopter-env`.
 
 ## Configuration
 
 | Command | Description |
 |---------|-------------|
-| `thopter setup` | Interactive first-time setup wizard |
-| `thopter config get [key]` | View config (omit key to show all) |
+| `thopter setup` | Interactive first-time setup |
+| `thopter config get [key]` | Show config |
 | `thopter config set <key> <value>` | Set a config value |
+
+## SyncThing
+
+| Command | Description |
+|---------|-------------|
+| `thopter sync setup` | Configure local SyncThing integration |
+| `thopter sync show` | Show current SyncThing config |
+| `thopter sync pair <name>` | Pair a thopter with your local SyncThing |
+| `thopter sync unpair <name>` | Remove a thopter from local SyncThing |
+
+In DigitalOcean mode, `thopter sync pair` is the reliable way to connect a thopter. Auto-pair on `create` is not implemented yet.

@@ -15,7 +15,7 @@ const program = new Command();
 
 program
   .name("thopter")
-  .description("Manage Runloop devboxes for Claude Code development.")
+  .description("Manage remote thopters for Claude Code development (DigitalOcean-first, RunLoop-compatible).")
   .addHelpText(
     "after",
     `
@@ -26,12 +26,12 @@ lifecycle:
 
 examples:
   thopter setup                          First-time auth & env var config
-  thopter create dev                     Create a devbox
-  thopter create --snapshot golden        Create from a snapshot
-  thopter ssh dev                        SSH into the devbox
+  thopter create dev                     Create a thopter
+  thopter create --snapshot golden       Create from a snapshot
+  thopter ssh dev                        SSH into the thopter
   thopter attach dev                     Attach to tmux (iTerm2 -CC mode)
   thopter exec dev -- uname -a           Run a one-off command
-  thopter snapshot create dev golden      Snapshot a devbox
+  thopter snapshot create dev golden     Snapshot a thopter
   thopter snapshot list                  List snapshots
   thopter snapshot destroy golden         Delete a snapshot
   thopter snapshot default golden         Set default snapshot
@@ -57,10 +57,10 @@ examples:
   thopter repos list                     List predefined repos
   thopter repos add                      Add a predefined repo
   thopter repos remove                   Remove a predefined repo
-  thopter keepalive dev                   Reset keep-alive timer for a devbox
-  thopter suspend dev                    Suspend a devbox
-  thopter resume dev                     Resume a suspended devbox
-  thopter destroy dev                    Shut down a devbox`,
+  thopter keepalive dev                  Reset keep-alive timer (RunLoop mode)
+  thopter suspend dev                    Suspend a thopter (RunLoop mode)
+  thopter resume dev                     Resume a suspended thopter (RunLoop mode)
+  thopter destroy dev                    Shut down a thopter`,
   );
 
 program
@@ -79,7 +79,7 @@ program
 // --- setup ---
 program
   .command("setup")
-  .description("Interactive first-time setup (API keys, env vars, notifications)")
+  .description("Interactive first-time setup for the active provider plus env vars and notifications")
   .action(async () => {
     const { runSetup } = await import("./setup.js");
     await runSetup();
@@ -88,8 +88,8 @@ program
 // --- create ---
 program
   .command("create")
-  .description("Create a new devbox")
-  .argument("[name]", "Name for the devbox (auto-generated if omitted)")
+  .description("Create a new thopter")
+  .argument("[name]", "Name for the thopter (auto-generated if omitted)")
   .option("--snapshot <id>", "Snapshot ID or label to restore from")
   .option("--fresh", "Create a fresh devbox, ignoring the default snapshot")
   .option("--keep-alive <minutes>", "Keep-alive time in minutes before shutdown (default: 1440)", parseInt)
@@ -116,7 +116,7 @@ program
   .command("status")
   .alias("list")
   .alias("ls")
-  .description("Show thopter status (unified Runloop + Redis view)")
+  .description("Show thopter status (provider + Redis view)")
   .argument("[name]", "Thopter name (omit for overview of all)")
   .option("-f, --follow [interval]", "Re-render every N seconds (default: 10)")
   .option("-w, --wide", "Force wide (single-line) layout")
@@ -290,8 +290,8 @@ program
   .alias("rm")
   .alias("kill")
   .alias("shutdown")
-  .description("Shut down a devbox")
-  .argument("<devbox>", "Devbox name or ID")
+  .description("Shut down a thopter")
+  .argument("<devbox>", "Thopter name or ID")
   .action(async (devbox: string) => {
     const { destroyDevbox } = await import("./devbox.js");
     await destroyDevbox(resolveThopterName(devbox));
@@ -300,8 +300,8 @@ program
 // --- suspend ---
 program
   .command("suspend")
-  .description("Suspend a devbox (preserves disk, can resume later)")
-  .argument("<devbox>", "Devbox name or ID")
+  .description("Suspend a thopter (RunLoop mode only)")
+  .argument("<devbox>", "Thopter name or ID")
   .action(async (devbox: string) => {
     const { suspendDevbox } = await import("./devbox.js");
     await suspendDevbox(resolveThopterName(devbox));
@@ -310,8 +310,8 @@ program
 // --- resume ---
 program
   .command("resume")
-  .description("Resume a suspended devbox")
-  .argument("<devbox>", "Devbox name or ID")
+  .description("Resume a suspended thopter (RunLoop mode only)")
+  .argument("<devbox>", "Thopter name or ID")
   .action(async (devbox: string) => {
     const { resumeDevbox } = await import("./devbox.js");
     await resumeDevbox(resolveThopterName(devbox));
@@ -320,8 +320,8 @@ program
 // --- keepalive ---
 program
   .command("keepalive")
-  .description("Reset a devbox's keep-alive timer")
-  .argument("<devbox>", "Devbox name or ID")
+  .description("Reset a thopter's keep-alive timer (RunLoop mode only)")
+  .argument("<devbox>", "Thopter name or ID")
   .action(async (devbox: string) => {
     const { keepaliveDevbox } = await import("./devbox.js");
     await keepaliveDevbox(resolveThopterName(devbox));
@@ -330,8 +330,8 @@ program
 // --- ssh ---
 program
   .command("ssh")
-  .description("SSH into a devbox (via rli)")
-  .argument("<devbox>", "Devbox name or ID")
+  .description("SSH into a thopter")
+  .argument("<devbox>", "Thopter name or ID")
   .option("--spawn-json", "Print JSON spawn info instead of connecting")
   .action(async (devbox: string, opts: { spawnJson?: boolean }) => {
     const { sshDevbox, getSSHSpawn } = await import("./devbox.js");
@@ -346,8 +346,8 @@ program
 // --- attach ---
 program
   .command("attach")
-  .description("SSH into a devbox and attach to tmux in control mode (-CC)")
-  .argument("<devbox>", "Devbox name or ID")
+  .description("SSH into a thopter and attach to tmux in control mode (-CC)")
+  .argument("<devbox>", "Thopter name or ID")
   .action(async (devbox: string) => {
     const { attachDevbox } = await import("./devbox.js");
     await attachDevbox(resolveThopterName(devbox));
@@ -356,8 +356,8 @@ program
 // --- exec ---
 program
   .command("exec")
-  .description("Run a command in a devbox")
-  .argument("<devbox>", "Devbox name or ID")
+  .description("Run a command in a thopter")
+  .argument("<devbox>", "Thopter name or ID")
   .argument("<command...>", "Command and arguments")
   .action(async (devbox: string, command: string[]) => {
     const { execDevbox } = await import("./devbox.js");
@@ -380,8 +380,8 @@ snapshotCmd
 
 snapshotCmd
   .command("create")
-  .description("Take a disk snapshot of a devbox")
-  .argument("<devbox>", "Devbox name or ID")
+  .description("Take a disk snapshot of a thopter")
+  .argument("<devbox>", "Thopter name or ID")
   .argument("[name]", "Name/label for the snapshot")
   .action(async (devbox: string, name?: string) => {
     const { snapshotDevbox } = await import("./devbox.js");
@@ -390,8 +390,8 @@ snapshotCmd
 
 snapshotCmd
   .command("replace")
-  .description("Replace an existing snapshot with a fresh one from a devbox")
-  .argument("<devbox>", "Devbox name or ID")
+  .description("Replace an existing snapshot with a fresh one from a thopter")
+  .argument("<devbox>", "Thopter name or ID")
   .argument("<name>", "Name of the snapshot to replace")
   .action(async (devbox: string, name: string) => {
     const { replaceSnapshot } = await import("./devbox.js");
@@ -481,7 +481,7 @@ configCmd
         break;
       default:
         console.error(`Unknown config key: ${key}`);
-        console.error("Available keys: runloopApiKey, defaultSnapshotName, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
+      console.error("Available keys: runloopApiKey (RunLoop mode), defaultSnapshotName, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
         console.error("For env vars (THOPTER_REDIS_URL, THOPTER_NTFY_CHANNEL, etc.): thopter env set <KEY> <VALUE>");
         process.exit(1);
     }
@@ -494,7 +494,7 @@ configCmd
   .action(async (key?: string) => {
     const { getRunloopApiKey, getDefaultSnapshot, getDefaultRepo, getDefaultBranch, getStopNotifications, getStopNotificationQuietPeriod, getEnvVars, getDefaultThopter, getRepos, getSyncthingConfig } = await import("./config.js");
     if (!key) {
-      console.log(`runloopApiKey:                  ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
+      console.log(`runloopApiKey (RunLoop only):   ${getRunloopApiKey() ? "(set)" : "(not set)"}`);
       console.log(`defaultSnapshotName:             ${getDefaultSnapshot() ?? "(not set)"}`);
       console.log(`defaultRepo:                    ${getDefaultRepo() ?? "(not set)"}`);
       console.log(`defaultBranch:                  ${getDefaultBranch() ?? "(not set)"}`);
@@ -535,7 +535,7 @@ configCmd
           break;
         default:
           console.error(`Unknown config key: ${key}`);
-          console.error("Available keys: runloopApiKey, defaultSnapshotName, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
+          console.error("Available keys: runloopApiKey (RunLoop mode), defaultSnapshotName, defaultRepo, defaultBranch, stopNotifications, stopNotificationQuietPeriod, defaultThopter");
           console.error("For env vars: thopter env list");
           process.exit(1);
       }

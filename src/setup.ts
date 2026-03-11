@@ -66,6 +66,8 @@ export async function runSetup(): Promise<void> {
   console.log("Thopter Swarm Setup");
   console.log("=".repeat(60));
   console.log();
+  console.log(`Active provider: ${isDigitalOceanProvider() ? "digitalocean" : "runloop"}`);
+  console.log();
 
   // --- Step 1: Provider auth ---
   if (isDigitalOceanProvider()) {
@@ -157,7 +159,7 @@ export async function runSetup(): Promise<void> {
   // --- Step 3: Devbox environment variables ---
   console.log("Step 3: Devbox Environment Variables");
   console.log("  These are injected into every new devbox via ~/.thopter-env.");
-  console.log("  Stored locally in ~/.thopter.json (not in the Runloop platform).");
+  console.log("  Stored locally in ~/.thopter.json.");
   const currentEnv = getEnvVars();
   const envKeys = Object.keys(currentEnv);
   if (envKeys.length > 0) {
@@ -249,7 +251,7 @@ export async function runSetup(): Promise<void> {
   console.log();
   console.log("Next steps:");
   console.log("");
-  console.log("  1. Create a devbox:        thopter create jw/hello --fresh");
+  console.log("  1. Create a thopter:       thopter create jw/hello --fresh");
   console.log("     (note that thopter names are up to you or can be left blank and");
   console.log("     a random one is assigned. But using $initials/$purpose is good");
   console.log("     convention when working in a team)");
@@ -272,9 +274,15 @@ export async function runSetup(): Promise<void> {
   console.log("Manage env vars later with: thopter env {list,set,delete}");
   console.log("");
   console.log("A couple things to keep in mind:");
-  console.log("  - Thopters shut down after 12 hours. Reset the timer with:");
-  console.log("    thopter keepalive <name> ");
-  console.log("    A suspended thopter can be resumed with: thopter resume <name>");
+  if (isDigitalOceanProvider()) {
+    console.log("  - In DigitalOcean mode, destroy is the primary lifecycle exit.");
+    console.log("    Suspend/resume/keepalive are still in the CLI for legacy compatibility,");
+    console.log("    but are not currently supported in this mode.");
+  } else {
+    console.log("  - Thopters shut down after 12 hours. Reset the timer with:");
+    console.log("    thopter keepalive <name> ");
+    console.log("    A suspended thopter can be resumed with: thopter resume <name>");
+  }
   console.log("  - Thopter github credentials can only modify branches starting with");
   console.log("    'thopter/' and can create, but not merge, PRs to other branches.");
   console.log("");
