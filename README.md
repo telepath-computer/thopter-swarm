@@ -84,6 +84,7 @@ All local config lives in `~/.thopter.json`.
 ```bash
 thopter create --fresh
 thopter ssh adventurous-quesadilla
+thopter ssh adventurous-quesadilla -L 3000:localhost:3000
 ```
 
 Authenticate Claude/Codex, clone the repos you use a lot, install whatever tools you want in your baseline, then snapshot it:

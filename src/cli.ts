@@ -29,6 +29,7 @@ examples:
   thopter create dev                     Create a thopter
   thopter create --snapshot golden       Create from a snapshot
   thopter ssh dev                        SSH into the thopter
+  thopter ssh dev -L 3000:localhost:3000 Forward a local port over SSH
   thopter attach dev                     Attach to tmux (iTerm2 -CC mode)
   thopter exec dev -- uname -a           Run a one-off command
   thopter snapshot create dev golden     Snapshot a thopter
@@ -326,15 +327,37 @@ program
   .command("ssh")
   .description("SSH into a thopter")
   .argument("<devbox>", "Thopter name or ID")
+  .option("-L, --forward-local <spec>", "Add a local port forward (repeatable)", collectValues, [])
+  .option("-R, --forward-remote <spec>", "Add a remote port forward (repeatable)", collectValues, [])
+  .option("-D, --forward-dynamic <spec>", "Add a dynamic/SOCKS port forward (repeatable)", collectValues, [])
+  .option("-N, --no-command", "Set up port forwarding without opening a shell")
   .option("--spawn-json", "Print JSON spawn info instead of connecting")
-  .action(async (devbox: string, opts: { spawnJson?: boolean }) => {
+  .action(async (
+    devbox: string,
+    opts: {
+      forwardLocal?: string[];
+      forwardRemote?: string[];
+      forwardDynamic?: string[];
+      noCommand?: boolean;
+      spawnJson?: boolean;
+    },
+  ) => {
     const { sshDevbox, getSSHSpawn } = await import("./devbox.js");
+    const sshOptions = {
+      localForwards: opts.forwardLocal ?? [],
+      remoteForwards: opts.forwardRemote ?? [],
+      dynamicForwards: opts.forwardDynamic ?? [],
+      noCommand: opts.noCommand ?? false,
+    };
     if (opts.spawnJson) {
-      const spawn = await getSSHSpawn(resolveThopterName(devbox));
+      const spawn = await getSSHSpawn(resolveThopterName(devbox), {
+        ...sshOptions,
+        remoteCommand: sshOptions.noCommand ? undefined : "bash -l",
+      });
       process.stdout.write(JSON.stringify(spawn) + "\n");
       return;
     }
-    await sshDevbox(resolveThopterName(devbox));
+    await sshDevbox(resolveThopterName(devbox), sshOptions);
   });
 
 // --- attach ---
@@ -600,6 +623,11 @@ envCmd
     deleteEnvVar(key);
     console.log(`Deleted ${key}.`);
   });
+
+function collectValues(value: string, previous: string[]): string[] {
+  previous.push(value);
+  return previous;
+}
 
 // Parse and run
 program.parseAsync(process.argv).catch((err) => {

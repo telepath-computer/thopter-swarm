@@ -51,7 +51,7 @@ These commands are present for compatibility, but are not supported by the activ
 
 | Command | Description |
 |---------|-------------|
-| `thopter ssh <name>` | SSH into a thopter |
+| `thopter ssh <name>` | SSH into a thopter. Supports repeatable `-L`, `-R`, `-D`, and `-N` for port forwarding |
 | `thopter attach <name>` | Attach to tmux in iTerm2 control mode (`-CC`) |
 | `thopter exec <name> -- <cmd...>` | Run a one-off command remotely |
 

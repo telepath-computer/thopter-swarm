@@ -1776,57 +1776,35 @@ export async function keepaliveDevbox(nameOrId: string): Promise<void> {
   console.log("Done. Keep-alive timer reset.");
 }
 
-export async function sshDevbox(nameOrId: string): Promise<void> {
-  const { id } = await resolveDevbox(nameOrId);
-
-  if (isDigitalOceanProvider()) {
-    const ip = getDODropletPublicIPv4(id);
-    const child = spawn("ssh", [
-      "-o",
-      "StrictHostKeyChecking=no",
-      "-o",
-      "UserKnownHostsFile=/dev/null",
-      "-i",
-      getLocalRSAPrivateKeyPath(),
-      `user@${ip}`,
-    ], {
-      stdio: "inherit",
-    });
-    child.on("exit", (code) => process.exit(code ?? 0));
-    return;
-  }
-
-  console.log(`Connecting to ${id} via rli...`);
-  rliSsh(id);
+export interface SSHOptions {
+  localForwards?: string[];
+  remoteForwards?: string[];
+  dynamicForwards?: string[];
+  noCommand?: boolean;
+  remoteCommand?: string;
 }
 
-export async function getSSHSpawn(
-  nameOrId: string,
-  remoteCommand = "bash -l",
-): Promise<{ command: string; args: string[] }> {
-  const { id } = await resolveDevbox(nameOrId);
-
-  if (isDigitalOceanProvider()) {
-    const ip = getDODropletPublicIPv4(id);
-    return {
-      command: "ssh",
-      args: [
-        "-tt",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-o",
-        "ConnectTimeout=5",
-        "-i",
-        getLocalRSAPrivateKeyPath(),
-        `user@${ip}`,
-        remoteCommand,
-      ],
-    };
+function appendForwardArgs(args: string[], options: SSHOptions): void {
+  for (const spec of options.localForwards ?? []) {
+    args.push("-L", spec);
   }
+  for (const spec of options.remoteForwards ?? []) {
+    args.push("-R", spec);
+  }
+  for (const spec of options.dynamicForwards ?? []) {
+    args.push("-D", spec);
+  }
+  if (options.noCommand) {
+    args.push("-N");
+  }
+}
 
-  const configOutput = execSync(`rli devbox ssh --config-only ${id}`, {
+function getRunloopSSHConfig(devboxId: string): {
+  hostname: string;
+  identityFile: string;
+  proxyCommand: string;
+} {
+  const configOutput = execSync(`rli devbox ssh --config-only ${devboxId}`, {
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -1838,9 +1816,110 @@ export async function getSSHSpawn(
     throw new Error("Failed to parse SSH config from rli.");
   }
 
-  return {
-    command: "ssh",
-    args: [
+  return { hostname, identityFile, proxyCommand };
+}
+
+function buildSSHSpawnFromTarget(
+  target: string,
+  baseArgs: string[],
+  options: SSHOptions = {},
+): { command: string; args: string[] } {
+  const args = [...baseArgs];
+  appendForwardArgs(args, options);
+  args.push(target);
+  if (options.remoteCommand) {
+    args.push(options.remoteCommand);
+  }
+  return { command: "ssh", args };
+}
+
+export async function sshDevbox(nameOrId: string, options: SSHOptions = {}): Promise<void> {
+  const { id } = await resolveDevbox(nameOrId);
+
+  if (isDigitalOceanProvider()) {
+    const ip = getDODropletPublicIPv4(id);
+    const child = spawn(
+      "ssh",
+      buildSSHSpawnFromTarget(
+        `user@${ip}`,
+        [
+          "-o",
+          "StrictHostKeyChecking=no",
+          "-o",
+          "UserKnownHostsFile=/dev/null",
+          "-i",
+          getLocalRSAPrivateKeyPath(),
+        ],
+        options,
+      ).args,
+      {
+        stdio: "inherit",
+      },
+    );
+    child.on("exit", (code) => process.exit(code ?? 0));
+    return;
+  }
+
+  const hasForwarding =
+    (options.localForwards?.length ?? 0) > 0 ||
+    (options.remoteForwards?.length ?? 0) > 0 ||
+    (options.dynamicForwards?.length ?? 0) > 0 ||
+    options.noCommand === true;
+  if (hasForwarding) {
+    const { hostname, identityFile, proxyCommand } = getRunloopSSHConfig(id);
+    const child = spawn(
+      "ssh",
+      buildSSHSpawnFromTarget(
+        `user@${hostname}`,
+        [
+          "-o",
+          "StrictHostKeyChecking=no",
+          "-o",
+          `ProxyCommand=${proxyCommand}`,
+          "-i",
+          identityFile,
+        ],
+        options,
+      ).args,
+      { stdio: "inherit" },
+    );
+    child.on("exit", (code) => process.exit(code ?? 0));
+    return;
+  }
+
+  console.log(`Connecting to ${id} via rli...`);
+  rliSsh(id);
+}
+
+export async function getSSHSpawn(
+  nameOrId: string,
+  options: SSHOptions = {},
+): Promise<{ command: string; args: string[] }> {
+  const { id } = await resolveDevbox(nameOrId);
+
+  if (isDigitalOceanProvider()) {
+    const ip = getDODropletPublicIPv4(id);
+    return buildSSHSpawnFromTarget(
+      `user@${ip}`,
+      [
+        "-tt",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "ConnectTimeout=5",
+        "-i",
+        getLocalRSAPrivateKeyPath(),
+      ],
+      options,
+    );
+  }
+
+  const { hostname, identityFile, proxyCommand } = getRunloopSSHConfig(id);
+  return buildSSHSpawnFromTarget(
+    `user@${hostname}`,
+    [
       "-tt",
       "-o",
       "StrictHostKeyChecking=no",
@@ -1848,10 +1927,9 @@ export async function getSSHSpawn(
       `ProxyCommand=${proxyCommand}`,
       "-i",
       identityFile,
-      `user@${hostname}`,
-      remoteCommand,
     ],
-  };
+    options,
+  );
 }
 
 export async function attachDevbox(nameOrId: string): Promise<void> {
